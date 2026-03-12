@@ -1661,7 +1661,16 @@ function getAudioEnergy() {
 }
 
 function applyAudioSync() {
-    if (!audioSync || !audioLoaded || !audioPlaying) return;
+    if (!audioSync) return;
+
+    // Sync is ON but audio isn't ready/playing — zero out everything
+    if (!audioLoaded || !audioPlaying) {
+        paramValues[0] = 0;
+        paramValues[1] = 0;
+        paramValues[6] = 0;
+        syncUI();
+        return;
+    }
 
     const sens = paramValues[7] / 50;
     const base = audioBaseValues;
@@ -1702,6 +1711,9 @@ function applyAudioSync() {
         paramValues[6] = constrain(smoothOverall * (base[6] || 40) * sens + beat * 20 * sens, 0, 100);
         paramValues[1] = constrain(smoothMid * (base[1] || 30) * sens + beat * 15 * sens, 0, 100);
     }
+
+    // Hard cutoff: if quantity is below 2, snap to 0 for clean on/off
+    if (paramValues[0] < 2) paramValues[0] = 0;
 
     syncUI();
 }
