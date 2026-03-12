@@ -460,9 +460,38 @@
             transition: width 0.05s;
         }
 
+        /* Debug Panel */
+        #debug-panel {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid #333;
+            padding: 12px 16px;
+            z-index: 20;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #0f0;
+            line-height: 1.6;
+            min-width: 320px;
+            pointer-events: none;
+        }
+        #debug-panel .label { color: #888; }
+        #debug-panel .val { color: #0f0; }
+        #debug-panel .warn { color: #f80; }
+        #debug-panel .off { color: #f44; }
+        .debug-bar {
+            display: inline-block;
+            height: 8px;
+            background: #0f0;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
     </style>
 </head>
 <body>
+
+    <div id="debug-panel"></div>
 
     <div id="ui-container">
         <div class="header-section">
@@ -1182,6 +1211,49 @@ function draw() {
         }
     }
     if (!showCursor) noCursor(); else cursor();
+    renderDebug();
+}
+
+function renderDebug() {
+    let dp = document.getElementById('debug-panel');
+    if (!dp) return;
+
+    let sRate = audioContext ? audioContext.sampleRate : '—';
+    let bins = audioAnalyser ? audioAnalyser.frequencyBinCount : '—';
+    let nyq = audioContext ? (audioContext.sampleRate / 2) : 0;
+    let lowBin = nyq ? Math.floor(freqLow / nyq * bins) : '—';
+    let highBin = nyq ? Math.floor(freqHigh / nyq * bins) : '—';
+
+    let rawBand = 0;
+    if (audioAnalyser && frequencyData) {
+        audioAnalyser.getByteFrequencyData(frequencyData);
+        let lb = Math.max(0, Math.min(parseInt(lowBin), bins - 1));
+        let hb = Math.max(lb + 1, Math.min(parseInt(highBin), bins));
+        let sum = 0;
+        for (let i = lb; i < hb; i++) sum += frequencyData[i];
+        rawBand = sum / ((hb - lb) * 255);
+    }
+
+    let barW = (val) => `<span class="debug-bar" style="width:${Math.round(val * 200)}px"></span>`;
+
+    dp.innerHTML = `
+<span class="label">AUDIO STATE</span>
+  loaded: <span class="${audioLoaded ? 'val' : 'off'}">${audioLoaded}</span>  playing: <span class="${audioPlaying ? 'val' : 'off'}">${audioPlaying}</span>  sync: <span class="${audioSync ? 'val' : 'off'}">${audioSync}</span>
+<span class="label">AUDIO CONTEXT</span>
+  sampleRate: <span class="val">${sRate}</span>  bins: <span class="val">${bins}</span>  state: <span class="val">${audioContext ? audioContext.state : '—'}</span>
+<span class="label">FREQ RANGE</span>
+  ${freqLow} Hz → ${freqHigh} Hz  (bins ${lowBin}–${highBin})
+<span class="label">RAW BAND</span>   ${rawBand.toFixed(3)} ${barW(rawBand)}
+<span class="label">SMOOTHED</span>   ${smoothBand.toFixed(3)} ${barW(smoothBand)}
+<span class="label">THRESHOLD</span>  ${audioThreshold}/100  gate: ${(audioThreshold/100).toFixed(2)}
+<span class="label">GATED BAND</span> ${Math.max(0, rawBand > audioThreshold/100 ? (rawBand - audioThreshold/100)/(1 - audioThreshold/100) : 0).toFixed(3)}
+<span class="label">FULL SPLITS</span>
+  bass:   ${smoothBass.toFixed(3)} ${barW(smoothBass)}
+  mid:    ${smoothMid.toFixed(3)} ${barW(smoothMid)}
+  treble: ${smoothTreble.toFixed(3)} ${barW(smoothTreble)}
+<span class="label">SYNC → ${audioSyncTarget.toUpperCase()}</span>
+  qty:${paramValues[0].toFixed(1)}  spec:${paramValues[1].toFixed(1)}  blobVar:${paramValues[6].toFixed(1)}  rate:${paramValues[5].toFixed(1)}
+`;
 }
 
 function updateSmoothedAudio() {
