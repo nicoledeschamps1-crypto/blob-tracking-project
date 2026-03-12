@@ -1604,27 +1604,28 @@ function applyAudioSync() {
     const target = audioSyncTarget;
     const beat = beatIntensity;
 
-    // ── Single target uses smoothBand + beatIntensity for sharp transients ──
+    // ── Multiplicative sync: audio energy SCALES params from 0 → base → beyond ──
+    // Silence = 0. Full energy = base value. Beat spikes push above base.
 
     if (target === 'qty') {
         let baseQty = base[0] || 15;
-        let continuous = smoothBand * 40 * sens;
-        let beatBoost = beat * 45 * sens;
-        paramValues[0] = constrain(baseQty + continuous + beatBoost, 0, 100);
+        let scaled = smoothBand * baseQty * sens;
+        let beatBoost = beat * 35 * sens;
+        paramValues[0] = constrain(scaled + beatBoost, 0, 100);
     }
 
     else if (target === 'blob') {
         let baseBlob = base[6] || 40;
-        let continuous = smoothBand * 40 * sens;
-        let beatBoost = beat * 50 * sens;
-        paramValues[6] = constrain(baseBlob + continuous + beatBoost, 0, 100);
+        let scaled = smoothBand * baseBlob * sens;
+        let beatBoost = beat * 40 * sens;
+        paramValues[6] = constrain(scaled + beatBoost, 0, 100);
     }
 
     else if (target === 'curve') {
         let baseSpec = base[1] || 30;
-        let continuous = smoothBand * 45 * sens;
-        let beatBoost = beat * 40 * sens;
-        paramValues[1] = constrain(baseSpec + continuous + beatBoost, 0, 100);
+        let scaled = smoothBand * baseSpec * sens;
+        let beatBoost = beat * 30 * sens;
+        paramValues[1] = constrain(scaled + beatBoost, 0, 100);
     }
 
     else if (target === 'flash') {
@@ -1633,9 +1634,9 @@ function applyAudioSync() {
 
     else if (target === 'all') {
         let baseQty = base[0] || 15;
-        paramValues[0] = constrain(baseQty + smoothBass * 35 * sens + beat * 30 * sens, 0, 100);
-        paramValues[6] = constrain((base[6] || 40) + smoothOverall * 30 * sens + beat * 25 * sens, 0, 100);
-        paramValues[1] = constrain((base[1] || 30) + smoothMid * 30 * sens + beat * 20 * sens, 0, 100);
+        paramValues[0] = constrain(smoothBass * baseQty * sens + beat * 25 * sens, 0, 100);
+        paramValues[6] = constrain(smoothOverall * (base[6] || 40) * sens + beat * 20 * sens, 0, 100);
+        paramValues[1] = constrain(smoothMid * (base[1] || 30) * sens + beat * 15 * sens, 0, 100);
     }
 
     syncUI();
