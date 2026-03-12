@@ -600,7 +600,7 @@
             </div>
 
             
-            <div class="control-group" id="group-4">
+            <div class="control-group" id="group-viz">
                 <label>Visualization</label>
                 <div class="selector-row" id="viz-buttons">
                     <button class="selector-btn" data-value="0">XY</button>
@@ -613,6 +613,7 @@
                     <button class="selector-btn" data-value="6">BRI</button>
                     <button class="selector-btn" data-value="9">PLT</button>
                     <button class="selector-btn" data-value="7">NONE</button>
+                    <button class="selector-btn" data-value="10">ZOOM</button>
                 </div>
             </div>
 
@@ -657,7 +658,13 @@
                 </div>
             </div>
 
-             
+            <div class="control-group" id="group-4">
+                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
+                </div>
+            </div>
+
              <div class="control-group">
                 <label>Lines</label>
                 <div class="selector-row" id="line-buttons">
@@ -838,7 +845,7 @@ let currentMode = 1;
 let currentParam = 0;
 
 const DEFAULT_CONFIG = {
-    parametros: [15, 30, 40, 3, 0, 4, 40, 50],
+    parametros: [15, 30, 40, 3, 20, 4, 40, 50],
     modo: 1,
     linhas: false,
     viz: 1
@@ -846,7 +853,7 @@ const DEFAULT_CONFIG = {
 
 let paramValues = [...DEFAULT_CONFIG.parametros];
 
-const navOrder = [0, 1, 5, 6, 2, 3, 7];
+const navOrder = [0, 1, 4, 5, 6, 2, 3, 7];
 let navIndex = 0;
 
 let trackedPoints = [];
@@ -954,9 +961,10 @@ class TrackedPoint {
         this.posicao = createVector(x, y);
         this.cor = c;
         this.brightness = brightness(c);
-        let baseHeight = 11 + (this.brightness / 255.0) * 30;
-        let baseWidth = 11;
-        let maxVariation = map(blobVarLevel, 0, 100, 0, 145);
+        let sizeScale = map(paramValues[4], 0, 100, 0.3, 5);
+        let baseHeight = (11 + (this.brightness / 255.0) * 30) * sizeScale;
+        let baseWidth = 11 * sizeScale;
+        let maxVariation = map(blobVarLevel, 0, 100, 0, 145) * sizeScale;
         let offsetX = random(-maxVariation, maxVariation);
         let offsetY = random(-maxVariation, maxVariation);
         this.width = max(2, baseWidth + offsetX);
@@ -995,7 +1003,7 @@ function setup() {
 
 function setupUIListeners() {
 
-    [0, 1, 2, 3, 5, 6, 7].forEach(idx => {
+    [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         ui.sliders[idx] = document.getElementById(`slider-${idx}`);
         ui.inputs[idx] = document.getElementById(`val-${idx}`);
         ui.groups[idx] = document.getElementById(`group-${idx}`);
@@ -1314,7 +1322,7 @@ function restartVideo() {
 }
 
 function syncUI() {
-    [0, 1, 2, 3, 5, 6, 7].forEach(idx => {
+    [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         if(ui.sliders[idx]) {
             ui.sliders[idx].value = paramValues[idx];
             if (document.activeElement !== ui.inputs[idx]) {
@@ -1445,8 +1453,24 @@ function draw() {
         if (showLines && trackedPoints.length > 1) drawLines();
 
         for (let p of trackedPoints) {
-            stroke(150); noFill(); strokeWeight(1.2); rectMode(CENTER);
-            rect(p.posicao.x, p.posicao.y, p.width, p.height);
+            if (activeVizModes.has(10)) {
+                // ZOOM — magnified video crop inside blob
+                push();
+                let srcX = map(p.posicao.x, videoX, videoX + videoW, 0, videoEl.width);
+                let srcY = map(p.posicao.y, videoY, videoY + videoH, 0, videoEl.height);
+                let sampleR = 20;
+                let zW = max(p.width, 30);
+                let zH = max(p.height, 30);
+                image(videoEl, p.posicao.x - zW/2, p.posicao.y - zH/2, zW, zH,
+                      srcX - sampleR, srcY - sampleR, sampleR * 2, sampleR * 2);
+                noFill(); stroke(255, 120); strokeWeight(1);
+                rectMode(CENTER);
+                rect(p.posicao.x, p.posicao.y, zW, zH);
+                pop();
+            } else {
+                stroke(150); noFill(); strokeWeight(1.2); rectMode(CENTER);
+                rect(p.posicao.x, p.posicao.y, p.width, p.height);
+            }
             drawPointInfo(p);
         }
     }
