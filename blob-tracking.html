@@ -858,7 +858,7 @@ let flickerScores = {};
 let p5Canvas = null;
 let bgDim = 0;
 let productInfo = { brand: '', name: '', material: '', price: '', size: '' };
-let textTypeIndex = 1;
+let activeVizModes = new Set([1]);
 
 let videoX, videoY, videoW, videoH;
 
@@ -1050,7 +1050,13 @@ function setupUIListeners() {
 
     ui.vizButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            textTypeIndex = parseInt(e.target.dataset.value);
+            let val = parseInt(e.target.dataset.value);
+            if (val === 7) { // NONE — clear all
+                activeVizModes.clear();
+            } else {
+                if (activeVizModes.has(val)) activeVizModes.delete(val);
+                else activeVizModes.add(val);
+            }
             updateButtonStates();
         });
     });
@@ -1239,8 +1245,14 @@ function updateButtonStates() {
     });
 
     ui.vizButtons.forEach(btn => {
-        if (parseInt(btn.dataset.value) === textTypeIndex) btn.classList.add('active');
-        else btn.classList.remove('active');
+        let val = parseInt(btn.dataset.value);
+        if (val === 7) {
+            if (activeVizModes.size === 0) btn.classList.add('active');
+            else btn.classList.remove('active');
+        } else {
+            if (activeVizModes.has(val)) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
     });
 
     ui.lineButtons.forEach(btn => {
@@ -1776,70 +1788,80 @@ function drawLines() {
 }
 
 function drawPointInfo(p) {
-    let colorSquareSize = 24.0;
+    if (activeVizModes.size === 0) return;
+
+    let colorSquareSize = 24;
     let fontColor = color(255, 200);
     let offsetX = p.posicao.x + 12;
-    let offsetY = p.posicao.y + 4;
-    fill(fontColor); noStroke();
+    let curY = p.posicao.y + 4;
+    let modes = [...activeVizModes].sort((a, b) => a - b);
 
-    switch(textTypeIndex) {
-        case 0: text(`x${p.posicao.x.toFixed(0)},y${p.posicao.y.toFixed(0)}`, offsetX, offsetY); break;
-        case 1:
+    for (let vizMode of modes) {
+        fill(fontColor); noStroke(); textSize(11);
+
+        if (vizMode === 0) { // XY
+            text(`x${p.posicao.x.toFixed(0)},y${p.posicao.y.toFixed(0)}`, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 1) { // RGB
             let r = red(p.cor), g = green(p.cor), b = blue(p.cor);
-            text(`R:${r.toFixed(0)} G:${g.toFixed(0)} B:${b.toFixed(0)}`, offsetX, offsetY - 15);
+            text(`R:${r.toFixed(0)} G:${g.toFixed(0)} B:${b.toFixed(0)}`, offsetX, curY);
+            curY += 4;
             fill(p.cor); rectMode(CORNER);
-            rect(offsetX, p.posicao.y - colorSquareSize/2, colorSquareSize, colorSquareSize);
-            break;
-        case 2: text(`st: ${saturation(p.cor).toFixed(0)}%`, offsetX, offsetY); break;
-        case 3: text(p.dynamicWord, offsetX, offsetY); break;
-        case 4:
-            let h = hue(p.cor);
-            text(`hue: ${h.toFixed(0)}°`, offsetX, offsetY);
-            break;
-        case 5:
+            rect(offsetX, curY, colorSquareSize, colorSquareSize);
+            curY += colorSquareSize + 6;
+        }
+        else if (vizMode === 2) { // SAT
+            text(`st: ${saturation(p.cor).toFixed(0)}%`, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 3) { // TXT
+            text(p.dynamicWord, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 4) { // HUE
+            text(`hue: ${hue(p.cor).toFixed(0)}\u00B0`, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 5) { // HEX
             let rr = red(p.cor), gg = green(p.cor), bb = blue(p.cor);
             let hex = '#' + [rr, gg, bb].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
-            text(hex, offsetX, offsetY);
-            break;
-        case 6:
-            text(`bri: ${brightness(p.cor).toFixed(0)}%`, offsetX, offsetY);
-            break;
-        case 7: break; // NONE — no text overlay
-        case 8: // TAG — product label
+            text(hex, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 6) { // BRI
+            text(`bri: ${brightness(p.cor).toFixed(0)}%`, offsetX, curY);
+            curY += 14;
+        }
+        else if (vizMode === 8) { // TAG
             push();
-            let tagY = offsetY - 4;
-            textSize(8);
-            textStyle(BOLD);
-            fill(255, 200);
-            if (productInfo.brand) { text(productInfo.brand.toUpperCase(), offsetX, tagY); tagY += 11; }
+            textSize(8); textStyle(BOLD); fill(255, 200);
+            if (productInfo.brand) { text(productInfo.brand.toUpperCase(), offsetX, curY); curY += 11; }
+            textStyle(NORMAL); textSize(10);
+            if (productInfo.name) { text(productInfo.name, offsetX, curY); curY += 12; }
+            textSize(8); fill(200, 160);
+            let tagDetails = [productInfo.material, productInfo.size].filter(Boolean).join(' \u00B7 ');
+            if (tagDetails) { text(tagDetails, offsetX, curY); curY += 11; }
+            fill(255, 220); textStyle(BOLD);
+            if (productInfo.price) { text(productInfo.price, offsetX, curY); curY += 11; }
             textStyle(NORMAL);
-            textSize(10);
-            if (productInfo.name) { text(productInfo.name, offsetX, tagY); tagY += 12; }
-            textSize(8);
-            fill(200, 160);
-            let tagDetails = [productInfo.material, productInfo.size].filter(Boolean).join(' · ');
-            if (tagDetails) { text(tagDetails, offsetX, tagY); tagY += 11; }
-            fill(255, 220);
-            textStyle(BOLD);
-            if (productInfo.price) { text(productInfo.price, offsetX, tagY); }
-            textStyle(NORMAL);
-            textSize(11);
             pop();
-            break;
-        case 9: // PLT — color paint chip
+            curY += 4;
+        }
+        else if (vizMode === 9) { // PLT
             push();
             let chipSize = 26;
             fill(p.cor); noStroke(); rectMode(CORNER);
-            rect(offsetX, p.posicao.y - chipSize/2, chipSize, chipSize);
+            rect(offsetX, curY, chipSize, chipSize);
             noFill(); stroke(255, 100); strokeWeight(0.5);
-            rect(offsetX, p.posicao.y - chipSize/2, chipSize, chipSize);
+            rect(offsetX, curY, chipSize, chipSize);
             let pr = red(p.cor), pg = green(p.cor), pb = blue(p.cor);
             let pHex = '#' + [pr, pg, pb].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
             noStroke(); fill(255, 160); textSize(8);
-            text(pHex, offsetX, p.posicao.y + chipSize/2 + 10);
-            textSize(11);
+            text(pHex, offsetX, curY + chipSize + 10);
             pop();
-            break;
+            curY += chipSize + 16;
+        }
     }
 }
 
