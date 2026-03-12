@@ -809,6 +809,10 @@ const ui = {
 // Smoothed audio energy (persists across frames)
 let smoothBass = 0, smoothMid = 0, smoothTreble = 0, smoothOverall = 0, smoothBand = 0;
 
+// Auto-gain: track rolling max per band for normalization
+let autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
+const AUTO_GAIN_DECAY = 0.998; // slow decay so max adapts over time
+
 class CandidatePoint {
     constructor(x, y, c) { this.x = x; this.y = y; this.c = c; }
 }
@@ -1050,8 +1054,8 @@ function updateButtonStates() {
 
     // Freq presets — highlight matching preset or none if custom
     const presetMap = {
-        kick:  [20, 100], bass: [40, 250], vocal: [250, 4000],
-        hats:  [4000, 16000], full: [20, 20000]
+        kick:  [20, 120], bass: [60, 300], vocal: [800, 4000],
+        hats:  [5000, 16000], full: [20, 20000]
     };
     ui.freqPresetButtons.forEach(btn => {
         let p = presetMap[btn.dataset.value];
@@ -1251,6 +1255,8 @@ function renderDebug() {
   bass:   ${smoothBass.toFixed(3)} ${barW(smoothBass)}
   mid:    ${smoothMid.toFixed(3)} ${barW(smoothMid)}
   treble: ${smoothTreble.toFixed(3)} ${barW(smoothTreble)}
+<span class="label">AUTO-GAIN MAX</span>
+  band:${autoGainMax.band.toFixed(3)}  bass:${autoGainMax.bass.toFixed(3)}  mid:${autoGainMax.mid.toFixed(3)}  tre:${autoGainMax.treble.toFixed(3)}
 <span class="label">SYNC → ${audioSyncTarget.toUpperCase()}</span>
   qty:${paramValues[0].toFixed(1)}  spec:${paramValues[1].toFixed(1)}  blobVar:${paramValues[6].toFixed(1)}  rate:${paramValues[5].toFixed(1)}
 `;
@@ -1266,8 +1272,8 @@ function updateSmoothedAudio() {
         return;
     }
     const raw = getAudioEnergy();
-    let attackRate = 0.35;
-    let releaseRate = 0.04;
+    let attackRate = 0.55;
+    let releaseRate = 0.06;
     smoothBass = lerp(smoothBass, raw.bass, raw.bass > smoothBass ? attackRate : releaseRate);
     smoothMid = lerp(smoothMid, raw.mid, raw.mid > smoothMid ? attackRate : releaseRate);
     smoothTreble = lerp(smoothTreble, raw.treble, raw.treble > smoothTreble ? attackRate : releaseRate);
@@ -1404,6 +1410,9 @@ function handleAudioFile(event) {
     ui.audioName.innerText = file.name;
     const url = URL.createObjectURL(file);
 
+    // Reset auto-gain for new audio source
+    autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
+
     audioElement = new Audio();
     audioElement.crossOrigin = 'anonymous';
     audioElement.src = url;
@@ -1412,7 +1421,8 @@ function handleAudioFile(event) {
     audioElement.addEventListener('canplaythrough', () => {
         audioSource = audioContext.createMediaElementSource(audioElement);
         audioAnalyser = audioContext.createAnalyser();
-        audioAnalyser.fftSize = 2048;
+        audioAnalyser.fftSize = 4096;
+        audioAnalyser.smoothingTimeConstant = 0;
         audioGainNode = audioContext.createGain();
 
         audioSource.connect(audioAnalyser);
@@ -1461,6 +1471,18 @@ function getAudioEnergy() {
     mid /= ((midEnd - bassEnd) * 255);
     treble /= ((binCount - midEnd) * 255);
     let overall = (bass + mid + treble) / 3;
+
+    // Auto-gain: update rolling max, then normalize
+    autoGainMax.band = Math.max(autoGainMax.band * AUTO_GAIN_DECAY, band);
+    autoGainMax.bass = Math.max(autoGainMax.bass * AUTO_GAIN_DECAY, bass);
+    autoGainMax.mid = Math.max(autoGainMax.mid * AUTO_GAIN_DECAY, mid);
+    autoGainMax.treble = Math.max(autoGainMax.treble * AUTO_GAIN_DECAY, treble);
+
+    band = band / autoGainMax.band;
+    bass = bass / autoGainMax.bass;
+    mid = mid / autoGainMax.mid;
+    treble = treble / autoGainMax.treble;
+    overall = (bass + mid + treble) / 3;
 
     // Apply threshold gate — energy below threshold reads as 0
     let gate = audioThreshold / 100;
