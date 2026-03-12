@@ -685,6 +685,21 @@
                 </div>
             </div>
 
+            <div class="control-group" id="group-11">
+                <label>Release <input type="number" class="value-input" id="val-11" value="40"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-11" min="0" max="100" value="40" step="1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Auto-Gain</label>
+                <div class="selector-row" id="autogain-buttons">
+                    <button class="selector-btn active" data-value="off">OFF</button>
+                    <button class="selector-btn" data-value="on">ON</button>
+                </div>
+            </div>
+
             <div class="control-group">
                 <label>Sync Target</label>
                 <div class="selector-row" id="sync-target-buttons">
@@ -790,6 +805,8 @@ let audioBaseValues = {};
 let freqLow = 20;
 let freqHigh = 20000;
 let audioThreshold = 10; // 0-100, energy below this reads as 0
+let releaseSpeed = 40; // 0-100, controls smoothing release rate
+let autoGainEnabled = false; // off by default — prevents noise amplification
 
 const ui = {
     fileInput: document.getElementById('videoUpload'),
@@ -810,6 +827,7 @@ const ui = {
     syncButtons: document.querySelectorAll('#sync-buttons .selector-btn'),
     syncTargetButtons: document.querySelectorAll('#sync-target-buttons .selector-btn'),
     freqPresetButtons: document.querySelectorAll('#freq-preset-buttons .selector-btn'),
+    autogainButtons: document.querySelectorAll('#autogain-buttons .selector-btn'),
     freqLowSlider: document.getElementById('slider-8'),
     freqLowInput: document.getElementById('val-8'),
     freqHighSlider: document.getElementById('slider-9'),
@@ -977,6 +995,32 @@ function setupUIListeners() {
     });
     threshInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
 
+    // Release speed slider
+    let releaseSlider = document.getElementById('slider-11');
+    let releaseInput = document.getElementById('val-11');
+    releaseSlider.addEventListener('input', (e) => {
+        releaseSpeed = parseInt(e.target.value);
+        releaseInput.value = releaseSpeed;
+    });
+    releaseInput.addEventListener('change', (e) => {
+        releaseSpeed = constrain(parseInt(e.target.value) || 0, 0, 100);
+        releaseSlider.value = releaseSpeed;
+        e.target.value = releaseSpeed;
+        e.target.blur();
+    });
+    releaseInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
+
+    // Auto-gain toggle
+    ui.autogainButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            autoGainEnabled = (e.target.dataset.value === 'on');
+            if (!autoGainEnabled) {
+                autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
+            }
+            updateButtonStates();
+        });
+    });
+
     // Frequency range presets
     const freqPresets = {
         kick:  { low: 20,   high: 120 },
@@ -986,16 +1030,27 @@ function setupUIListeners() {
         full:  { low: 20,   high: 20000 }
     };
 
+    // Recommended thresholds per preset — narrowband presets need higher
+    // thresholds to filter instrument bleed in that range
+    const presetThresholds = {
+        kick: 15, bass: 15, vocal: 30, hats: 20, full: 5
+    };
+
     ui.freqPresetButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            let preset = freqPresets[e.target.dataset.value];
+            let presetName = e.target.dataset.value;
+            let preset = freqPresets[presetName];
             freqLow = preset.low;
             freqHigh = preset.high;
             ui.freqLowSlider.value = freqLow;
             ui.freqLowInput.value = freqLow;
             ui.freqHighSlider.value = freqHigh;
             ui.freqHighInput.value = freqHigh;
-            // Reset band auto-gain so stale max from previous range doesn't linger
+            // Auto-set threshold for this preset
+            audioThreshold = presetThresholds[presetName];
+            threshSlider.value = audioThreshold;
+            threshInput.value = audioThreshold;
+            // Reset band state
             autoGainMax.band = AUTO_GAIN_FLOOR;
             smoothBand = 0;
             beatHistory = [];
@@ -1090,6 +1145,12 @@ function updateButtonStates() {
     ui.freqPresetButtons.forEach(btn => {
         let p = presetMap[btn.dataset.value];
         if (p && freqLow === p[0] && freqHigh === p[1]) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+
+    ui.autogainButtons.forEach(btn => {
+        const isOn = btn.dataset.value === 'on';
+        if (autoGainEnabled === isOn) btn.classList.add('active');
         else btn.classList.remove('active');
     });
 }
@@ -1364,7 +1425,8 @@ function updateSmoothedAudio() {
     }
     const raw = getAudioEnergy();
     let attackRate = 0.55;
-    let releaseRate = 0.06;
+    // Release rate from slider: 0=very slow (0.03), 50=medium (0.15), 100=instant (0.5)
+    let releaseRate = map(releaseSpeed, 0, 100, 0.03, 0.5);
     smoothBass = lerp(smoothBass, raw.bass, raw.bass > smoothBass ? attackRate : releaseRate);
     smoothMid = lerp(smoothMid, raw.mid, raw.mid > smoothMid ? attackRate : releaseRate);
     smoothTreble = lerp(smoothTreble, raw.treble, raw.treble > smoothTreble ? attackRate : releaseRate);
@@ -1403,7 +1465,7 @@ function changeValue(amount) {
 
 function trackPoints() {
     trackedPoints = [];
-    if (currentMode === 0 || !videoLoaded) return;
+    if (currentMode === 0 || !videoLoaded || !videoPlaying) return;
     videoEl.loadPixels();
     if (videoEl.pixels.length === 0) return;
 
@@ -1535,9 +1597,11 @@ function handleAudioFile(event) {
         frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
         audioLoaded = true;
 
-        // Auto-play audio
-        audioElement.play();
-        audioPlaying = true;
+        // Only auto-play audio if video is currently playing
+        if (videoPlaying) {
+            audioElement.play();
+            audioPlaying = true;
+        }
     }, { once: true });
 }
 
@@ -1575,18 +1639,18 @@ function getAudioEnergy() {
     treble /= ((binCount - midEnd) * 255);
     let overall = (bass + mid + treble) / 3;
 
-    // Auto-gain: update rolling max, then normalize
-    // Floor prevents noise amplification — if raw energy is below the floor,
-    // the max won't shrink below the floor, so noise stays near 0 after normalization
-    autoGainMax.band = Math.max(autoGainMax.band * AUTO_GAIN_DECAY, band, AUTO_GAIN_FLOOR);
-    autoGainMax.bass = Math.max(autoGainMax.bass * AUTO_GAIN_DECAY, bass, AUTO_GAIN_FLOOR);
-    autoGainMax.mid = Math.max(autoGainMax.mid * AUTO_GAIN_DECAY, mid, AUTO_GAIN_FLOOR);
-    autoGainMax.treble = Math.max(autoGainMax.treble * AUTO_GAIN_DECAY, treble, AUTO_GAIN_FLOOR);
+    // Auto-gain: only apply if enabled — off by default to prevent noise amplification
+    if (autoGainEnabled) {
+        autoGainMax.band = Math.max(autoGainMax.band * AUTO_GAIN_DECAY, band, AUTO_GAIN_FLOOR);
+        autoGainMax.bass = Math.max(autoGainMax.bass * AUTO_GAIN_DECAY, bass, AUTO_GAIN_FLOOR);
+        autoGainMax.mid = Math.max(autoGainMax.mid * AUTO_GAIN_DECAY, mid, AUTO_GAIN_FLOOR);
+        autoGainMax.treble = Math.max(autoGainMax.treble * AUTO_GAIN_DECAY, treble, AUTO_GAIN_FLOOR);
 
-    band = band / autoGainMax.band;
-    bass = bass / autoGainMax.bass;
-    mid = mid / autoGainMax.mid;
-    treble = treble / autoGainMax.treble;
+        band = band / autoGainMax.band;
+        bass = bass / autoGainMax.bass;
+        mid = mid / autoGainMax.mid;
+        treble = treble / autoGainMax.treble;
+    }
     overall = (bass + mid + treble) / 3;
 
     // Apply threshold gate — energy below threshold reads as 0
@@ -1768,16 +1832,20 @@ function keyPressed() {
             vocal: { low: 800, high: 4000 }, hats: { low: 5000, high: 16000 },
             full: { low: 20, high: 20000 }
         };
-        // Find current preset
+        const presetThresh = { kick: 15, bass: 15, vocal: 30, hats: 20, full: 5 };
         let curIdx = presetOrder.findIndex(p => {
             let pv = presetValues[p];
             return freqLow === pv.low && freqHigh === pv.high;
         });
         let nextIdx = (curIdx + 1) % presetOrder.length;
-        let next = presetValues[presetOrder[nextIdx]];
+        let nextName = presetOrder[nextIdx];
+        let next = presetValues[nextName];
         freqLow = next.low; freqHigh = next.high;
         ui.freqLowSlider.value = freqLow; ui.freqLowInput.value = freqLow;
         ui.freqHighSlider.value = freqHigh; ui.freqHighInput.value = freqHigh;
+        audioThreshold = presetThresh[nextName];
+        document.getElementById('slider-10').value = audioThreshold;
+        document.getElementById('val-10').value = audioThreshold;
         autoGainMax.band = AUTO_GAIN_FLOOR; smoothBand = 0; beatHistory = [];
         changed = true;
     }
