@@ -734,11 +734,21 @@ function updateButtonStates() {
         else btn.classList.remove('active');
     });
 
+    // Progressive disclosure: audio controls visibility
+    let acg = document.getElementById('audio-controls-group');
+    if (acg) acg.style.display = audioLoaded ? '' : 'none';
+    let am = document.getElementById('audio-meter');
+    if (am) am.style.display = audioLoaded ? '' : 'none';
+    let ms = document.getElementById('mini-spectrum');
+    if (ms) ms.style.display = audioLoaded ? '' : 'none';
+
     ui.syncButtons.forEach(btn => {
         const isSyncOn = btn.dataset.value === 'on';
         if (audioSync === isSyncOn) btn.classList.add('active');
         else btn.classList.remove('active');
     });
+    let scg = document.getElementById('sync-controls-group');
+    if (scg) scg.style.display = audioSync ? '' : 'none';
     let srg = document.getElementById('sync-range-group');
     if (srg) srg.style.display = audioSync ? '' : 'none';
 

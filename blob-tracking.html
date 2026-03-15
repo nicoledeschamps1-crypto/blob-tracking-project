@@ -1320,83 +1320,89 @@
                     <div id="audio-name">mp3, wav, ogg</div>
                     <input type="file" id="audioUpload" accept="audio/*">
                 </div>
-                <div class="audio-meter" id="audio-meter">
+                <div class="audio-meter" id="audio-meter" style="display:none">
                     <div class="audio-meter-fill" id="audio-meter-fill"></div>
                 </div>
-                <canvas id="mini-spectrum" width="260" height="32"></canvas>
+                <canvas id="mini-spectrum" width="260" height="32" style="display:none"></canvas>
             </div>
 
-            <!-- Audio Sync -->
-            <div class="control-group">
-                <label>Audio Sync</label>
-                <div class="selector-row" id="sync-buttons">
-                    <button class="selector-btn active" data-value="off">OFF</button>
-                    <button class="selector-btn" data-value="on">ON</button>
+            <!-- Audio Controls (hidden until audio loaded) -->
+            <div id="audio-controls-group" style="display:none">
+                <div class="control-group">
+                    <label>Audio Sync</label>
+                    <div class="selector-row" id="sync-buttons">
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                        <button class="selector-btn" data-value="on">ON</button>
+                    </div>
                 </div>
-            </div>
-            <div class="control-group">
-                <label>Freq Range</label>
-                <div class="selector-row" id="freq-preset-buttons">
-                    <button class="selector-btn" data-value="kick">KICK</button>
-                    <button class="selector-btn" data-value="bass">BASS</button>
-                    <button class="selector-btn" data-value="vocal">VOCAL</button>
-                    <button class="selector-btn" data-value="hats">HATS</button>
-                    <button class="selector-btn active" data-value="full">FULL</button>
+                <div class="control-group">
+                    <label>Freq Range</label>
+                    <div class="selector-row" id="freq-preset-buttons">
+                        <button class="selector-btn" data-value="kick">KICK</button>
+                        <button class="selector-btn" data-value="bass">BASS</button>
+                        <button class="selector-btn" data-value="vocal">VOCAL</button>
+                        <button class="selector-btn" data-value="hats">HATS</button>
+                        <button class="selector-btn active" data-value="full">FULL</button>
+                    </div>
                 </div>
-            </div>
-            <div class="control-group" id="group-8">
-                <label>Freq Low (Hz) <input type="number" class="value-input" id="val-8" value="20"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-8" min="20" max="20000" value="20" step="1"></div>
-            </div>
-            <div class="control-group" id="group-9">
-                <label>Freq High (Hz) <input type="number" class="value-input" id="val-9" value="20000"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-9" min="20" max="20000" value="20000" step="1"></div>
-            </div>
-            <div class="control-group" id="group-7">
-                <label>Sensitivity <input type="number" class="value-input" id="val-7" value="50"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-7" min="0" max="100" value="50" step="1"></div>
-            </div>
-            <div class="control-group" id="group-10">
-                <label>Threshold <input type="number" class="value-input" id="val-10" value="10"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-10" min="0" max="100" value="10" step="1"></div>
-            </div>
-            <div class="control-group" id="group-11">
-                <label>Release <input type="number" class="value-input" id="val-11" value="40"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-11" min="0" max="100" value="40" step="1"></div>
-            </div>
-            <div class="control-group">
-                <label>Auto-Gain</label>
-                <div class="selector-row" id="autogain-buttons">
-                    <button class="selector-btn active" data-value="off">OFF</button>
-                    <button class="selector-btn" data-value="on">ON</button>
+                <div class="control-group" id="group-8">
+                    <label>Freq Low (Hz) <input type="number" class="value-input" id="val-8" value="20"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-8" min="20" max="20000" value="20" step="1"></div>
                 </div>
-            </div>
-            <div class="control-group">
-                <label>Sync Target</label>
-                <div class="selector-row" id="sync-target-buttons">
-                    <button class="selector-btn active" data-value="all">MIX</button>
-                    <button class="selector-btn" data-value="qty">QTY</button>
-                    <button class="selector-btn" data-value="size">SIZE</button>
-                    <button class="selector-btn" data-value="color">COLOR</button>
-                    <button class="selector-btn" data-value="flash">FLASH</button>
-                    <button class="selector-btn" data-value="pulse">PULSE</button>
+                <div class="control-group" id="group-9">
+                    <label>Freq High (Hz) <input type="number" class="value-input" id="val-9" value="20000"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-9" min="20" max="20000" value="20000" step="1"></div>
                 </div>
-            </div>
-            <div class="control-group" id="sync-range-group" style="display:none">
-                <label>Qty Range</label>
-                <div style="display:flex;gap:6px;align-items:center">
-                    <input type="range" id="sync-min-qty" min="0" max="100" value="0" style="flex:1">
-                    <span style="font-size:10px;color:var(--text-muted)">to</span>
-                    <input type="range" id="sync-max-qty" min="0" max="100" value="100" style="flex:1">
+                <div class="control-group" id="group-7">
+                    <label>Sensitivity <input type="number" class="value-input" id="val-7" value="50"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-7" min="0" max="100" value="50" step="1"></div>
                 </div>
-                <label>Size Range</label>
-                <div style="display:flex;gap:6px;align-items:center">
-                    <input type="range" id="sync-min-size" min="0" max="100" value="0" style="flex:1">
-                    <span style="font-size:10px;color:var(--text-muted)">to</span>
-                    <input type="range" id="sync-max-size" min="0" max="100" value="100" style="flex:1">
+                <div class="control-group" id="group-10">
+                    <label>Threshold <input type="number" class="value-input" id="val-10" value="10"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-10" min="0" max="100" value="10" step="1"></div>
                 </div>
-                <label>Beat Decay <input type="number" class="value-input" id="val-beat-decay" value="82"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-beat-decay" min="70" max="95" value="82" step="1"></div>
+                <div class="control-group" id="group-11">
+                    <label>Release <input type="number" class="value-input" id="val-11" value="40"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-11" min="0" max="100" value="40" step="1"></div>
+                </div>
+                <div class="control-group">
+                    <label>Auto-Gain</label>
+                    <div class="selector-row" id="autogain-buttons">
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                        <button class="selector-btn" data-value="on">ON</button>
+                    </div>
+                </div>
+
+                <!-- Sync-specific controls (hidden until sync ON) -->
+                <div id="sync-controls-group" style="display:none">
+                    <div class="control-group">
+                        <label>Sync Target</label>
+                        <div class="selector-row" id="sync-target-buttons">
+                            <button class="selector-btn active" data-value="all">MIX</button>
+                            <button class="selector-btn" data-value="qty">QTY</button>
+                            <button class="selector-btn" data-value="size">SIZE</button>
+                            <button class="selector-btn" data-value="color">COLOR</button>
+                            <button class="selector-btn" data-value="flash">FLASH</button>
+                            <button class="selector-btn" data-value="pulse">PULSE</button>
+                        </div>
+                    </div>
+                    <div class="control-group" id="sync-range-group" style="display:none">
+                        <label>Qty Range</label>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <input type="range" id="sync-min-qty" min="0" max="100" value="0" style="flex:1">
+                            <span style="font-size:10px;color:var(--text-muted)">to</span>
+                            <input type="range" id="sync-max-qty" min="0" max="100" value="100" style="flex:1">
+                        </div>
+                        <label>Size Range</label>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <input type="range" id="sync-min-size" min="0" max="100" value="0" style="flex:1">
+                            <span style="font-size:10px;color:var(--text-muted)">to</span>
+                            <input type="range" id="sync-max-size" min="0" max="100" value="100" style="flex:1">
+                        </div>
+                        <label>Beat Decay <input type="number" class="value-input" id="val-beat-decay" value="82"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-beat-decay" min="70" max="95" value="82" step="1"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Record & Save -->

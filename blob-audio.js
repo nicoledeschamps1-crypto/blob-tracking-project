@@ -66,6 +66,7 @@ function handleAudioFile(event) {
         prevFloatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
         resetBandDetectors();
         audioLoaded = true;
+        updateButtonStates();
         if (audioElement.duration && isFinite(audioElement.duration)) {
             audioDuration = audioElement.duration;
         }
