@@ -5,6 +5,45 @@
 // zoom/pan, ruler, segment management
 // ══════════════════════════════════════════
 
+let _rulerRedrawPending = false;
+
+// ── Undo/Redo Stack ─────────────────────
+const TL_UNDO_MAX = 50;
+let tlUndoStack = [];
+let tlRedoStack = [];
+
+function tlSaveState() {
+    tlUndoStack.push(JSON.stringify(timelineSegments));
+    if (tlUndoStack.length > TL_UNDO_MAX) tlUndoStack.shift();
+    tlRedoStack = [];
+}
+
+function tlUndo() {
+    if (tlUndoStack.length === 0) return;
+    tlRedoStack.push(JSON.stringify(timelineSegments));
+    timelineSegments = JSON.parse(tlUndoStack.pop());
+    let maxId = 0;
+    for (let s of timelineSegments) if (s.id > maxId) maxId = s.id;
+    nextSegId = maxId + 1;
+    selectedSegments.clear();
+    syncSelectedSegment();
+    assignLanes();
+    renderTimelineSegments();
+}
+
+function tlRedo() {
+    if (tlRedoStack.length === 0) return;
+    tlUndoStack.push(JSON.stringify(timelineSegments));
+    timelineSegments = JSON.parse(tlRedoStack.pop());
+    let maxId = 0;
+    for (let s of timelineSegments) if (s.id > maxId) maxId = s.id;
+    nextSegId = maxId + 1;
+    selectedSegments.clear();
+    syncSelectedSegment();
+    assignLanes();
+    renderTimelineSegments();
+}
+
 // ── Zoom/Pan Helpers ─────────────────────
 
 function getVisibleTimeRange() {
@@ -38,6 +77,7 @@ function refreshTimeline() {
     renderTimelineRuler();
     renderTimelineWaveform();
     renderTimelineSegments();
+    updateScrollIndicator();
 }
 
 // ── Core Timeline Functions ──────────────
@@ -57,6 +97,7 @@ function addModeSegmentAt(modeValue, startTime) {
         lane: 0,
         color: '#aaaaaa'
     };
+    tlSaveState();
     timelineSegments.push(seg);
     assignLanes();
     renderTimelineSegments();
@@ -66,6 +107,37 @@ function addModeSegmentAt(modeValue, startTime) {
         newEl.classList.add('just-added');
         setTimeout(() => newEl.classList.remove('just-added'), 500);
     }
+}
+
+function addBlobSegmentAt(startTime) {
+    let tlDur = getTimelineDuration();
+    if (!tlDur) return;
+    let endTime = Math.min(startTime + 5, tlDur);
+    let seg = {
+        id: nextSegId++,
+        type: 'blob',
+        effect: 'blob',
+        startTime: startTime,
+        endTime: endTime,
+        params: [...paramValues],
+        lane: 0,
+        color: BLOB_SEG_COLOR
+    };
+    tlSaveState();
+    timelineSegments.push(seg);
+    assignLanes();
+    renderTimelineSegments();
+    let container = ui.tlTrackInner || ui.tlTrack;
+    let newEl = container.querySelector(`.timeline-segment[data-id="${seg.id}"]`);
+    if (newEl) {
+        newEl.classList.add('just-added');
+        setTimeout(() => newEl.classList.remove('just-added'), 500);
+    }
+    // Auto-select the new blob segment for editing
+    selectedSegments.clear();
+    selectedSegments.add(seg.id);
+    syncSelectedSegment();
+    renderTimelineSegments();
 }
 
 function addTimelineSegmentAt(effectName, startTime) {
@@ -81,6 +153,7 @@ function addTimelineSegmentAt(effectName, startTime) {
         lane: 0,
         color: FX_CAT_COLORS[FX_CATEGORIES[effectName]] || '#888'
     };
+    tlSaveState();
     timelineSegments.push(seg);
     assignLanes();
     renderTimelineSegments();
@@ -123,6 +196,12 @@ function updateTimelinePlayhead() {
     let pct = timeToPercent(currentTime);
     ui.tlPlayhead.style.left = Math.max(0, Math.min(100, pct)) + '%';
     ui.tlTime.textContent = formatTime(currentTime) + ' / ' + formatTime(tlDur);
+
+    // Update ruler playhead indicator (throttled to ~15fps)
+    if (!_rulerRedrawPending) {
+        _rulerRedrawPending = true;
+        setTimeout(() => { _rulerRedrawPending = false; renderTimelineRuler(); }, 66);
+    }
 
     // Auto-scroll when zoomed: keep playhead in view
     if (tlZoom > 1 && videoPlaying) {
@@ -184,12 +263,13 @@ function renderTimelineRuler() {
     if (!parent) return;
     let rect = parent.getBoundingClientRect();
     let dpr = window.devicePixelRatio || 1;
+    let rulerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-ruler-height')) || 22;
     canvas.width = rect.width * dpr;
-    canvas.height = 18 * dpr;
+    canvas.height = rulerH * dpr;
     canvas.style.width = rect.width + 'px';
     let ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, rect.width, 18);
+    ctx.clearRect(0, 0, rect.width, rulerH);
 
     let vr = getVisibleTimeRange();
     if (vr.duration <= 0) return;
@@ -213,13 +293,31 @@ function renderTimelineRuler() {
         let x = ((t - vr.start) / vr.duration) * rect.width;
         let isMajor = Math.abs(t % majorInterval) < 0.01 || Math.abs(t % majorInterval - majorInterval) < 0.01;
         ctx.beginPath();
-        ctx.moveTo(x, isMajor ? 4 : 12);
-        ctx.lineTo(x, 18);
+        ctx.moveTo(x, isMajor ? 4 : rulerH - 6);
+        ctx.lineTo(x, rulerH);
         ctx.lineWidth = isMajor ? 1 : 0.5;
         ctx.stroke();
         if (isMajor && t >= 0) {
-            ctx.fillText(formatTime(t), x, 11);
+            ctx.fillText(formatTime(t), x, rulerH - 8);
         }
+    }
+
+    // Draw playhead indicator on ruler
+    let currentTime;
+    if (tlRulerMode === 'audio' && audioElement && audioLoaded) {
+        currentTime = audioElement.currentTime;
+    } else {
+        currentTime = videoEl ? videoEl.time() : 0;
+    }
+    let phX = ((currentTime - vr.start) / vr.duration) * rect.width;
+    if (phX >= 0 && phX <= rect.width) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(phX - 4, rulerH);
+        ctx.lineTo(phX + 4, rulerH);
+        ctx.lineTo(phX, rulerH - 5);
+        ctx.closePath();
+        ctx.fill();
     }
 }
 
@@ -429,6 +527,10 @@ function assignLanes() {
 }
 
 function segLabel(seg) {
+    if (seg.type === 'blob') {
+        let p = seg.params;
+        return 'BLOB Q:' + Math.round(p[0]) + ' S:' + Math.round(p[4]) + ' R:' + Math.round(p[5]) + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
+    }
     if (seg.type === 'mode') {
         return (MODE_NAMES[seg.modeValue] || 'MODE') + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
     }
@@ -439,6 +541,40 @@ function syncSelectedSegment() {
     selectedSegment = selectedSegments.size > 0
         ? timelineSegments.find(s => selectedSegments.has(s.id)) || null
         : null;
+
+    // Blob segment editing: sync sliders to segment params
+    let banner = document.getElementById('blob-edit-banner');
+    if (selectedSegment && selectedSegment.type === 'blob') {
+        editingBlobSeg = selectedSegment;
+        // Load segment params into sliders
+        for (let i = 0; i < editingBlobSeg.params.length; i++) {
+            if (ui.sliders[i]) {
+                ui.sliders[i].value = editingBlobSeg.params[i];
+                if (ui.inputs[i]) {
+                    ui.inputs[i].value = Number.isInteger(editingBlobSeg.params[i])
+                        ? editingBlobSeg.params[i]
+                        : editingBlobSeg.params[i].toFixed(1);
+                }
+            }
+        }
+        if (banner) banner.classList.add('visible');
+    } else {
+        if (editingBlobSeg) {
+            // Restore live params to sliders
+            editingBlobSeg = null;
+            for (let i = 0; i < paramValues.length; i++) {
+                if (ui.sliders[i]) {
+                    ui.sliders[i].value = paramValues[i];
+                    if (ui.inputs[i]) {
+                        ui.inputs[i].value = Number.isInteger(paramValues[i])
+                            ? paramValues[i]
+                            : paramValues[i].toFixed(1);
+                    }
+                }
+            }
+        }
+        if (banner) banner.classList.remove('visible');
+    }
 }
 
 function renderTimelineSegments() {
@@ -449,6 +585,7 @@ function renderTimelineSegments() {
     if (!tlDur) return;
 
     let vr = getVisibleTimeRange();
+    let lanePitch = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-lane-pitch')) || 32;
 
     // Find max lane for lane lines
     let maxLane = 0;
@@ -460,7 +597,7 @@ function renderTimelineSegments() {
     for (let i = 1; i <= maxLane; i++) {
         let line = document.createElement('div');
         line.className = 'tl-lane-line';
-        line.style.top = (i * 26) + 'px';
+        line.style.top = (i * lanePitch) + 'px';
         container.appendChild(line);
     }
 
@@ -471,11 +608,12 @@ function renderTimelineSegments() {
         let el = document.createElement('div');
         el.className = 'timeline-segment';
         el.dataset.id = seg.id;
+        el.dataset.type = seg.type || 'effect';
         let left = timeToPercent(seg.startTime);
         let w = ((seg.endTime - seg.startTime) / vr.duration) * 100;
         el.style.left = left + '%';
         el.style.width = Math.max(w, 0.5) + '%';
-        el.style.top = (seg.lane * 26 + 2) + 'px';
+        el.style.top = (seg.lane * lanePitch + 2) + 'px';
         el.style.background = seg.color;
         el.textContent = segLabel(seg);
         if (selectedSegments.has(seg.id)) el.classList.add('selected');
@@ -505,6 +643,7 @@ function renderTimelineSegments() {
         // Double-click to delete
         el.addEventListener('dblclick', (e) => {
             e.stopPropagation();
+            tlSaveState();
             if (selectedSegments.has(seg.id) && selectedSegments.size > 1) {
                 timelineSegments = timelineSegments.filter(s => !selectedSegments.has(s.id));
                 selectedSegments.clear();
@@ -515,6 +654,33 @@ function renderTimelineSegments() {
             syncSelectedSegment();
             assignLanes();
             renderTimelineSegments();
+        });
+
+        // Hover tooltip
+        el.addEventListener('mouseenter', (e) => {
+            let tooltip = document.getElementById('tl-tooltip');
+            if (!tooltip) return;
+            let label = seg.type === 'blob'
+                ? 'BLOB — Q:' + Math.round(seg.params[0]) + ' S:' + Math.round(seg.params[4]) + ' R:' + Math.round(seg.params[5])
+                : seg.type === 'mode'
+                ? 'Mode: ' + (MODE_NAMES[seg.modeValue] || 'MODE')
+                : 'FX: ' + seg.effect.toUpperCase();
+            let time = formatTime(seg.startTime) + ' → ' + formatTime(seg.endTime) + ' (' + (seg.endTime - seg.startTime).toFixed(1) + 's)';
+            tooltip.innerHTML = '<strong>' + label + '</strong><br>' + time;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.clientX + 12) + 'px';
+            tooltip.style.top = (e.clientY - 30) + 'px';
+        });
+        el.addEventListener('mousemove', (e) => {
+            let tooltip = document.getElementById('tl-tooltip');
+            if (tooltip && tooltip.style.display !== 'none') {
+                tooltip.style.left = (e.clientX + 12) + 'px';
+                tooltip.style.top = (e.clientY - 30) + 'px';
+            }
+        });
+        el.addEventListener('mouseleave', () => {
+            let tooltip = document.getElementById('tl-tooltip');
+            if (tooltip) tooltip.style.display = 'none';
         });
 
         // Drag to move/resize
@@ -566,6 +732,7 @@ function setupSegmentDrag(el, seg) {
     });
 
     function startDrag() {
+        tlSaveState();
         function onMove(e) {
             let container = ui.tlTrackInner || ui.tlTrack;
             let rect = container.getBoundingClientRect();
@@ -573,6 +740,7 @@ function setupSegmentDrag(el, seg) {
             let tlDur = getTimelineDuration();
             let dx = (e.clientX - startX) / rect.width * vr.duration;
 
+            let didSnap = false;
             if (dragType === 'move') {
                 if (origPositions && selectedSegments.has(seg.id)) {
                     // Multi-drag: move all selected segments
@@ -581,22 +749,29 @@ function setupSegmentDrag(el, seg) {
                         if (!s) continue;
                         let dur = orig.endTime - orig.startTime;
                         let newStart = Math.max(0, Math.min(orig.startTime + dx, tlDur - dur));
-                        s.startTime = snapToBeat(newStart);
+                        let snapped = snapToBeat(newStart);
+                        if (snapped !== newStart) didSnap = true;
+                        s.startTime = snapped;
                         s.endTime = s.startTime + dur;
                     }
                 } else {
                     let dur = origEnd - origStart;
                     let newStart = Math.max(0, Math.min(origStart + dx, tlDur - dur));
-                    newStart = snapToBeat(newStart);
-                    seg.startTime = newStart;
-                    seg.endTime = newStart + dur;
+                    let snapped = snapToBeat(newStart);
+                    if (snapped !== newStart) didSnap = true;
+                    seg.startTime = snapped;
+                    seg.endTime = snapped + dur;
                 }
             } else if (dragType === 'left') {
                 let newStart = Math.max(0, Math.min(origStart + dx, seg.endTime - 0.1));
-                seg.startTime = snapToBeat(newStart);
+                let snapped = snapToBeat(newStart);
+                if (snapped !== newStart) didSnap = true;
+                seg.startTime = snapped;
             } else if (dragType === 'right') {
                 let newEnd = Math.max(seg.startTime + 0.1, Math.min(origEnd + dx, tlDur));
-                seg.endTime = snapToBeat(newEnd);
+                let snapped = snapToBeat(newEnd);
+                if (snapped !== newEnd) didSnap = true;
+                seg.endTime = snapped;
             }
 
             // CSS-only update during drag (zoom-aware)
@@ -610,12 +785,14 @@ function setupSegmentDrag(el, seg) {
                         sEl.style.left = timeToPercent(s.startTime) + '%';
                         sEl.style.width = Math.max(((s.endTime - s.startTime) / vr.duration) * 100, 0.5) + '%';
                         sEl.textContent = segLabel(s);
+                        sEl.classList.toggle('snapped', didSnap);
                     }
                 }
             } else {
                 el.style.left = timeToPercent(seg.startTime) + '%';
                 el.style.width = Math.max(((seg.endTime - seg.startTime) / vr.duration) * 100, 0.5) + '%';
                 el.textContent = segLabel(seg);
+                el.classList.toggle('snapped', didSnap);
             }
         }
         function onUp() {
@@ -640,6 +817,17 @@ function applyTimelineEffects() {
     let active = timelineSegments.filter(s => currentTime >= s.startTime && currentTime <= s.endTime);
     if (active.length === 0) return;
 
+    // Apply blob segments: override paramValues (last one wins)
+    let blobSegs = active.filter(s => s.type === 'blob');
+    if (blobSegs.length > 0) {
+        let blobSeg = blobSegs[blobSegs.length - 1];
+        if (blobSeg.params && Array.isArray(blobSeg.params)) {
+            for (let i = 0; i < blobSeg.params.length; i++) {
+                paramValues[i] = blobSeg.params[i];
+            }
+        }
+    }
+
     // Apply mode segments: last one wins (override currentMode + params)
     let modeSegs = active.filter(s => s.type === 'mode');
     if (modeSegs.length > 0) {
@@ -652,8 +840,8 @@ function applyTimelineEffects() {
         }
     }
 
-    // Apply effect segments
-    let fxSegs = active.filter(s => s.type !== 'mode');
+    // Apply effect segments (exclude mode and blob segments)
+    let fxSegs = active.filter(s => s.type !== 'mode' && s.type !== 'blob');
     if (fxSegs.length === 0) return;
     const catOrder = ['color', 'distortion', 'pattern', 'overlay'];
     fxSegs.sort((a, b) => catOrder.indexOf(FX_CATEGORIES[a.effect]) - catOrder.indexOf(FX_CATEGORIES[b.effect]));
@@ -680,6 +868,22 @@ function setupTimelineUIListeners() {
     ui.tlBtnPlay.addEventListener('click', togglePlay);
     ui.tlBtnRestart.addEventListener('click', restartVideo);
     ui.tlBtnRecord.addEventListener('click', toggleRecording);
+
+    // + BLOB button
+    let addBlobBtn = document.getElementById('tl-btn-add-blob');
+    if (addBlobBtn) {
+        addBlobBtn.addEventListener('click', () => {
+            let tlDur = getTimelineDuration();
+            if (!tlDur) return;
+            let currentTime;
+            if (tlRulerMode === 'audio' && audioElement && audioLoaded) {
+                currentTime = audioElement.currentTime;
+            } else {
+                currentTime = videoEl ? videoEl.time() : 0;
+            }
+            addBlobSegmentAt(currentTime);
+        });
+    }
 
     // Timeline band selector
     ui.tlBandButtons.forEach(btn => {
@@ -798,10 +1002,73 @@ function setupTimelineUIListeners() {
         seekToTimelinePosition(e.clientX);
     });
     document.addEventListener('mousemove', (e) => {
-        if (tlDragging) seekToTimelinePosition(e.clientX);
+        if (tlDragging) {
+            seekToTimelinePosition(e.clientX);
+            let tooltip = document.getElementById('tl-tooltip');
+            if (tooltip) {
+                let container = ui.tlTrackInner || ui.tlTrack;
+                let rect = container.getBoundingClientRect();
+                let ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                let scrubTime = percentToTime(ratio * 100);
+                tooltip.textContent = formatTime(scrubTime);
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.clientX + 10) + 'px';
+                tooltip.style.top = (rect.top - 25) + 'px';
+            }
+        }
     });
-    document.addEventListener('mouseup', () => { tlDragging = false; });
+    document.addEventListener('mouseup', () => {
+        tlDragging = false;
+        let tooltip = document.getElementById('tl-tooltip');
+        if (tooltip) tooltip.style.display = 'none';
+    });
 
     // Re-render on resize
     window.addEventListener('resize', () => { if (tlWaveform) refreshTimeline(); });
+
+    // Resize handle
+    setupTimelineResize();
+}
+
+// ── Scroll Position Indicator ───────────
+
+function updateScrollIndicator() {
+    let el = document.getElementById('tl-scroll-indicator');
+    if (!el) return;
+    if (tlZoom <= 1) { el.classList.remove('visible'); return; }
+    el.classList.add('visible');
+    let vp = el.querySelector('.viewport');
+    let dur = getTimelineDuration();
+    if (!dur || !vp) return;
+    let vpWidth = (1 / tlZoom) * 100;
+    let vpLeft = (tlScrollOffset / dur) * 100;
+    vp.style.left = Math.max(0, vpLeft) + '%';
+    vp.style.width = Math.min(vpWidth, 100) + '%';
+}
+
+// ── Resizable Timeline Height ───────────
+
+function setupTimelineResize() {
+    let handle = document.getElementById('tl-resize-handle');
+    let container = ui.tlContainer;
+    if (!handle || !container) return;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        let startY = e.clientY;
+        let startH = container.getBoundingClientRect().height;
+
+        function onMove(ev) {
+            let dy = startY - ev.clientY;
+            let newH = Math.max(180, Math.min(500, startH + dy));
+            container.style.height = newH + 'px';
+            refreshTimeline();
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
 }

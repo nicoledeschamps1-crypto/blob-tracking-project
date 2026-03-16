@@ -25,6 +25,21 @@
             --btn-active-bg: #e5e5e5;
             --btn-active-text: #0b0b0b;
             --save-btn-color: #4a4a4a;
+
+            /* Timeline sizing */
+            --tl-height: 280px;
+            --tl-padding-v: 12px;
+            --tl-padding-h: 14px;
+            --tl-row-gap: 5px;
+            --tl-btn-svg: 14px;
+            --tl-band-font: 10px;
+            --tl-band-padding: 3px 8px;
+            --tl-time-font: 11px;
+            --tl-ruler-height: 22px;
+            --tl-seg-height: 28px;
+            --tl-lane-pitch: 32px;
+            --tl-seg-font: 10px;
+            --tl-zoom-width: 80px;
         }
 
         body {
@@ -560,39 +575,55 @@
         /* ═══ TIMELINE ═══ */
         #timeline-container {
             position: fixed;
-            bottom: 12px;
-            left: 320px;
-            right: 320px;
-            height: 200px;
-            background: rgba(12, 12, 12, 0.95);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.05);
+            bottom: 10px;
+            left: 350px;
+            right: 350px;
+            height: var(--tl-height);
+            background: rgba(10, 10, 10, 0.97);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
             z-index: 10;
             display: flex;
             flex-direction: column;
-            padding: 6px 12px;
-            gap: 4px;
-            transition: opacity 0.3s;
+            padding: var(--tl-padding-v) var(--tl-padding-h);
+            gap: var(--tl-row-gap);
         }
         #timeline-container.hidden { display: none; }
+        /* Row 1: transport + mode selectors */
         .timeline-controls {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-shrink: 0;
         }
-        .timeline-controls .action-btn {
-            padding: 4px 8px;
+        /* Row 2: blob, waveform band, zoom */
+        .timeline-controls-row2 {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .timeline-controls .action-btn,
+        .timeline-controls-row2 .action-btn {
+            padding: 5px 10px;
             flex: 0;
-            min-width: 36px;
+            min-width: 32px;
+            min-height: 28px;
+        }
+        .timeline-controls .action-btn svg,
+        .timeline-controls-row2 .action-btn svg {
+            width: var(--tl-btn-svg);
+            height: var(--tl-btn-svg);
         }
         #timeline-time {
-            font-size: 10px;
+            font-size: var(--tl-time-font);
             font-weight: 600;
             color: var(--text-muted);
             font-family: 'Roboto Mono', monospace;
             margin-left: auto;
         }
+        .tl-spacer { flex: 1; }
         #timeline-track {
             flex: 1;
             display: flex;
@@ -602,7 +633,7 @@
         }
         #tl-ruler {
             width: 100%;
-            height: 18px;
+            height: var(--tl-ruler-height);
             display: block;
             flex-shrink: 0;
             background: #1a1a1a;
@@ -624,21 +655,33 @@
             top: 0;
             bottom: 0;
             left: 0;
-            width: 2px;
+            width: 3px;
+            border-radius: 1.5px;
             background: #fff;
             z-index: 5;
             pointer-events: none;
-            box-shadow: 0 0 4px rgba(255,255,255,0.5);
+            box-shadow: 0 0 6px rgba(255,255,255,0.6);
+        }
+        #timeline-playhead::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 7px solid #fff;
         }
         .timeline-segment {
             position: absolute;
-            height: 22px;
+            height: var(--tl-seg-height);
             border-radius: 3px;
-            font-size: 9px;
+            font-size: var(--tl-seg-font);
             font-weight: 700;
             color: rgba(0,0,0,0.8);
             text-transform: uppercase;
-            line-height: 22px;
+            line-height: var(--tl-seg-height);
             padding: 0 5px;
             cursor: pointer;
             overflow: hidden;
@@ -657,11 +700,21 @@
             box-shadow: 0 0 8px 2px rgba(255,255,255,0.25);
             z-index: 3;
         }
+        .timeline-segment[data-type="blob"] {
+            border-left: 3px solid rgba(0, 206, 201, 0.8);
+        }
+        .timeline-segment[data-type="mode"] {
+            border-left: 3px solid rgba(170, 170, 170, 0.8);
+        }
+        .timeline-segment[data-type="effect"] {
+            border-left: 3px solid currentColor;
+            filter: brightness(1.05);
+        }
         .tl-lane-line {
             position: absolute;
             left: 0; right: 0;
             height: 1px;
-            background: repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 4px, transparent 4px, transparent 8px);
+            background: repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0, rgba(255,255,255,0.15) 4px, transparent 4px, transparent 8px);
             pointer-events: none;
             z-index: 0;
         }
@@ -719,10 +772,10 @@
             content: '';
             position: absolute;
             top: 0;
-            left: -2px;
-            width: 5px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.6);
+            left: -3px;
+            width: 7px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.75);
             clip-path: polygon(50% 100%, 0 0, 100% 0);
         }
         /* Band selector in timeline controls */
@@ -735,9 +788,9 @@
             background: transparent;
             border: 1px solid rgba(255,255,255,0.12);
             color: var(--text-muted);
-            font-size: 8px;
+            font-size: var(--tl-band-font);
             font-weight: 700;
-            padding: 2px 6px;
+            padding: var(--tl-band-padding);
             cursor: pointer;
             font-family: inherit;
             border-radius: 2px;
@@ -751,8 +804,9 @@
         }
         /* Snap indicator */
         .timeline-segment.snapped {
-            outline: 1px solid rgba(255,255,255,0.6);
+            outline: 1.5px solid rgba(255,255,255,0.8);
             outline-offset: 1px;
+            box-shadow: 0 0 8px rgba(255,255,255,0.2);
         }
         /* Timeline drag-over state */
         #tl-track-inner.drag-over {
@@ -772,7 +826,7 @@
             text-transform: uppercase;
         }
         #tl-zoom-slider {
-            width: 50px;
+            width: var(--tl-zoom-width);
             height: 12px;
             accent-color: #6C5CE7;
         }
@@ -791,6 +845,53 @@
             white-space: nowrap;
             box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
+        /* Scroll position indicator */
+        #tl-scroll-indicator {
+            height: 3px;
+            background: #1a1a1a;
+            border-radius: 1.5px;
+            position: relative;
+            flex-shrink: 0;
+            display: none;
+        }
+        #tl-scroll-indicator .viewport {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(108, 92, 231, 0.5);
+            border-radius: 1.5px;
+            min-width: 10px;
+        }
+        #tl-scroll-indicator.visible { display: block; }
+        /* Resize handle */
+        #tl-resize-handle {
+            height: 5px;
+            cursor: ns-resize;
+            background: transparent;
+            flex-shrink: 0;
+            transition: background 0.15s;
+            border-radius: 8px 8px 0 0;
+            margin: -2px -4px 0;
+        }
+        #tl-resize-handle:hover {
+            background: rgba(108, 92, 231, 0.3);
+        }
+        /* Timeline tooltip */
+        #tl-tooltip {
+            position: fixed;
+            display: none;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--text-main);
+            font-size: 10px;
+            font-family: 'Roboto Mono', monospace;
+            padding: 4px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
         /* Drag hint on timeline */
         .tl-offset-label {
             font-size: 9px;
@@ -807,6 +908,38 @@
             margin-top: 2px;
             opacity: 0.5;
         }
+        /* + BLOB button */
+        #tl-btn-add-blob {
+            background: #00CEC9;
+            color: #0b0b0b;
+            font-weight: 700;
+            font-size: 9px;
+            border: none;
+            padding: 4px 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            transition: background 0.15s;
+        }
+        #tl-btn-add-blob:hover { background: #00E0D9; }
+        /* Blob edit indicator on right panel */
+        #blob-edit-banner {
+            display: none;
+            background: rgba(0, 206, 201, 0.12);
+            border: 1px solid rgba(0, 206, 201, 0.3);
+            color: #00CEC9;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 5px 10px;
+            margin-bottom: 6px;
+            border-radius: 3px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        #blob-edit-banner.visible { display: block; }
         #tl-drag-hint.drop-active {
             color: #6C5CE7;
             opacity: 1;
@@ -1286,6 +1419,7 @@
         </div>
 
         <div id="ui-controls-right">
+            <div id="blob-edit-banner">editing blob segment</div>
 
             <div class="control-group" id="group-0">
                 <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
@@ -1487,6 +1621,8 @@
 
     <!-- TIMELINE -->
     <div id="timeline-container" class="hidden">
+        <div id="tl-resize-handle"></div>
+        <!-- Row 1: Transport + mode selectors -->
         <div class="timeline-controls">
             <button id="tl-btn-play" class="action-btn" title="Play/Pause">
                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -1505,31 +1641,38 @@
             </div>
             <span id="tl-offset-label" class="tl-offset-label hidden">OFFSET: 0.0s</span>
             <span id="timeline-time">0:00 / 0:00</span>
+            <button id="tl-btn-record" class="action-btn" title="Record">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+            </button>
+        </div>
+        <!-- Row 2: Blob + waveform band + zoom -->
+        <div class="timeline-controls-row2">
+            <button id="tl-btn-add-blob" title="Add blob params at playhead">+ BLOB</button>
             <div class="tl-band-selector" id="tl-band-selector">
                 <button class="tl-band-btn active" data-band="full">FULL</button>
                 <button class="tl-band-btn" data-band="kick">KICK</button>
                 <button class="tl-band-btn" data-band="vocal">VOCAL</button>
                 <button class="tl-band-btn" data-band="hats">HATS</button>
             </div>
-            <button id="tl-btn-record" class="action-btn" title="Record">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
-            </button>
+            <div class="tl-spacer"></div>
             <div class="tl-zoom-controls">
                 <span class="tl-zoom-label">ZOOM</span>
                 <input type="range" id="tl-zoom-slider" min="1" max="20" step="0.5" value="1">
             </div>
         </div>
+        <div id="tl-scroll-indicator"><div class="viewport"></div></div>
         <div id="timeline-track">
-            <canvas id="tl-ruler" height="18"></canvas>
+            <canvas id="tl-ruler" height="22"></canvas>
             <div id="tl-track-inner">
                 <canvas id="tl-waveform"></canvas>
                 <div id="timeline-playhead"></div>
                 <div id="timeline-ghost"></div>
             </div>
         </div>
-        <div id="tl-drag-hint">drag effects here to place them at specific moments &bull; drag waveform to offset audio</div>
+        <div id="tl-drag-hint">drag effects/modes to place &bull; + BLOB = snapshot params at playhead &bull; alt+drag waveform = offset audio</div>
     </div>
     <div id="drag-ghost"></div>
+    <div id="tl-tooltip"></div>
 
 
 

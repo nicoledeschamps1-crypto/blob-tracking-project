@@ -161,6 +161,8 @@ const MODE_NAMES = {
     12:'FLKR', 13:'INV', 14:'MASK'
 };
 let modeDragState = null;
+const BLOB_SEG_COLOR = '#00CEC9';
+let editingBlobSeg = null; // when a blob segment is selected, sliders edit its params
 
 const FX_CATEGORIES = {
     sepia:'color', tint:'color', palette:'color', bricon:'color',
@@ -311,9 +313,9 @@ let beatDecayValue = 0.82;
 let floatFreqData = null;
 let prevFloatFreqData = null;
 let bandDetectors = {
-    kick:  { low: 30, high: 150,   fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 200, decay: 0.82 },
-    snare: { low: 150, high: 900,  fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 150, decay: 0.82 },
-    hat:   { low: 7500, high: 16000, fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 60,  decay: 0.70 }
+    kick:  { low: 40, high: 200,    fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 200, decay: 0.82 },
+    snare: { low: 200, high: 5000,  fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 120, decay: 0.82 },
+    hat:   { low: 6000, high: 20000, fluxHistory: [], lastBeat: 0, intensity: 0, cooldown: 60,  decay: 0.65, hfc: true }
 };
 const FLUX_HISTORY_SIZE = 43;
 const FLUX_SENSITIVITY = 1.5;
@@ -590,8 +592,14 @@ function setupCoreUIListeners() {
         if (!ui.sliders[idx]) return;
 
         ui.sliders[idx].addEventListener('input', (e) => {
-            paramValues[idx] = parseFloat(e.target.value);
-            if (ui.inputs[idx]) ui.inputs[idx].value = paramValues[idx];
+            let val = parseFloat(e.target.value);
+            if (editingBlobSeg) {
+                editingBlobSeg.params[idx] = val;
+                renderTimelineSegments();
+            } else {
+                paramValues[idx] = val;
+            }
+            if (ui.inputs[idx]) ui.inputs[idx].value = val;
             currentParam = idx;
             navIndex = navOrder.indexOf(idx);
         });
@@ -602,7 +610,12 @@ function setupCoreUIListeners() {
                 if (isNaN(val)) val = 0;
                 val = constrain(val, 0, 100);
 
-                paramValues[idx] = val;
+                if (editingBlobSeg) {
+                    editingBlobSeg.params[idx] = val;
+                    renderTimelineSegments();
+                } else {
+                    paramValues[idx] = val;
+                }
                 ui.sliders[idx].value = val;
                 e.target.value = val;
                 e.target.blur();
@@ -957,6 +970,8 @@ function restartVideo() {
 }
 
 function syncUI() {
+    // Don't overwrite sliders while editing a blob segment
+    if (editingBlobSeg) { updateButtonStates(); return; }
     [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         if(ui.sliders[idx]) {
             ui.sliders[idx].value = paramValues[idx];
@@ -1284,11 +1299,11 @@ function keyPressed() {
     if (key === 'f' || key === 'F') {
         const presetOrder = ['kick', 'bass', 'vocal', 'hats', 'full'];
         const presetValues = {
-            kick: { low: 30, high: 150 }, bass: { low: 60, high: 300 },
-            vocal: { low: 800, high: 4000 }, hats: { low: 7500, high: 16000 },
+            kick: { low: 40, high: 200 }, bass: { low: 40, high: 300 },
+            vocal: { low: 300, high: 5000 }, hats: { low: 6000, high: 20000 },
             full: { low: 20, high: 20000 }
         };
-        const presetThresh = { kick: 15, bass: 15, vocal: 30, hats: 20, full: 5 };
+        const presetThresh = { kick: 8, bass: 15, vocal: 25, hats: 15, full: 5 };
         let curIdx = presetOrder.findIndex(p => {
             let pv = presetValues[p];
             return freqLow === pv.low && freqHigh === pv.high;
@@ -1306,6 +1321,17 @@ function keyPressed() {
         smoothBand = 0;
         resetBandDetectors();
         changed = true;
+    }
+
+    // Undo (Cmd+Z) — works regardless of selection
+    if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'z' || key === 'Z') && !e.shiftKey) {
+        tlUndo();
+        return false;
+    }
+    // Redo (Cmd+Shift+Z) — works regardless of selection
+    if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'z' || key === 'Z') && e.shiftKey) {
+        tlRedo();
+        return false;
     }
 
     // Segment management (when segments selected, override arrow seek)
@@ -1340,6 +1366,7 @@ function keyPressed() {
 
         // Delete (Backspace or Delete)
         if (keyCode === BACKSPACE || keyCode === 46) {
+            tlSaveState();
             timelineSegments = timelineSegments.filter(s => !selectedSegments.has(s.id));
             selectedSegments.clear();
             syncSelectedSegment();
@@ -1350,6 +1377,7 @@ function keyPressed() {
 
         // Duplicate (Cmd+D)
         if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'd' || key === 'D')) {
+            tlSaveState();
             let newSegs = [];
             for (let seg of timelineSegments) {
                 if (selectedSegments.has(seg.id)) {
@@ -1385,6 +1413,7 @@ function keyPressed() {
 
     // Paste (Cmd+V) — works even without selection
     if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'v' || key === 'V') && clipboardSegments.length > 0) {
+        tlSaveState();
         let currentTime = (tlRulerMode === 'audio' && audioElement && audioLoaded)
             ? audioElement.currentTime : (videoEl ? videoEl.time() : 0);
         let tlDur = getTimelineDuration();
