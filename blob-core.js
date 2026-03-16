@@ -138,6 +138,10 @@ let timelineSegments = [];
 let videoDuration = 0;
 let audioDuration = 0;
 let selectedSegment = null;
+let selectedSegments = new Set();
+let clipboardSegments = [];
+let tlZoom = 1;
+let tlScrollOffset = 0;
 let tlDragging = false;
 let fxDragState = null;
 let tlWaveform = null;
@@ -259,6 +263,9 @@ const ui = {
     // Timeline
     tlContainer: document.getElementById('timeline-container'),
     tlTrack: document.getElementById('timeline-track'),
+    tlTrackInner: document.getElementById('tl-track-inner'),
+    tlRulerCanvas: document.getElementById('tl-ruler'),
+    tlZoomSlider: document.getElementById('tl-zoom-slider'),
     tlPlayhead: document.getElementById('timeline-playhead'),
     tlTime: document.getElementById('timeline-time'),
     tlBtnPlay: document.getElementById('tl-btn-play'),
@@ -1229,6 +1236,112 @@ function keyPressed() {
         changed = true;
     }
 
+    // Segment management (when segments selected, override arrow seek)
+    if (selectedSegments.size > 0) {
+        let tlDur = getTimelineDuration();
+
+        // Arrow nudge
+        if (keyCode === LEFT_ARROW && tlDur) {
+            let delta = keyIsDown(SHIFT) ? -1 : -0.1;
+            for (let seg of timelineSegments) {
+                if (selectedSegments.has(seg.id)) {
+                    let dur = seg.endTime - seg.startTime;
+                    seg.startTime = Math.max(0, seg.startTime + delta);
+                    seg.endTime = seg.startTime + dur;
+                }
+            }
+            assignLanes(); renderTimelineSegments();
+            return false;
+        }
+        if (keyCode === RIGHT_ARROW && tlDur) {
+            let delta = keyIsDown(SHIFT) ? 1 : 0.1;
+            for (let seg of timelineSegments) {
+                if (selectedSegments.has(seg.id)) {
+                    let dur = seg.endTime - seg.startTime;
+                    seg.startTime = Math.min(tlDur - dur, seg.startTime + delta);
+                    seg.endTime = seg.startTime + dur;
+                }
+            }
+            assignLanes(); renderTimelineSegments();
+            return false;
+        }
+
+        // Delete (Backspace or Delete)
+        if (keyCode === BACKSPACE || keyCode === 46) {
+            timelineSegments = timelineSegments.filter(s => !selectedSegments.has(s.id));
+            selectedSegments.clear();
+            syncSelectedSegment();
+            assignLanes();
+            renderTimelineSegments();
+            return false;
+        }
+
+        // Duplicate (Cmd+D)
+        if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'd' || key === 'D')) {
+            let newSegs = [];
+            for (let seg of timelineSegments) {
+                if (selectedSegments.has(seg.id)) {
+                    let dur = seg.endTime - seg.startTime;
+                    let newSeg = {
+                        id: nextSegId++,
+                        effect: seg.effect,
+                        startTime: seg.endTime,
+                        endTime: Math.min(seg.endTime + dur, tlDur),
+                        params: JSON.parse(JSON.stringify(seg.params)),
+                        lane: 0,
+                        color: seg.color
+                    };
+                    newSegs.push(newSeg);
+                }
+            }
+            timelineSegments.push(...newSegs);
+            selectedSegments.clear();
+            newSegs.forEach(s => selectedSegments.add(s.id));
+            syncSelectedSegment();
+            assignLanes(); renderTimelineSegments();
+            return false;
+        }
+
+        // Copy (Cmd+C)
+        if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'c' || key === 'C')) {
+            clipboardSegments = timelineSegments
+                .filter(s => selectedSegments.has(s.id))
+                .map(s => JSON.parse(JSON.stringify(s)));
+            return false;
+        }
+    }
+
+    // Paste (Cmd+V) — works even without selection
+    if ((keyIsDown(91) || keyIsDown(93) || keyIsDown(17)) && (key === 'v' || key === 'V') && clipboardSegments.length > 0) {
+        let currentTime = (tlRulerMode === 'audio' && audioElement && audioLoaded)
+            ? audioElement.currentTime : (videoEl ? videoEl.time() : 0);
+        let tlDur = getTimelineDuration();
+        if (tlDur > 0) {
+            let earliest = Math.min(...clipboardSegments.map(s => s.startTime));
+            let newSegs = [];
+            for (let clip of clipboardSegments) {
+                let offset = clip.startTime - earliest;
+                let dur = clip.endTime - clip.startTime;
+                let newSeg = {
+                    id: nextSegId++,
+                    effect: clip.effect,
+                    startTime: currentTime + offset,
+                    endTime: Math.min(currentTime + offset + dur, tlDur),
+                    params: JSON.parse(JSON.stringify(clip.params)),
+                    lane: 0,
+                    color: clip.color
+                };
+                newSegs.push(newSeg);
+            }
+            timelineSegments.push(...newSegs);
+            selectedSegments.clear();
+            newSegs.forEach(s => selectedSegments.add(s.id));
+            syncSelectedSegment();
+            assignLanes(); renderTimelineSegments();
+        }
+        return false;
+    }
+
     if (keyCode === LEFT_ARROW && videoLoaded && videoDuration > 0) {
         let t = Math.max(0, videoEl.time() - 5);
         videoEl.time(t);
@@ -1239,14 +1352,6 @@ function keyPressed() {
         let t = Math.min(videoDuration, videoEl.time() + 5);
         videoEl.time(t);
         if (audioElement && audioLoaded) audioElement.currentTime = Math.max(0, getAudioTimeForVideo(t));
-        return false;
-    }
-
-    if (keyCode === BACKSPACE && selectedSegment) {
-        timelineSegments = timelineSegments.filter(s => s.id !== selectedSegment.id);
-        selectedSegment = null;
-        assignLanes();
-        renderTimelineSegments();
         return false;
     }
 

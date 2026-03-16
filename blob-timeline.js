@@ -1,8 +1,46 @@
 // ══════════════════════════════════════════
 // SECTION: TIMELINE (blob-timeline.js)
 // Timeline segments, waveform, beat detection,
-// playhead, drag/resize, lane assignment
+// playhead, drag/resize, lane assignment,
+// zoom/pan, ruler, segment management
 // ══════════════════════════════════════════
+
+// ── Zoom/Pan Helpers ─────────────────────
+
+function getVisibleTimeRange() {
+    let dur = getTimelineDuration();
+    if (!dur) return { start: 0, end: 0, duration: 0 };
+    let visibleDur = dur / tlZoom;
+    let start = tlScrollOffset;
+    let end = start + visibleDur;
+    return { start, end, duration: visibleDur };
+}
+
+function timeToPercent(time) {
+    let vr = getVisibleTimeRange();
+    if (vr.duration <= 0) return 0;
+    return ((time - vr.start) / vr.duration) * 100;
+}
+
+function percentToTime(pct) {
+    let vr = getVisibleTimeRange();
+    return vr.start + (pct / 100) * vr.duration;
+}
+
+function clampScroll() {
+    let dur = getTimelineDuration();
+    if (!dur) return;
+    let maxOffset = dur - (dur / tlZoom);
+    tlScrollOffset = Math.max(0, Math.min(tlScrollOffset, maxOffset));
+}
+
+function refreshTimeline() {
+    renderTimelineRuler();
+    renderTimelineWaveform();
+    renderTimelineSegments();
+}
+
+// ── Core Timeline Functions ──────────────
 
 function addTimelineSegmentAt(effectName, startTime) {
     let tlDur = getTimelineDuration();
@@ -20,7 +58,8 @@ function addTimelineSegmentAt(effectName, startTime) {
     timelineSegments.push(seg);
     assignLanes();
     renderTimelineSegments();
-    let newEl = ui.tlTrack.querySelector(`.timeline-segment[data-id="${seg.id}"]`);
+    let container = ui.tlTrackInner || ui.tlTrack;
+    let newEl = container.querySelector(`.timeline-segment[data-id="${seg.id}"]`);
     if (newEl) {
         newEl.classList.add('just-added');
         setTimeout(() => newEl.classList.remove('just-added'), 500);
@@ -30,9 +69,10 @@ function addTimelineSegmentAt(effectName, startTime) {
 function seekToTimelinePosition(clientX) {
     let tlDur = getTimelineDuration();
     if (!tlDur || !videoEl) return;
-    let rect = ui.tlTrack.getBoundingClientRect();
+    let container = ui.tlTrackInner || ui.tlTrack;
+    let rect = container.getBoundingClientRect();
     let ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    let seekTime = ratio * tlDur;
+    let seekTime = percentToTime(ratio * 100);
     if (tlRulerMode === 'audio') {
         let videoTime = seekTime + audioOffset;
         if (videoDuration > 0) videoTime = ((videoTime % videoDuration) + videoDuration) % videoDuration;
@@ -54,9 +94,26 @@ function updateTimelinePlayhead() {
     } else {
         currentTime = videoEl.time();
     }
-    let ratio = Math.max(0, Math.min(1, currentTime / tlDur));
-    ui.tlPlayhead.style.left = (ratio * 100) + '%';
+    let pct = timeToPercent(currentTime);
+    ui.tlPlayhead.style.left = Math.max(0, Math.min(100, pct)) + '%';
     ui.tlTime.textContent = formatTime(currentTime) + ' / ' + formatTime(tlDur);
+
+    // Auto-scroll when zoomed: keep playhead in view
+    if (tlZoom > 1 && videoPlaying) {
+        let vr = getVisibleTimeRange();
+        if (currentTime > vr.start + vr.duration * 0.9 || currentTime < vr.start) {
+            tlScrollOffset = currentTime - vr.duration * 0.2;
+            clampScroll();
+            refreshTimeline();
+        }
+    }
+
+    // Toggle active class on segments (lightweight, no re-render)
+    let container = ui.tlTrackInner || ui.tlTrack;
+    container.querySelectorAll('.timeline-segment').forEach(el => {
+        let seg = timelineSegments.find(s => s.id == el.dataset.id);
+        if (seg) el.classList.toggle('active', currentTime >= seg.startTime && currentTime <= seg.endTime);
+    });
 }
 
 function formatTime(s) {
@@ -90,6 +147,54 @@ function showTimeline() {
 }
 function hideTimeline() {
     ui.tlContainer.classList.add('hidden');
+}
+
+// ── Time Ruler ───────────────────────────
+
+function renderTimelineRuler() {
+    let canvas = ui.tlRulerCanvas;
+    if (!canvas) return;
+    let parent = canvas.parentElement;
+    if (!parent) return;
+    let rect = parent.getBoundingClientRect();
+    let dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = 18 * dpr;
+    canvas.style.width = rect.width + 'px';
+    let ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, 18);
+
+    let vr = getVisibleTimeRange();
+    if (vr.duration <= 0) return;
+
+    // Adaptive tick interval
+    let majorInterval;
+    if (vr.duration < 5) majorInterval = 1;
+    else if (vr.duration < 15) majorInterval = 2;
+    else if (vr.duration < 30) majorInterval = 5;
+    else if (vr.duration < 120) majorInterval = 10;
+    else majorInterval = 30;
+    let minorInterval = majorInterval / 5;
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+
+    let firstTick = Math.floor(vr.start / minorInterval) * minorInterval;
+    for (let t = firstTick; t <= vr.end; t += minorInterval) {
+        let x = ((t - vr.start) / vr.duration) * rect.width;
+        let isMajor = Math.abs(t % majorInterval) < 0.01 || Math.abs(t % majorInterval - majorInterval) < 0.01;
+        ctx.beginPath();
+        ctx.moveTo(x, isMajor ? 4 : 12);
+        ctx.lineTo(x, 18);
+        ctx.lineWidth = isMajor ? 1 : 0.5;
+        ctx.stroke();
+        if (isMajor && t >= 0) {
+            ctx.fillText(formatTime(t), x, 11);
+        }
+    }
 }
 
 // ── Audio Waveform Analysis for Timeline ───
@@ -179,7 +284,7 @@ function analyzeAudioForTimeline(file) {
             }
 
             audioDuration = buffer.duration;
-            renderTimelineWaveform();
+            refreshTimeline();
         }, function(err) {
             console.error('Audio decode failed:', err);
             ui.audioName.innerText = 'decode error — try another file';
@@ -190,8 +295,9 @@ function analyzeAudioForTimeline(file) {
 
 function renderTimelineWaveform() {
     let canvas = ui.tlWaveformCanvas;
+    let container = ui.tlTrackInner || ui.tlTrack;
     if (!canvas || !tlWaveform || tlWaveform.length === 0) return;
-    let rect = ui.tlTrack.getBoundingClientRect();
+    let rect = container.getBoundingClientRect();
     canvas.width = rect.width * (window.devicePixelRatio || 1);
     canvas.height = rect.height * (window.devicePixelRatio || 1);
     canvas.style.width = rect.width + 'px';
@@ -201,8 +307,8 @@ function renderTimelineWaveform() {
     ctx.clearRect(0, 0, w, h);
 
     let audioDur = tlWaveform[tlWaveform.length - 1].time;
-    let dur = getTimelineDuration();
-    if (dur <= 0) return;
+    let vr = getVisibleTimeRange();
+    if (vr.duration <= 0) return;
 
     let colors = {
         full: 'rgba(200, 200, 200, 0.55)',
@@ -217,7 +323,7 @@ function renderTimelineWaveform() {
     let barCount = Math.min(w, tlWaveform.length);
     let barW = w / barCount;
     for (let i = 0; i < barCount; i++) {
-        let tlTime = (i / barCount) * dur;
+        let tlTime = vr.start + (i / barCount) * vr.duration;
         let audioTime = tlTime - audioOffset;
         if (audioTime < 0 || audioTime > audioDur) continue;
         let idx = Math.floor(audioTime / audioDur * tlWaveform.length);
@@ -228,20 +334,20 @@ function renderTimelineWaveform() {
         ctx.fillRect(i * barW, h - barH, Math.max(barW, 1), barH);
     }
 
-    // Draw beat markers (cached)
-    let beatKey = tlBeats.length + '|' + audioOffset.toFixed(2) + '|' + dur.toFixed(2);
+    // Draw beat markers (zoom-aware)
+    let beatKey = tlBeats.length + '|' + audioOffset.toFixed(2) + '|' + vr.start.toFixed(2) + '|' + vr.duration.toFixed(2);
     if (beatKey !== _cachedBeatKey) {
         _cachedBeatKey = beatKey;
         _cachedBeatMarkers.forEach(el => el.remove());
         _cachedBeatMarkers = [];
         for (let beatTime of tlBeats) {
             let tlBeatTime = beatTime + audioOffset;
-            if (tlBeatTime < 0 || tlBeatTime > dur) continue;
-            let pct = (tlBeatTime / dur) * 100;
+            if (tlBeatTime < vr.start || tlBeatTime > vr.end) continue;
+            let pct = timeToPercent(tlBeatTime);
             let marker = document.createElement('div');
             marker.className = 'tl-beat-marker';
             marker.style.left = pct + '%';
-            ui.tlTrack.appendChild(marker);
+            container.appendChild(marker);
             _cachedBeatMarkers.push(marker);
         }
     }
@@ -296,22 +402,51 @@ function assignLanes() {
     }
 }
 
+function syncSelectedSegment() {
+    selectedSegment = selectedSegments.size > 0
+        ? timelineSegments.find(s => selectedSegments.has(s.id)) || null
+        : null;
+}
+
 function renderTimelineSegments() {
-    ui.tlTrack.querySelectorAll('.timeline-segment').forEach(el => el.remove());
+    let container = ui.tlTrackInner || ui.tlTrack;
+    container.querySelectorAll('.timeline-segment').forEach(el => el.remove());
+    container.querySelectorAll('.tl-lane-line').forEach(el => el.remove());
     let tlDur = getTimelineDuration();
     if (!tlDur) return;
+
+    let vr = getVisibleTimeRange();
+
+    // Find max lane for lane lines
+    let maxLane = 0;
     for (let seg of timelineSegments) {
+        if (seg.lane > maxLane) maxLane = seg.lane;
+    }
+
+    // Draw lane separator lines
+    for (let i = 1; i <= maxLane; i++) {
+        let line = document.createElement('div');
+        line.className = 'tl-lane-line';
+        line.style.top = (i * 26) + 'px';
+        container.appendChild(line);
+    }
+
+    for (let seg of timelineSegments) {
+        // Skip segments entirely outside visible range
+        if (seg.endTime < vr.start || seg.startTime > vr.end) continue;
+
         let el = document.createElement('div');
         el.className = 'timeline-segment';
         el.dataset.id = seg.id;
-        let left = (seg.startTime / tlDur) * 100;
-        let w = ((seg.endTime - seg.startTime) / tlDur) * 100;
+        let left = timeToPercent(seg.startTime);
+        let w = ((seg.endTime - seg.startTime) / vr.duration) * 100;
         el.style.left = left + '%';
         el.style.width = Math.max(w, 0.5) + '%';
-        el.style.top = (seg.lane * 20 + 2) + 'px';
+        el.style.top = (seg.lane * 26 + 2) + 'px';
         el.style.background = seg.color;
-        el.textContent = seg.effect.toUpperCase().slice(0, 6);
-        if (selectedSegment && selectedSegment.id === seg.id) el.classList.add('selected');
+        el.textContent = seg.effect.toUpperCase() + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
+        if (selectedSegments.has(seg.id)) el.classList.add('selected');
+
         // Left/right resize handles
         let hl = document.createElement('div');
         hl.className = 'seg-handle seg-handle-left';
@@ -319,29 +454,46 @@ function renderTimelineSegments() {
         hr.className = 'seg-handle seg-handle-right';
         el.appendChild(hl);
         el.appendChild(hr);
-        // Click to select
+
+        // Click to select (multi-select with Shift/Cmd)
         el.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectedSegment = seg;
+            if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                if (selectedSegments.has(seg.id)) selectedSegments.delete(seg.id);
+                else selectedSegments.add(seg.id);
+            } else {
+                selectedSegments.clear();
+                selectedSegments.add(seg.id);
+            }
+            syncSelectedSegment();
             renderTimelineSegments();
         });
+
         // Double-click to delete
         el.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            timelineSegments = timelineSegments.filter(s => s.id !== seg.id);
-            if (selectedSegment && selectedSegment.id === seg.id) selectedSegment = null;
+            if (selectedSegments.has(seg.id) && selectedSegments.size > 1) {
+                timelineSegments = timelineSegments.filter(s => !selectedSegments.has(s.id));
+                selectedSegments.clear();
+            } else {
+                timelineSegments = timelineSegments.filter(s => s.id !== seg.id);
+                selectedSegments.delete(seg.id);
+            }
+            syncSelectedSegment();
             assignLanes();
             renderTimelineSegments();
         });
-        // Drag to move
+
+        // Drag to move/resize
         setupSegmentDrag(el, seg);
-        ui.tlTrack.appendChild(el);
+        container.appendChild(el);
     }
 }
 
 function setupSegmentDrag(el, seg) {
     let dragType = null;
     let startX, origStart, origEnd;
+    let origPositions = null; // For multi-drag
 
     el.querySelector('.seg-handle-left').addEventListener('mousedown', (e) => {
         e.stopPropagation();
@@ -366,20 +518,46 @@ function setupSegmentDrag(el, seg) {
         startX = e.clientX;
         origStart = seg.startTime;
         origEnd = seg.endTime;
+        // Store positions of all selected segments for multi-drag
+        if (selectedSegments.has(seg.id) && selectedSegments.size > 1) {
+            origPositions = new Map();
+            for (let s of timelineSegments) {
+                if (selectedSegments.has(s.id)) {
+                    origPositions.set(s.id, { startTime: s.startTime, endTime: s.endTime });
+                }
+            }
+        } else {
+            origPositions = null;
+        }
         startDrag();
     });
 
     function startDrag() {
         function onMove(e) {
-            let rect = ui.tlTrack.getBoundingClientRect();
+            let container = ui.tlTrackInner || ui.tlTrack;
+            let rect = container.getBoundingClientRect();
+            let vr = getVisibleTimeRange();
             let tlDur = getTimelineDuration();
-            let dx = (e.clientX - startX) / rect.width * tlDur;
+            let dx = (e.clientX - startX) / rect.width * vr.duration;
+
             if (dragType === 'move') {
-                let dur = origEnd - origStart;
-                let newStart = Math.max(0, Math.min(origStart + dx, tlDur - dur));
-                newStart = snapToBeat(newStart);
-                seg.startTime = newStart;
-                seg.endTime = newStart + dur;
+                if (origPositions && selectedSegments.has(seg.id)) {
+                    // Multi-drag: move all selected segments
+                    for (let [id, orig] of origPositions) {
+                        let s = timelineSegments.find(ts => ts.id === id);
+                        if (!s) continue;
+                        let dur = orig.endTime - orig.startTime;
+                        let newStart = Math.max(0, Math.min(orig.startTime + dx, tlDur - dur));
+                        s.startTime = snapToBeat(newStart);
+                        s.endTime = s.startTime + dur;
+                    }
+                } else {
+                    let dur = origEnd - origStart;
+                    let newStart = Math.max(0, Math.min(origStart + dx, tlDur - dur));
+                    newStart = snapToBeat(newStart);
+                    seg.startTime = newStart;
+                    seg.endTime = newStart + dur;
+                }
             } else if (dragType === 'left') {
                 let newStart = Math.max(0, Math.min(origStart + dx, seg.endTime - 0.1));
                 seg.startTime = snapToBeat(newStart);
@@ -387,15 +565,30 @@ function setupSegmentDrag(el, seg) {
                 let newEnd = Math.max(seg.startTime + 0.1, Math.min(origEnd + dx, tlDur));
                 seg.endTime = snapToBeat(newEnd);
             }
-            // CSS-only update during drag
-            let left = (seg.startTime / tlDur) * 100;
-            let w = ((seg.endTime - seg.startTime) / tlDur) * 100;
-            el.style.left = left + '%';
-            el.style.width = Math.max(w, 0.5) + '%';
+
+            // CSS-only update during drag (zoom-aware)
+            if (origPositions && dragType === 'move') {
+                // Update all dragged segments visually
+                let container2 = ui.tlTrackInner || ui.tlTrack;
+                for (let [id, _] of origPositions) {
+                    let s = timelineSegments.find(ts => ts.id === id);
+                    let sEl = container2.querySelector(`.timeline-segment[data-id="${id}"]`);
+                    if (s && sEl) {
+                        sEl.style.left = timeToPercent(s.startTime) + '%';
+                        sEl.style.width = Math.max(((s.endTime - s.startTime) / vr.duration) * 100, 0.5) + '%';
+                        sEl.textContent = s.effect.toUpperCase() + ' ' + formatTime(s.startTime) + '-' + formatTime(s.endTime);
+                    }
+                }
+            } else {
+                el.style.left = timeToPercent(seg.startTime) + '%';
+                el.style.width = Math.max(((seg.endTime - seg.startTime) / vr.duration) * 100, 0.5) + '%';
+                el.textContent = seg.effect.toUpperCase() + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
+            }
         }
         function onUp() {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
+            origPositions = null;
             assignLanes();
             renderTimelineSegments();
         }
@@ -432,6 +625,8 @@ function applyTimelineEffects() {
 
 // ── TIMELINE UI LISTENERS ──────────────────────
 
+let _tlWheelRAF = null;
+
 function setupTimelineUIListeners() {
     // Timeline transport controls
     ui.tlBtnPlay.addEventListener('click', togglePlay);
@@ -454,8 +649,7 @@ function setupTimelineUIListeners() {
             tlRulerMode = e.target.dataset.ruler;
             ui.tlRulerButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            renderTimelineWaveform();
-            renderTimelineSegments();
+            refreshTimeline();
         });
     });
 
@@ -469,22 +663,73 @@ function setupTimelineUIListeners() {
         });
     });
 
+    // Zoom slider
+    if (ui.tlZoomSlider) {
+        ui.tlZoomSlider.addEventListener('input', (e) => {
+            tlZoom = parseFloat(e.target.value);
+            clampScroll();
+            refreshTimeline();
+        });
+    }
+
+    // Ctrl+scroll = zoom, scroll = pan
+    let trackEl = ui.tlTrackInner || ui.tlTrack;
+    trackEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (_tlWheelRAF) return; // debounce
+        _tlWheelRAF = requestAnimationFrame(() => {
+            _tlWheelRAF = null;
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom centered on cursor
+                let rect = trackEl.getBoundingClientRect();
+                let cursorRatio = (e.clientX - rect.left) / rect.width;
+                let cursorTime = percentToTime(cursorRatio * 100);
+                tlZoom = Math.max(1, Math.min(20, tlZoom * (1 - e.deltaY * 0.005)));
+                let newVisDur = getTimelineDuration() / tlZoom;
+                tlScrollOffset = cursorTime - cursorRatio * newVisDur;
+                clampScroll();
+                if (ui.tlZoomSlider) ui.tlZoomSlider.value = tlZoom;
+            } else {
+                // Horizontal pan
+                let panAmount = (e.deltaX || e.deltaY) * 0.05 * (getTimelineDuration() / tlZoom);
+                tlScrollOffset += panAmount;
+                clampScroll();
+            }
+            refreshTimeline();
+        });
+    }, { passive: false });
+
+    // Ruler click = scrub
+    if (ui.tlRulerCanvas) {
+        ui.tlRulerCanvas.addEventListener('mousedown', (e) => {
+            tlDragging = true;
+            seekToTimelinePosition(e.clientX);
+        });
+    }
+
     // Timeline track — merged mousedown for waveform drag + scrub
-    ui.tlTrack.addEventListener('mousedown', (e) => {
+    trackEl.addEventListener('mousedown', (e) => {
         if (e.target.classList.contains('timeline-segment') || e.target.classList.contains('seg-handle')) return;
+
+        // Deselect segments when clicking empty track
+        if (selectedSegments.size > 0) {
+            selectedSegments.clear();
+            syncSelectedSegment();
+            renderTimelineSegments();
+        }
 
         // Alt+click on waveform = drag audio offset
         if (e.altKey && tlWaveform && tlWaveform.length > 0 &&
-            (e.target === ui.tlWaveformCanvas || e.target === ui.tlTrack)) {
+            (e.target === ui.tlWaveformCanvas || e.target === trackEl)) {
             e.preventDefault();
             waveformDragging = true;
             let startX = e.clientX;
             let origOffset = audioOffset;
-            let rect = ui.tlTrack.getBoundingClientRect();
-            let tlDur = getTimelineDuration();
+            let rect = trackEl.getBoundingClientRect();
+            let vr = getVisibleTimeRange();
 
             function onWfMove(ev) {
-                let dx = (ev.clientX - startX) / rect.width * tlDur;
+                let dx = (ev.clientX - startX) / rect.width * vr.duration;
                 audioOffset = origOffset + dx;
                 updateOffsetLabel();
                 renderTimelineWaveform();
@@ -509,7 +754,6 @@ function setupTimelineUIListeners() {
     });
     document.addEventListener('mouseup', () => { tlDragging = false; });
 
-    // FX card drag to timeline (drag events handled by setupFxUIListeners)
-    // Re-render waveform on resize
-    window.addEventListener('resize', () => { if (tlWaveform) renderTimelineWaveform(); });
+    // Re-render on resize
+    window.addEventListener('resize', () => { if (tlWaveform) refreshTimeline(); });
 }

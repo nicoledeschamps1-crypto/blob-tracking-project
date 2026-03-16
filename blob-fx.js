@@ -1055,15 +1055,17 @@ function setupFxUIListeners() {
         if (fxDragState.dragging) {
             ui.dragGhost.style.left = (e.clientX + 12) + 'px';
             ui.dragGhost.style.top = (e.clientY + 12) + 'px';
-            let tlRect = ui.tlTrack.getBoundingClientRect();
+            let tlInner = ui.tlTrackInner || ui.tlTrack;
+            let tlRect = tlInner.getBoundingClientRect();
             let overTl = e.clientX >= tlRect.left && e.clientX <= tlRect.right &&
                          e.clientY >= tlRect.top - 20 && e.clientY <= tlRect.bottom + 20;
-            ui.tlTrack.classList.toggle('drag-over', overTl);
+            tlInner.classList.toggle('drag-over', overTl);
             ui.tlDragHint.classList.toggle('drop-active', overTl);
             let tlDurG = getTimelineDuration();
             if (overTl && tlDurG > 0) {
                 let ratio = Math.max(0, Math.min(1, (e.clientX - tlRect.left) / tlRect.width));
-                let segW = Math.min(5, tlDurG) / tlDurG * 100;
+                let vr = getVisibleTimeRange();
+                let segW = Math.min(5, vr.duration) / vr.duration * 100;
                 ui.tlGhost.style.left = (ratio * 100) + '%';
                 ui.tlGhost.style.width = segW + '%';
                 ui.tlGhost.style.background = FX_CAT_COLORS[FX_CATEGORIES[fxDragState.effect]] || '#888';
@@ -1078,16 +1080,17 @@ function setupFxUIListeners() {
         if (!fxDragState) return;
         if (fxDragState.dragging) {
             ui.dragGhost.style.display = 'none';
-            ui.tlTrack.classList.remove('drag-over');
+            let tlInner2 = ui.tlTrackInner || ui.tlTrack;
+            tlInner2.classList.remove('drag-over');
             ui.tlDragHint.classList.remove('drop-active');
             ui.tlGhost.classList.remove('visible');
-            let tlRect = ui.tlTrack.getBoundingClientRect();
+            let tlRect = tlInner2.getBoundingClientRect();
             let overTl = e.clientX >= tlRect.left && e.clientX <= tlRect.right &&
                          e.clientY >= tlRect.top - 20 && e.clientY <= tlRect.bottom + 20;
             let tlDur = getTimelineDuration();
             if (overTl && tlDur > 0) {
                 let ratio = Math.max(0, Math.min(1, (e.clientX - tlRect.left) / tlRect.width));
-                let dropTime = snapToBeat(ratio * tlDur);
+                let dropTime = snapToBeat(percentToTime(ratio * 100));
                 addTimelineSegmentAt(fxDragState.effect, dropTime);
             }
         } else {

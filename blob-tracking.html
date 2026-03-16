@@ -563,7 +563,7 @@
             bottom: 12px;
             left: 320px;
             right: 320px;
-            height: 130px;
+            height: 200px;
             background: rgba(12, 12, 12, 0.95);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255,255,255,0.05);
@@ -594,13 +594,30 @@
             margin-left: auto;
         }
         #timeline-track {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-radius: 3px;
+            min-height: 0;
+        }
+        #tl-ruler {
+            width: 100%;
+            height: 18px;
+            display: block;
+            flex-shrink: 0;
+            background: #1a1a1a;
+            border-radius: 3px 3px 0 0;
+            cursor: pointer;
+        }
+        #tl-track-inner {
             position: relative;
             flex: 1;
             background: #1a1a1a;
-            border-radius: 3px;
+            border-radius: 0 0 3px 3px;
             cursor: pointer;
-            overflow: hidden;
-            min-height: 70px;
+            overflow-x: hidden;
+            overflow-y: auto;
+            min-height: 80px;
         }
         #timeline-playhead {
             position: absolute;
@@ -615,13 +632,13 @@
         }
         .timeline-segment {
             position: absolute;
-            height: 16px;
+            height: 22px;
             border-radius: 3px;
-            font-size: 8px;
+            font-size: 9px;
             font-weight: 700;
             color: rgba(0,0,0,0.8);
             text-transform: uppercase;
-            line-height: 16px;
+            line-height: 22px;
             padding: 0 5px;
             cursor: pointer;
             overflow: hidden;
@@ -632,9 +649,21 @@
         }
         .timeline-segment:hover { opacity: 0.85; }
         .timeline-segment.selected {
-            outline: 1px solid #fff;
-            outline-offset: 1px;
-            z-index: 4;
+            outline: 2px solid rgba(255,255,255,0.9);
+            outline-offset: 2px;
+            z-index: 6;
+        }
+        .timeline-segment.active {
+            box-shadow: 0 0 8px 2px rgba(255,255,255,0.25);
+            z-index: 3;
+        }
+        .tl-lane-line {
+            position: absolute;
+            left: 0; right: 0;
+            height: 1px;
+            background: repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 4px, transparent 4px, transparent 8px);
+            pointer-events: none;
+            z-index: 0;
         }
         .timeline-segment .seg-handle {
             position: absolute;
@@ -726,9 +755,26 @@
             outline-offset: 1px;
         }
         /* Timeline drag-over state */
-        #timeline-track.drag-over {
+        #tl-track-inner.drag-over {
             background: #1e1a2e;
             box-shadow: inset 0 0 16px rgba(108, 92, 231, 0.25);
+        }
+        .tl-zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 4px;
+        }
+        .tl-zoom-label {
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        #tl-zoom-slider {
+            width: 50px;
+            height: 12px;
+            accent-color: #6C5CE7;
         }
         /* Drag ghost (follows cursor) */
         #drag-ghost {
@@ -1468,11 +1514,18 @@
             <button id="tl-btn-record" class="action-btn" title="Record">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
             </button>
+            <div class="tl-zoom-controls">
+                <span class="tl-zoom-label">ZOOM</span>
+                <input type="range" id="tl-zoom-slider" min="1" max="20" step="0.5" value="1">
+            </div>
         </div>
         <div id="timeline-track">
-            <canvas id="tl-waveform"></canvas>
-            <div id="timeline-playhead"></div>
-            <div id="timeline-ghost"></div>
+            <canvas id="tl-ruler" height="18"></canvas>
+            <div id="tl-track-inner">
+                <canvas id="tl-waveform"></canvas>
+                <div id="timeline-playhead"></div>
+                <div id="timeline-ghost"></div>
+            </div>
         </div>
         <div id="tl-drag-hint">drag effects here to place them at specific moments &bull; drag waveform to offset audio</div>
     </div>
