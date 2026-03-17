@@ -901,6 +901,75 @@
             white-space: nowrap;
         }
         .tl-offset-label.hidden { display: none; }
+        /* Audio section indicator */
+        .tl-audio-section {
+            font-size: 10px;
+            font-weight: 600;
+            color: #6C5CE7;
+            font-family: 'Roboto Mono', monospace;
+            white-space: nowrap;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .tl-audio-section:hover { background: rgba(108, 92, 231, 0.15); }
+        .tl-audio-section.hidden { display: none; }
+        .tl-audio-start-input {
+            width: 38px;
+            background: rgba(108, 92, 231, 0.2);
+            border: 1px solid #6C5CE7;
+            border-radius: 3px;
+            color: #fff;
+            font-size: 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 600;
+            padding: 1px 4px;
+            outline: none;
+            text-align: center;
+        }
+        .tl-audio-start-input.hidden { display: none; }
+        /* Mini song overview bar */
+        .tl-song-overview {
+            height: 20px;
+            position: relative;
+            flex-shrink: 0;
+            background: #111;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .tl-song-overview.hidden { display: none; }
+        .tl-song-overview canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+        }
+        .tl-overview-window {
+            position: absolute;
+            top: 0; bottom: 0;
+            background: rgba(108, 92, 231, 0.2);
+            border: 1px solid rgba(108, 92, 231, 0.6);
+            border-radius: 2px;
+            cursor: grab;
+            min-width: 4px;
+            transition: left 0.05s;
+        }
+        .tl-overview-window:active { cursor: grabbing; transition: none; }
+        .tl-overview-label {
+            position: absolute;
+            top: 2px; left: 4px;
+            font-size: 8px;
+            color: rgba(255,255,255,0.35);
+            font-family: 'Roboto Mono', monospace;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
         #tl-drag-hint {
             font-size: 9px;
             color: var(--text-muted);
@@ -924,6 +993,63 @@
             transition: background 0.15s;
         }
         #tl-btn-add-blob:hover { background: #00E0D9; }
+        /* SYNC button */
+        #tl-btn-sync {
+            background: #6C5CE7;
+            color: #fff;
+            font-weight: 700;
+            font-size: 9px;
+            border: none;
+            padding: 4px 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            transition: background 0.15s;
+        }
+        #tl-btn-sync:hover { background: #7C6DF7; }
+        #tl-btn-sync.active { background: #E17055; }
+        /* Sync config row */
+        .tl-sync-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px;
+            background: rgba(108, 92, 231, 0.08);
+            border-bottom: 1px solid rgba(108, 92, 231, 0.2);
+            font-size: 9px;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--text-muted);
+        }
+        .tl-sync-row.hidden { display: none; }
+        .tl-sync-label { text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .tl-sync-label strong { color: #fff; }
+        .tl-sync-val { color: #fff; min-width: 24px; text-align: center; }
+        .tl-sync-row input[type="range"] {
+            width: 60px; height: 3px;
+            -webkit-appearance: none; appearance: none;
+            background: rgba(255,255,255,0.15); border-radius: 2px; outline: none;
+        }
+        .tl-sync-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 10px; height: 10px;
+            border-radius: 50%; background: #6C5CE7; cursor: pointer;
+        }
+        .tl-sync-btn {
+            background: #6C5CE7;
+            color: #fff;
+            font-weight: 700;
+            font-size: 9px;
+            border: none;
+            padding: 3px 12px;
+            cursor: pointer;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            margin-left: auto;
+        }
+        .tl-sync-btn:hover { background: #7C6DF7; }
         /* Blob edit indicator on right panel */
         #blob-edit-banner {
             display: none;
@@ -1012,6 +1138,176 @@
         /* FX card drag cursor */
         .fx-card { cursor: grab; }
         .fx-card:active { cursor: grabbing; }
+
+        /* ═══ HELP OVERLAY ═══ */
+        #help-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 500;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+        #help-overlay.visible { display: flex; }
+        #help-content {
+            background: rgba(18, 18, 18, 0.98);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            max-width: 720px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 28px 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        }
+        #help-content::-webkit-scrollbar { width: 4px; }
+        #help-content::-webkit-scrollbar-track { background: transparent; }
+        #help-content::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .help-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .help-header h2 {
+            margin: 0;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-main);
+        }
+        .help-close {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .help-close:hover { color: var(--text-main); border-color: rgba(255,255,255,0.3); }
+        .help-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px 28px;
+        }
+        .help-section h3 {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6C5CE7;
+            margin: 0 0 8px;
+        }
+        .help-section dl {
+            margin: 0;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 3px 10px;
+            align-items: baseline;
+        }
+        .help-section dt {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--text-main);
+            background: rgba(255,255,255,0.06);
+            padding: 1px 5px;
+            border-radius: 3px;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .help-section dd {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin: 0;
+        }
+        .help-workflow {
+            grid-column: 1 / -1;
+            margin-top: 8px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .help-workflow h3 {
+            color: #00B894;
+        }
+        .help-workflow-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 28px;
+        }
+        .help-tip {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .help-tip strong {
+            color: var(--text-main);
+        }
+
+        /* Help button in header */
+        .help-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 50%;
+            background: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .help-btn:hover {
+            color: var(--text-main);
+            border-color: rgba(255,255,255,0.35);
+        }
+
+        /* ═══ EMPTY STATE HINT ═══ */
+        #tl-empty-hint {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 1;
+            gap: 6px;
+        }
+        #tl-empty-hint.hidden { display: none; }
+        .tl-hint-main {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.25);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tl-hint-sub {
+            font-size: 10px;
+            color: rgba(255,255,255,0.15);
+        }
+        .tl-hint-sub kbd {
+            background: rgba(255,255,255,0.06);
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 9px;
+        }
     </style>
 </head>
 <body>
@@ -1023,15 +1319,18 @@
         <div class="header-section">
             <div class="title-row">
                 <h1>Browser Blob Tracking</h1>
-                <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
-                    </svg>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <button class="help-btn" id="help-btn" title="Help (?)">?</button>
+                    <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
+                        </svg>
+                    </div>
                 </div>
             </div>
             <div class="subtitle">
-                | Made by <a href="https://instagram.com/pbltrr" target="_blank">@pbltrr</a><br>
-                | Free source code on <a href="https://www.patreon.com/pbltrr" target="_blank">Patreon</a>
+                | Made with HUESOFSATURN<br>
+                | Source: <a href="https://instagram.com/pbltrr" target="_blank">@pbltrr</a>
             </div>
         </div>
 
@@ -1567,20 +1866,20 @@
                             <button class="selector-btn" data-value="rate">RATE</button>
                         </div>
                     </div>
-                    <div class="control-group" id="sync-range-group" style="display:none">
-                        <label>Qty Range</label>
+                    <div class="control-group" id="sync-range-group">
+                        <label>Qty Range <span id="sync-qty-readout" style="font-size:10px;color:var(--text-muted);font-weight:400">5 – 50</span></label>
                         <div style="display:flex;gap:6px;align-items:center">
-                            <input type="range" id="sync-min-qty" min="0" max="100" value="0" style="flex:1">
+                            <input type="range" id="sync-min-qty" min="0" max="100" value="5" style="flex:1">
                             <span style="font-size:10px;color:var(--text-muted)">to</span>
-                            <input type="range" id="sync-max-qty" min="0" max="100" value="100" style="flex:1">
+                            <input type="range" id="sync-max-qty" min="0" max="100" value="50" style="flex:1">
                         </div>
-                        <label>Size Range</label>
+                        <label>Size Range <span id="sync-size-readout" style="font-size:10px;color:var(--text-muted);font-weight:400">10 – 60</span></label>
                         <div style="display:flex;gap:6px;align-items:center">
-                            <input type="range" id="sync-min-size" min="0" max="100" value="0" style="flex:1">
+                            <input type="range" id="sync-min-size" min="0" max="100" value="10" style="flex:1">
                             <span style="font-size:10px;color:var(--text-muted)">to</span>
-                            <input type="range" id="sync-max-size" min="0" max="100" value="100" style="flex:1">
+                            <input type="range" id="sync-max-size" min="0" max="100" value="60" style="flex:1">
                         </div>
-                        <label>Rate Range</label>
+                        <label>Rate Range <span id="sync-rate-readout" style="font-size:10px;color:var(--text-muted);font-weight:400">5 – 80</span></label>
                         <div style="display:flex;gap:6px;align-items:center">
                             <input type="range" id="sync-min-rate" min="0" max="100" value="5" style="flex:1">
                             <span style="font-size:10px;color:var(--text-muted)">to</span>
@@ -1640,6 +1939,10 @@
                 <button class="tl-band-btn" data-loop="once">ONCE</button>
             </div>
             <span id="tl-offset-label" class="tl-offset-label hidden">OFFSET: 0.0s</span>
+            <span id="tl-audio-section" class="tl-audio-section hidden" title="Click to set audio start time">
+                ♫ <span id="tl-audio-start">0:00</span> → <span id="tl-audio-end">0:12</span> of <span id="tl-audio-total">0:00</span>
+                <input id="tl-audio-start-input" class="tl-audio-start-input hidden" type="text" placeholder="m:ss" maxlength="6">
+            </span>
             <span id="timeline-time">0:00 / 0:00</span>
             <button id="tl-btn-record" class="action-btn" title="Record">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
@@ -1648,6 +1951,7 @@
         <!-- Row 2: Blob + waveform band + zoom -->
         <div class="timeline-controls-row2">
             <button id="tl-btn-add-blob" title="Add blob params at playhead">+ BLOB</button>
+            <button id="tl-btn-sync" title="Auto-place blobs at audio peaks">⚡ SYNC</button>
             <div class="tl-band-selector" id="tl-band-selector">
                 <button class="tl-band-btn active" data-band="full">FULL</button>
                 <button class="tl-band-btn" data-band="kick">KICK</button>
@@ -1657,16 +1961,38 @@
             <div class="tl-spacer"></div>
             <div class="tl-zoom-controls">
                 <span class="tl-zoom-label">ZOOM</span>
-                <input type="range" id="tl-zoom-slider" min="1" max="20" step="0.5" value="1">
+                <input type="range" id="tl-zoom-slider" min="1" max="50" step="0.5" value="1">
             </div>
         </div>
+        <!-- Sync config row (hidden by default) -->
+        <div id="tl-sync-row" class="tl-sync-row hidden">
+            <span class="tl-sync-label">BAND: <strong id="tl-sync-band">FULL</strong></span>
+            <span class="tl-sync-label">SENS</span>
+            <input type="range" id="tl-sync-sens" min="1" max="10" step="1" value="5">
+            <span id="tl-sync-sens-val" class="tl-sync-val">5</span>
+            <span class="tl-sync-label">DUR</span>
+            <input type="range" id="tl-sync-dur" min="0.05" max="2.0" step="0.05" value="0.2">
+            <span id="tl-sync-dur-val" class="tl-sync-val">0.2s</span>
+            <span class="tl-sync-label">PEAKS: <strong id="tl-sync-count">—</strong></span>
+            <button id="tl-sync-generate" class="tl-sync-btn">GENERATE</button>
+        </div>
         <div id="tl-scroll-indicator"><div class="viewport"></div></div>
+        <!-- Mini song overview (full audio waveform + draggable window) -->
+        <div id="tl-song-overview" class="tl-song-overview hidden">
+            <canvas id="tl-overview-canvas"></canvas>
+            <div id="tl-overview-window" class="tl-overview-window"></div>
+            <span class="tl-overview-label">SONG</span>
+        </div>
         <div id="timeline-track">
             <canvas id="tl-ruler" height="22"></canvas>
             <div id="tl-track-inner">
                 <canvas id="tl-waveform"></canvas>
                 <div id="timeline-playhead"></div>
                 <div id="timeline-ghost"></div>
+                <div id="tl-empty-hint">
+                    <div class="tl-hint-main">drag effects or modes here</div>
+                    <div class="tl-hint-sub"><kbd>+ BLOB</kbd> snapshot params &bull; <kbd>SYNC</kbd> auto-generate from beats &bull; <kbd>?</kbd> all shortcuts</div>
+                </div>
             </div>
         </div>
         <div id="tl-drag-hint">drag effects/modes to place &bull; + BLOB = snapshot params at playhead &bull; alt+drag waveform = offset audio</div>
@@ -1675,6 +2001,107 @@
     <div id="tl-tooltip"></div>
 
 
+
+<!-- HELP OVERLAY -->
+<div id="help-overlay">
+    <div id="help-content">
+        <div class="help-header">
+            <h2>Keyboard Shortcuts &amp; Tips</h2>
+            <button class="help-close" onclick="toggleHelp()">ESC to close</button>
+        </div>
+        <div class="help-grid">
+            <div class="help-section">
+                <h3>Playback</h3>
+                <dl>
+                    <dt>Space</dt><dd>Play / Pause</dd>
+                    <dt>R</dt><dd>Restart</dd>
+                    <dt>Left/Right</dt><dd>Seek +/-5s</dd>
+                </dl>
+            </div>
+            <div class="help-section">
+                <h3>Tracking Modes</h3>
+                <dl>
+                    <dt>0</dt><dd>OFF</dd>
+                    <dt>1 / Z</dt><dd>BLUE</dd>
+                    <dt>2 / X</dt><dd>RED</dd>
+                    <dt>3</dt><dd>MOTION</dd>
+                    <dt>4</dt><dd>SKIN</dd>
+                    <dt>5</dt><dd>CUSTOM</dd>
+                    <dt>6</dt><dd>BRIGHT</dd>
+                    <dt>7</dt><dd>DARK</dd>
+                    <dt>8</dt><dd>EDGE</dd>
+                    <dt>9</dt><dd>CHROMA</dd>
+                    <dt>M</dt><dd>AI MASK</dd>
+                    <dt>Esc</dt><dd>Exit Mask</dd>
+                </dl>
+            </div>
+            <div class="help-section">
+                <h3>Audio Sync</h3>
+                <dl>
+                    <dt>T</dt><dd>Toggle sync on/off</dd>
+                    <dt>F</dt><dd>Cycle freq preset</dd>
+                    <dt>Q</dt><dd>Cycle sync target</dd>
+                    <dt>B</dt><dd>BPM Lock toggle</dd>
+                </dl>
+            </div>
+            <div class="help-section">
+                <h3>Parameters</h3>
+                <dl>
+                    <dt>W / S</dt><dd>Navigate params</dd>
+                    <dt>A / D</dt><dd>Decrease / Increase (hold)</dd>
+                    <dt>Right-drag</dt><dd>Adjust value</dd>
+                    <dt>L</dt><dd>Lines on/off</dd>
+                    <dt>G</dt><dd>Debug panel</dd>
+                </dl>
+            </div>
+            <div class="help-section">
+                <h3>Timeline</h3>
+                <dl>
+                    <dt>Cmd+Z</dt><dd>Undo</dd>
+                    <dt>Cmd+Shift+Z</dt><dd>Redo</dd>
+                    <dt>Cmd+D</dt><dd>Duplicate</dd>
+                    <dt>Cmd+C/V</dt><dd>Copy / Paste</dd>
+                    <dt>Del</dt><dd>Delete segment</dd>
+                    <dt>Left/Right</dt><dd>Nudge +/-0.1s</dd>
+                    <dt>Shift+Arrow</dt><dd>Nudge +/-1s</dd>
+                    <dt>Ctrl+Scroll</dt><dd>Zoom in/out</dd>
+                    <dt>+ / -</dt><dd>Zoom in/out</dd>
+                    <dt>Home</dt><dd>Reset zoom to 1x</dd>
+                </dl>
+            </div>
+            <div class="help-section">
+                <h3>MASK Mode</h3>
+                <dl>
+                    <dt>Click</dt><dd>Select object</dd>
+                    <dt>Shift+Click</dt><dd>Add region</dd>
+                    <dt>Alt+Click</dt><dd>Subtract region</dd>
+                </dl>
+            </div>
+            <div class="help-section help-workflow">
+                <h3>Quick Start</h3>
+                <div class="help-workflow-grid">
+                    <div class="help-tip"><strong>1.</strong> Upload a video (or use webcam)</div>
+                    <div class="help-tip"><strong>5.</strong> Drag effects/modes to timeline</div>
+                    <div class="help-tip"><strong>2.</strong> Load audio (optional)</div>
+                    <div class="help-tip"><strong>6.</strong> Use <strong>+ BLOB</strong> to snapshot params</div>
+                    <div class="help-tip"><strong>3.</strong> Pick a tracking mode (1-9, M)</div>
+                    <div class="help-tip"><strong>7.</strong> Use <strong>SYNC</strong> to auto-place blobs at beats</div>
+                    <div class="help-tip"><strong>4.</strong> Adjust params with sliders</div>
+                    <div class="help-tip"><strong>8.</strong> Hit Record to capture your creation</div>
+                </div>
+            </div>
+            <div class="help-section help-workflow" style="margin-top:0; border-top:1px solid rgba(255,255,255,0.06); padding-top:14px;">
+                <h3>Tips</h3>
+                <div class="help-workflow-grid">
+                    <div class="help-tip"><strong>Alt+drag waveform</strong> to offset audio alignment</div>
+                    <div class="help-tip"><strong>Click the note indicator</strong> to type a start time</div>
+                    <div class="help-tip"><strong>Shift/Cmd+click</strong> segments for multi-select</div>
+                    <div class="help-tip"><strong>Photo button</strong> exports cropped screenshot</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
 <script src="blob-core.js"></script>

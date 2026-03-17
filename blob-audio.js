@@ -103,9 +103,10 @@ function getAudioEnergy() {
     }
     let band = bandSum / ((highBin - lowBin) * 255);
 
-    // Full-range splits for MIX mode
-    const bassEnd = Math.floor(binCount * 0.15);
-    const midEnd = Math.floor(binCount * 0.5);
+    // Full-range splits for MIX mode (frequency-based, not linear bin %)
+    // bass: 20-250Hz, mid: 250-4000Hz, treble: 4000Hz+
+    const bassEnd = Math.floor(250 / nyquist * binCount);
+    const midEnd = Math.floor(4000 / nyquist * binCount);
     let bass = 0, mid = 0, treble = 0;
     for (let i = 0; i < binCount; i++) {
         if (i < bassEnd) bass += frequencyData[i];
@@ -182,8 +183,8 @@ function resetBandDetectors() {
 function getActiveBandDetector() {
     // Map user's selected freq range to the closest band detector
     const midFreq = (freqLow + freqHigh) / 2;
-    if (midFreq < 300) return bandDetectors.kick;
-    if (midFreq < 5000) return bandDetectors.snare;
+    if (midFreq < 200) return bandDetectors.kick;
+    if (midFreq < 6000) return bandDetectors.snare;
     return bandDetectors.hat;
 }
 
@@ -207,10 +208,22 @@ function updateMultiBandBeats() {
         // Spectral flux (half-wave rectified)
         // For narrow bands (<20 bins, e.g. kick), use sum instead of average
         // to avoid diluting the signal across too few bins
+        // HFC weighting for hat band: weight by bin position (higher bins = more weight)
         let flux = 0;
-        for (let i = lowBin; i < highBin; i++) {
-            let diff = floatFreqData[i] - prevFloatFreqData[i];
-            if (diff > 0) flux += diff;
+        if (band.hfc) {
+            // High Frequency Content: weight each bin by its relative position in band
+            for (let i = lowBin; i < highBin; i++) {
+                let diff = floatFreqData[i] - prevFloatFreqData[i];
+                if (diff > 0) {
+                    let weight = (i - lowBin + 1) / bandWidth;
+                    flux += diff * weight;
+                }
+            }
+        } else {
+            for (let i = lowBin; i < highBin; i++) {
+                let diff = floatFreqData[i] - prevFloatFreqData[i];
+                if (diff > 0) flux += diff;
+            }
         }
         if (bandWidth >= 20) flux /= bandWidth;
 
@@ -281,7 +294,8 @@ function applyAudioSync() {
         return;
     }
 
-    const sens = paramValues[7] / 50;
+    // Sensitivity: 0→0, 50→1.5, 100→3.0 — boosted so audio drives fuller range
+    const sens = (paramValues[7] / 50) * 1.5;
     const target = audioSyncTarget;
     const kick = bandDetectors.kick.intensity;
     const snare = bandDetectors.snare.intensity;
@@ -518,14 +532,14 @@ function setupAudioUIListeners() {
 
     // Frequency range presets
     const freqPresets = {
-        kick:  { low: 30,   high: 150 },
-        bass:  { low: 60,   high: 300 },
-        vocal: { low: 800,  high: 4000 },
-        hats:  { low: 7500, high: 16000 },
+        kick:  { low: 40,   high: 200 },
+        bass:  { low: 40,   high: 300 },
+        vocal: { low: 300,  high: 5000 },
+        hats:  { low: 6000, high: 20000 },
         full:  { low: 20,   high: 20000 }
     };
     const presetThresholds = {
-        kick: 8, bass: 15, vocal: 30, hats: 20, full: 5
+        kick: 8, bass: 15, vocal: 25, hats: 15, full: 5
     };
 
     ui.freqPresetButtons.forEach(btn => {
@@ -588,28 +602,41 @@ function setupAudioUIListeners() {
     let syncMinSizeSlider = document.getElementById('sync-min-size');
     let syncMaxSizeSlider = document.getElementById('sync-max-size');
 
+    function updateSyncReadouts() {
+        let qr = document.getElementById('sync-qty-readout');
+        let sr = document.getElementById('sync-size-readout');
+        let rr = document.getElementById('sync-rate-readout');
+        if (qr) qr.textContent = syncMinQty + ' – ' + syncMaxQty;
+        if (sr) sr.textContent = syncMinSize + ' – ' + syncMaxSize;
+        if (rr) rr.textContent = syncMinRate + ' – ' + syncMaxRate;
+    }
+
     if (syncMinQtySlider) {
         syncMinQtySlider.addEventListener('input', (e) => {
             syncMinQty = parseInt(e.target.value);
             if (syncMinQty > syncMaxQty) { syncMaxQty = syncMinQty; syncMaxQtySlider.value = syncMaxQty; }
+            updateSyncReadouts();
         });
     }
     if (syncMaxQtySlider) {
         syncMaxQtySlider.addEventListener('input', (e) => {
             syncMaxQty = parseInt(e.target.value);
             if (syncMaxQty < syncMinQty) { syncMinQty = syncMaxQty; syncMinQtySlider.value = syncMinQty; }
+            updateSyncReadouts();
         });
     }
     if (syncMinSizeSlider) {
         syncMinSizeSlider.addEventListener('input', (e) => {
             syncMinSize = parseInt(e.target.value);
             if (syncMinSize > syncMaxSize) { syncMaxSize = syncMinSize; syncMaxSizeSlider.value = syncMaxSize; }
+            updateSyncReadouts();
         });
     }
     if (syncMaxSizeSlider) {
         syncMaxSizeSlider.addEventListener('input', (e) => {
             syncMaxSize = parseInt(e.target.value);
             if (syncMaxSize < syncMinSize) { syncMinSize = syncMaxSize; syncMinSizeSlider.value = syncMinSize; }
+            updateSyncReadouts();
         });
     }
 
@@ -620,12 +647,14 @@ function setupAudioUIListeners() {
         syncMinRateSlider.addEventListener('input', (e) => {
             syncMinRate = parseInt(e.target.value);
             if (syncMinRate > syncMaxRate) { syncMaxRate = syncMinRate; syncMaxRateSlider.value = syncMaxRate; }
+            updateSyncReadouts();
         });
     }
     if (syncMaxRateSlider) {
         syncMaxRateSlider.addEventListener('input', (e) => {
             syncMaxRate = parseInt(e.target.value);
             if (syncMaxRate < syncMinRate) { syncMinRate = syncMaxRate; syncMinRateSlider.value = syncMinRate; }
+            updateSyncReadouts();
         });
     }
 

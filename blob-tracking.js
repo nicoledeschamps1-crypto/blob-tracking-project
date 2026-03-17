@@ -13,11 +13,11 @@ function trackPoints() {
     if (currentMode === 14 && maskReady && maskSegData && maskClickNorm) {
         const w = videoEl.width, h = videoEl.height;
 
-        // Re-run AI segmentation every N frames (tracks the click point)
+        // Adaptive re-segmentation: interval adjusts based on centroid drift
         maskFrameCount++;
-        if (maskFrameCount >= MASK_RESEG_EVERY && window.mpSegmenterReady) {
+        if (maskFrameCount >= maskResegInterval && window.mpSegmenterReady) {
             maskFrameCount = 0;
-            maskSegmentWithPoint(maskClickNorm.x, maskClickNorm.y);
+            maskSegmentWithPoint(maskClickNorm.x, maskClickNorm.y, false, 'replace');
         }
 
         // Use current mask to generate blob candidates
@@ -29,10 +29,15 @@ function trackPoints() {
 
         for (let y = 0; y < h; y += gridSize) {
             for (let x = 0; x < w; x += gridSize) {
-                // Look up mask at this video pixel
                 let mx = Math.min(Math.floor(x * scaleX), maskSegW - 1);
                 let my = Math.min(Math.floor(y * scaleY), maskSegH - 1);
-                if (maskSegData[my * maskSegW + mx] > 0) {
+                let maskVal = maskSegData[my * maskSegW + mx];
+                if (maskVal > 0) {
+                    // Soft density: probabilistically thin blobs at feathered edges
+                    if (maskConfData) {
+                        let conf = maskConfData[my * maskSegW + mx];
+                        if (conf < 0.8 && Math.random() > conf) continue;
+                    }
                     let idx = (x + y * w) * 4;
                     let r = videoEl.pixels[idx], g = videoEl.pixels[idx+1], b = videoEl.pixels[idx+2];
                     candidates.push(new CandidatePoint(x, y, color(r, g, b)));
@@ -71,7 +76,10 @@ function trackPoints() {
             let validColor = false;
 
             if (currentMode === 1 && hVal > 100 && hVal < 260 && sVal > 20 && bVal > 20 && abs(hVal - 210) <= spectrum) validColor = true;
-            else if (currentMode === 2 && (hVal < 30 || hVal > 330) && sVal > 20 && bVal > 20) validColor = true;
+            else if (currentMode === 2 && sVal > 20 && bVal > 20) {
+                let redDist = hVal > 180 ? 360 - hVal : hVal;
+                if (redDist <= max(spectrum, 15)) validColor = true;
+            }
 
             // MOTION: compare to previous frame — RGB distance exceeds threshold
             else if (currentMode === 3) {

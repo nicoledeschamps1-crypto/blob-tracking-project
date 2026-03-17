@@ -23,6 +23,8 @@ const specialChars = "ㄱㄴㄷㄹㅁㅂㅅㅈㅊㅋㅌㅍイカクケコシス�
 
 let showLines = false;
 let currentMode = 1;
+let _userMode = 1;        // user's UI-selected mode (survives timeline overrides)
+let _userCustomHue = 195; // user's UI-selected custom hue
 let currentParam = 0;
 
 const DEFAULT_CONFIG = {
@@ -113,6 +115,11 @@ let paletteIntensity = 80;
 
 let videoX, videoY, videoW, videoH;
 let currentVideoUrl = null;
+
+// Video zoom/pan state
+let vidZoom = 1;
+let vidPanX = 0;
+let vidPanY = 0;
 
 // MASK tracking state (MediaPipe AI re-segmentation per frame)
 let maskSelecting = false;
@@ -224,6 +231,9 @@ let isRecording = false;
 let lastRecordedBlob = null;
 let lastRecordedExt = 'webm';
 let recordingAudioDest = null;
+let recordingCanvas = null;
+let recordingCtx = null;
+let recordingVideoTrack = null;
 
 // Audio base values (snapshot of params when sync turns on)
 let audioBaseValues = {};
@@ -324,10 +334,10 @@ const FLUX_SENSITIVITY = 1.5;
 let pulseIntensity = 0;
 
 // Audio sync range controls
-let syncMinQty = 0;
-let syncMaxQty = 100;
-let syncMinSize = 0;
-let syncMaxSize = 100;
+let syncMinQty = 5;
+let syncMaxQty = 50;
+let syncMinSize = 10;
+let syncMaxSize = 60;
 let syncMinRate = 5;
 let syncMaxRate = 80;
 
@@ -379,10 +389,46 @@ function generateSpecialCode() {
 function setup() {
     let canvas = createCanvas(windowWidth, windowHeight);
     p5Canvas = canvas.elt;
+    p5Canvas.setAttribute('tabindex', '0');
     canvas.elt.addEventListener('contextmenu', (e) => e.preventDefault());
     background(0);
     textFont('Helvetica Neue');
     textSize(11);
+
+    // Video zoom: scroll on canvas (no modifier = video zoom, Ctrl = timeline zoom)
+    canvas.elt.addEventListener('wheel', (e) => {
+        // Skip if cursor is over panels or timeline
+        let over = document.elementFromPoint(e.clientX, e.clientY);
+        if (over && (over.closest('.panel') || over.closest('#timeline-container'))) return;
+        e.preventDefault();
+        let zoomFactor = 1 - e.deltaY * 0.002;
+        let newZoom = Math.max(1, Math.min(8, vidZoom * zoomFactor));
+        // Zoom toward cursor
+        let cx = e.clientX, cy = e.clientY;
+        vidPanX = cx - (cx - vidPanX) * (newZoom / vidZoom);
+        vidPanY = cy - (cy - vidPanY) * (newZoom / vidZoom);
+        vidZoom = newZoom;
+        // Reset pan when zoomed out to 1x
+        if (vidZoom <= 1.01) { vidZoom = 1; vidPanX = 0; vidPanY = 0; }
+    }, { passive: false });
+
+    // Video pan: middle-click drag or left-drag when zoomed (on canvas only)
+    let _vidDrag = null;
+    canvas.elt.addEventListener('mousedown', (e) => {
+        if (vidZoom <= 1) return;
+        let over = document.elementFromPoint(e.clientX, e.clientY);
+        if (over && (over.closest('.panel') || over.closest('#timeline-container'))) return;
+        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+            e.preventDefault();
+            _vidDrag = { startX: e.clientX, startY: e.clientY, origPanX: vidPanX, origPanY: vidPanY };
+        }
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!_vidDrag) return;
+        vidPanX = _vidDrag.origPanX + (e.clientX - _vidDrag.startX);
+        vidPanY = _vidDrag.origPanY + (e.clientY - _vidDrag.startY);
+    });
+    document.addEventListener('mouseup', () => { _vidDrag = null; });
 
     // Initialize all UI listeners (split across modules)
     setupCoreUIListeners();
@@ -413,21 +459,27 @@ function draw() {
         let dispW = width;
         let dispH = height;
 
-        if ((dispW / dispH) > videoRatio) {
-            videoH = dispH;
-            videoW = videoH * videoRatio;
-        } else {
-            videoW = dispW;
-            videoH = videoW / videoRatio;
+        // Reserve space for timeline if visible
+        let tlEl = document.getElementById('timeline-container');
+        if (tlEl && !tlEl.classList.contains('hidden')) {
+            dispH -= tlEl.offsetHeight + 20; // +20 for bottom gap
         }
 
-        videoX = (dispW - videoW) / 2;
-        videoY = (dispH - videoH) / 2;
+        // Fit video into available space (base size before zoom)
+        let baseW, baseH;
+        if ((dispW / dispH) > videoRatio) {
+            baseH = dispH;
+            baseW = baseH * videoRatio;
+        } else {
+            baseW = dispW;
+            baseH = baseW / videoRatio;
+        }
 
-        videoX = Math.max(0, videoX);
-        videoY = Math.max(0, videoY);
-        videoW = Math.min(videoW, dispW);
-        videoH = Math.min(videoH, dispH);
+        // Apply video zoom
+        videoW = baseW * vidZoom;
+        videoH = baseH * vidZoom;
+        videoX = (dispW - videoW) / 2 + vidPanX;
+        videoY = (dispH - videoH) / 2 + vidPanY;
 
         image(videoEl, videoX, videoY, videoW, videoH);
 
@@ -578,6 +630,18 @@ function draw() {
     cursor();
     renderMiniSpectrum();
     if (debugVisible && frameCount % 10 === 0) renderDebug();
+
+    // Copy cropped video region to recording canvas (no black bars)
+    if (isRecording && recordingCanvas && recordingCtx) {
+        let pd = pixelDensity();
+        recordingCtx.drawImage(p5Canvas,
+            videoX * pd, videoY * pd, videoW * pd, videoH * pd,
+            0, 0, recordingCanvas.width, recordingCanvas.height);
+        // Signal captureStream(0) that a new frame is ready
+        if (recordingVideoTrack && recordingVideoTrack.requestFrame) {
+            recordingVideoTrack.requestFrame();
+        }
+    }
 }
 
 // ── CORE UI LISTENERS ─────────────────────
@@ -641,6 +705,7 @@ function setupCoreUIListeners() {
         btn.addEventListener('click', (e) => {
             if (modeDragState && modeDragState.dragging) return; // was a drag, not a click
             currentMode = parseInt(e.target.dataset.value);
+            _userMode = currentMode;
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
@@ -716,6 +781,7 @@ function setupCoreUIListeners() {
         let b = parseInt(hex.slice(5,7), 16);
         let c = color(r, g, b);
         customHue = hue(c);
+        _userCustomHue = customHue;
     });
 
     ui.vizButtons.forEach(btn => {
@@ -790,6 +856,12 @@ function setupCoreUIListeners() {
             ui.tlContainer.style.right = ui.uiControlsRight.classList.contains('collapsed') ? '24px' : '320px';
         }
     });
+
+    // Help button + overlay close
+    document.getElementById('help-btn').addEventListener('click', toggleHelp);
+    document.getElementById('help-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'help-overlay') toggleHelp();
+    });
 }
 
 // ── STATE UPDATE ──────────────────────────
@@ -849,8 +921,6 @@ function updateButtonStates() {
     });
     let scg = document.getElementById('sync-controls-group');
     if (scg) scg.style.display = audioSync ? '' : 'none';
-    let srg = document.getElementById('sync-range-group');
-    if (srg) srg.style.display = audioSync ? '' : 'none';
 
     ui.syncTargetButtons.forEach(btn => {
         if (btn.dataset.value === audioSyncTarget) btn.classList.add('active');
@@ -925,6 +995,20 @@ function updateEffectCardStates() {
             card.classList.add('active-' + cat);
         }
     });
+}
+
+// ── HELP OVERLAY ─────────────────────────
+
+let _helpVisible = false;
+
+function toggleHelp() {
+    _helpVisible = !_helpVisible;
+    document.getElementById('help-overlay').classList.toggle('visible', _helpVisible);
+}
+
+function updateEmptyHint() {
+    let hint = document.getElementById('tl-empty-hint');
+    if (hint) hint.classList.toggle('hidden', timelineSegments.length > 0);
 }
 
 // ── PLAYBACK ──────────────────────────────
@@ -1007,7 +1091,7 @@ function startWebcam() {
     hideTimeline();
     ui.webcamBtn.classList.add('active');
     ui.fileName.innerText = 'webcam active';
-    currentMode = 1;
+    currentMode = 1; _userMode = 1;
 
     videoEl = createCapture(VIDEO, () => {
         videoEl.hide();
@@ -1051,7 +1135,7 @@ function handleFile(event) {
         videoEl = createVideo(url, () => {
             videoEl.volume(0); videoEl.loop(); videoEl.hide();
             videoLoaded = true; videoPlaying = true;
-            currentMode = 1;
+            currentMode = 1; _userMode = 1;
             updateButtonStates();
             let pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
             ui.btnPlay.innerHTML = pauseIcon;
@@ -1137,8 +1221,16 @@ function toggleRecording() {
 
 function startRecording() {
     initAudioContext();
-    const canvas = p5Canvas;
-    const canvasStream = canvas.captureStream(30);
+    // Create cropped canvas (video area only, no black bars)
+    let pd = pixelDensity();
+    recordingCanvas = document.createElement('canvas');
+    recordingCanvas.width = Math.round(videoW * pd);
+    recordingCanvas.height = Math.round(videoH * pd);
+    recordingCtx = recordingCanvas.getContext('2d');
+    // captureStream(0) = manual frame mode: only captures when requestFrame() is called
+    // This syncs perfectly with p5's draw loop — no duplicated or skipped frames
+    const canvasStream = recordingCanvas.captureStream(0);
+    recordingVideoTrack = canvasStream.getVideoTracks()[0];
 
     let combinedStream;
     if (audioLoaded && audioContext && audioGainNode) {
@@ -1161,7 +1253,11 @@ function startRecording() {
                     ? 'video/webm;codecs=vp8,opus'
                     : 'video/webm';
 
-    mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 5000000 });
+    // Scale bitrate to resolution: ~12 Mbps for 1080p, ~20 Mbps for 4K
+    let pixels = recordingCanvas.width * recordingCanvas.height;
+    let bitrate = Math.max(8000000, Math.round(pixels * 6));
+
+    mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: bitrate });
 
     mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) recordedChunks.push(e.data);
@@ -1191,6 +1287,9 @@ function stopRecording() {
         recordingAudioDest = null;
     }
     isRecording = false;
+    recordingCanvas = null;
+    recordingCtx = null;
+    recordingVideoTrack = null;
     ui.btnRecord.classList.remove('recording');
     ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg> Record`;
     ui.tlBtnRecord.classList.remove('recording');
@@ -1242,8 +1341,17 @@ function saveScreenshot() {
 
 // ── KEYBOARD / MOUSE INPUT ────────────────
 
-function keyPressed() {
-    if (document.activeElement.tagName === 'INPUT') return;
+function keyPressed(event) {
+    let tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
+    let e = event instanceof KeyboardEvent ? event : {};
+
+    // Help overlay: ? to toggle, Escape to close
+    if (key === '?') { toggleHelp(); return false; }
+    if (keyCode === ESCAPE && _helpVisible) { toggleHelp(); return false; }
+
+    // Block all other keys while help is open
+    if (_helpVisible) return false;
 
     let changed = false;
 
@@ -1261,22 +1369,22 @@ function keyPressed() {
         return false;
     }
 
-    if (key === 'z' || key === 'Z' || key === '1') { exitMaskMode(); currentMode = 1; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === 'x' || key === 'X' || key === '2') { exitMaskMode(); currentMode = 2; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '0') { exitMaskMode(); currentMode = 0; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '3') { exitMaskMode(); currentMode = 3; prevGridPixels = {}; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '4') { exitMaskMode(); currentMode = 4; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '5') { exitMaskMode(); currentMode = 5; ui.customColorGroup.style.display = ''; changed = true; }
-    if (key === '6') { exitMaskMode(); currentMode = 6; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '7') { exitMaskMode(); currentMode = 7; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '8') { exitMaskMode(); currentMode = 8; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === '9') { exitMaskMode(); currentMode = 9; ui.customColorGroup.style.display = 'none'; changed = true; }
-    if (key === 'm' || key === 'M') { currentMode = 14; enterMaskSelecting(); changed = true; }
+    if ((key === 'z' || key === 'Z' || key === '1') && !e.metaKey && !e.ctrlKey) { exitMaskMode(); currentMode = 1; _userMode = 1; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if ((key === 'x' || key === 'X' || key === '2') && !e.metaKey && !e.ctrlKey) { exitMaskMode(); currentMode = 2; _userMode = 2; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '0') { exitMaskMode(); currentMode = 0; _userMode = 0; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '3') { exitMaskMode(); currentMode = 3; _userMode = 3; prevGridPixels = {}; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '4') { exitMaskMode(); currentMode = 4; _userMode = 4; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '5') { exitMaskMode(); currentMode = 5; _userMode = 5; ui.customColorGroup.style.display = ''; changed = true; }
+    if (key === '6') { exitMaskMode(); currentMode = 6; _userMode = 6; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '7') { exitMaskMode(); currentMode = 7; _userMode = 7; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '8') { exitMaskMode(); currentMode = 8; _userMode = 8; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === '9') { exitMaskMode(); currentMode = 9; _userMode = 9; ui.customColorGroup.style.display = 'none'; changed = true; }
+    if (key === 'm' || key === 'M') { currentMode = 14; _userMode = 14; enterMaskSelecting(); changed = true; }
     if (key === 'l' || key === 'L') { showLines = !showLines; changed = true; }
 
     if (keyCode === ESCAPE && currentMode === 14) {
         exitMaskMode();
-        currentMode = 1;
+        currentMode = 1; _userMode = 1;
         ui.customColorGroup.style.display = 'none';
         changed = true;
     }
@@ -1340,6 +1448,7 @@ function keyPressed() {
 
         // Arrow nudge
         if (keyCode === LEFT_ARROW && tlDur) {
+            tlSaveState();
             let delta = keyIsDown(SHIFT) ? -1 : -0.1;
             for (let seg of timelineSegments) {
                 if (selectedSegments.has(seg.id)) {
@@ -1352,6 +1461,7 @@ function keyPressed() {
             return false;
         }
         if (keyCode === RIGHT_ARROW && tlDur) {
+            tlSaveState();
             let delta = keyIsDown(SHIFT) ? 1 : 0.1;
             for (let seg of timelineSegments) {
                 if (selectedSegments.has(seg.id)) {
@@ -1383,13 +1493,13 @@ function keyPressed() {
                 if (selectedSegments.has(seg.id)) {
                     let dur = seg.endTime - seg.startTime;
                     let newSeg = {
+                        ...seg,
                         id: nextSegId++,
-                        effect: seg.effect,
                         startTime: seg.endTime,
                         endTime: Math.min(seg.endTime + dur, tlDur),
                         params: JSON.parse(JSON.stringify(seg.params)),
                         lane: 0,
-                        color: seg.color
+                        synced: undefined
                     };
                     newSegs.push(newSeg);
                 }
@@ -1424,13 +1534,13 @@ function keyPressed() {
                 let offset = clip.startTime - earliest;
                 let dur = clip.endTime - clip.startTime;
                 let newSeg = {
+                    ...clip,
                     id: nextSegId++,
-                    effect: clip.effect,
                     startTime: currentTime + offset,
                     endTime: Math.min(currentTime + offset + dur, tlDur),
                     params: JSON.parse(JSON.stringify(clip.params)),
                     lane: 0,
-                    color: clip.color
+                    synced: undefined
                 };
                 newSegs.push(newSeg);
             }
@@ -1453,6 +1563,28 @@ function keyPressed() {
         let t = Math.min(videoDuration, videoEl.time() + 5);
         videoEl.time(t);
         if (audioElement && audioLoaded) audioElement.currentTime = Math.max(0, getAudioTimeForVideo(t));
+        return false;
+    }
+
+    // Timeline zoom: +/- keys, Home = reset
+    if (key === '=' || key === '+') {
+        tlZoom = Math.min(50, tlZoom * 1.3);
+        clampScroll();
+        if (ui.tlZoomSlider) ui.tlZoomSlider.value = tlZoom;
+        refreshTimeline();
+        return false;
+    }
+    if (key === '-' || key === '_') {
+        tlZoom = Math.max(1, tlZoom / 1.3);
+        clampScroll();
+        if (ui.tlZoomSlider) ui.tlZoomSlider.value = tlZoom;
+        refreshTimeline();
+        return false;
+    }
+    if (keyCode === 36) { // Home key
+        tlZoom = 1; tlScrollOffset = 0;
+        if (ui.tlZoomSlider) ui.tlZoomSlider.value = 1;
+        refreshTimeline();
         return false;
     }
 

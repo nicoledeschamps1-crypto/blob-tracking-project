@@ -7,6 +7,112 @@
 
 let _rulerRedrawPending = false;
 
+// ── Segment keyboard shortcuts (capture phase — fires before p5/browser) ──
+window.addEventListener('keydown', (e) => {
+    let tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
+    if (typeof _helpVisible !== 'undefined' && _helpVisible) return;
+
+    let cmd = e.metaKey || e.ctrlKey;
+
+    // Undo (Cmd+Z)
+    if (cmd && e.key === 'z' && !e.shiftKey && typeof tlUndo === 'function') {
+        e.preventDefault(); e.stopPropagation();
+        tlUndo();
+        return;
+    }
+    // Redo (Cmd+Shift+Z)
+    if (cmd && e.key === 'z' && e.shiftKey && typeof tlRedo === 'function') {
+        e.preventDefault(); e.stopPropagation();
+        tlRedo();
+        return;
+    }
+
+    if (typeof selectedSegments === 'undefined') return;
+
+    // Delete selected segments (Backspace or Delete)
+    if ((e.key === 'Backspace' || e.key === 'Delete') && selectedSegments.size > 0) {
+        e.preventDefault(); e.stopPropagation();
+        tlSaveState();
+        timelineSegments = timelineSegments.filter(s => !selectedSegments.has(s.id));
+        selectedSegments.clear();
+        syncSelectedSegment();
+        assignLanes();
+        renderTimelineSegments();
+        return;
+    }
+
+    // Copy (Cmd+C)
+    if (cmd && e.key === 'c' && selectedSegments.size > 0) {
+        e.preventDefault(); e.stopPropagation();
+        clipboardSegments = timelineSegments
+            .filter(s => selectedSegments.has(s.id))
+            .map(s => JSON.parse(JSON.stringify(s)));
+        return;
+    }
+
+    // Paste (Cmd+V)
+    if (cmd && e.key === 'v' && typeof clipboardSegments !== 'undefined' && clipboardSegments.length > 0) {
+        e.preventDefault(); e.stopPropagation();
+        let tlDur = getTimelineDuration();
+        if (tlDur > 0) {
+            tlSaveState();
+            let currentTime = (tlRulerMode === 'audio' && audioElement && audioLoaded)
+                ? audioElement.currentTime : (videoEl ? videoEl.time() : 0);
+            let earliest = Math.min(...clipboardSegments.map(s => s.startTime));
+            let newSegs = [];
+            for (let clip of clipboardSegments) {
+                let offset = clip.startTime - earliest;
+                let dur = clip.endTime - clip.startTime;
+                newSegs.push({
+                    ...clip,
+                    id: nextSegId++,
+                    startTime: currentTime + offset,
+                    endTime: Math.min(currentTime + offset + dur, tlDur),
+                    params: JSON.parse(JSON.stringify(clip.params)),
+                    lane: 0,
+                    synced: undefined
+                });
+            }
+            timelineSegments.push(...newSegs);
+            selectedSegments.clear();
+            newSegs.forEach(s => selectedSegments.add(s.id));
+            syncSelectedSegment();
+            assignLanes(); renderTimelineSegments();
+        }
+        return;
+    }
+
+    // Duplicate (Cmd+D)
+    if (cmd && e.key === 'd' && selectedSegments.size > 0) {
+        e.preventDefault(); e.stopPropagation();
+        let tlDur = getTimelineDuration();
+        if (!tlDur) return;
+        tlSaveState();
+        let newSegs = [];
+        for (let seg of timelineSegments) {
+            if (selectedSegments.has(seg.id)) {
+                let dur = seg.endTime - seg.startTime;
+                newSegs.push({
+                    ...seg,
+                    id: nextSegId++,
+                    startTime: seg.endTime,
+                    endTime: Math.min(seg.endTime + dur, tlDur),
+                    params: JSON.parse(JSON.stringify(seg.params)),
+                    lane: 0,
+                    synced: undefined
+                });
+            }
+        }
+        timelineSegments.push(...newSegs);
+        selectedSegments.clear();
+        newSegs.forEach(s => selectedSegments.add(s.id));
+        syncSelectedSegment();
+        assignLanes(); renderTimelineSegments();
+        return;
+    }
+}, true);  // <-- capture phase
+
 // ── Undo/Redo Stack ─────────────────────
 const TL_UNDO_MAX = 50;
 let tlUndoStack = [];
@@ -78,6 +184,8 @@ function refreshTimeline() {
     renderTimelineWaveform();
     renderTimelineSegments();
     updateScrollIndicator();
+    renderSongOverview();
+    updateAudioSectionIndicator();
 }
 
 // ── Core Timeline Functions ──────────────
@@ -113,18 +221,26 @@ function addBlobSegmentAt(startTime) {
     let tlDur = getTimelineDuration();
     if (!tlDur) return;
     let endTime = Math.min(startTime + 5, tlDur);
+    // Never add OFF blobs — default to BLUE if mode is OFF
+    let segMode = _userMode === 0 ? 1 : _userMode;
     let seg = {
         id: nextSegId++,
         type: 'blob',
         effect: 'blob',
+        modeValue: segMode,
+        customHue: _userCustomHue,
         startTime: startTime,
         endTime: endTime,
-        params: [...paramValues],
+        params: _userParamValues ? [..._userParamValues] : [...paramValues],
         lane: 0,
         color: BLOB_SEG_COLOR
     };
     tlSaveState();
     timelineSegments.push(seg);
+    // Auto-select the new blob segment for editing
+    selectedSegments.clear();
+    selectedSegments.add(seg.id);
+    syncSelectedSegment();
     assignLanes();
     renderTimelineSegments();
     let container = ui.tlTrackInner || ui.tlTrack;
@@ -133,11 +249,6 @@ function addBlobSegmentAt(startTime) {
         newEl.classList.add('just-added');
         setTimeout(() => newEl.classList.remove('just-added'), 500);
     }
-    // Auto-select the new blob segment for editing
-    selectedSegments.clear();
-    selectedSegments.add(seg.id);
-    syncSelectedSegment();
-    renderTimelineSegments();
 }
 
 function addTimelineSegmentAt(effectName, startTime) {
@@ -146,6 +257,7 @@ function addTimelineSegmentAt(effectName, startTime) {
     let endTime = Math.min(startTime + 5, tlDur);
     let seg = {
         id: nextSegId++,
+        type: 'fx',
         effect: effectName,
         startTime: startTime,
         endTime: endTime,
@@ -203,11 +315,13 @@ function updateTimelinePlayhead() {
         setTimeout(() => { _rulerRedrawPending = false; renderTimelineRuler(); }, 66);
     }
 
-    // Auto-scroll when zoomed: keep playhead in view
+    // Auto-scroll when zoomed: smooth drift to keep playhead visible
     if (tlZoom > 1 && videoPlaying) {
         let vr = getVisibleTimeRange();
-        if (currentTime > vr.start + vr.duration * 0.9 || currentTime < vr.start) {
-            tlScrollOffset = currentTime - vr.duration * 0.2;
+        let headPos = (currentTime - vr.start) / vr.duration; // 0..1 within viewport
+        if (headPos > 0.85 || headPos < 0.05 || currentTime < vr.start || currentTime > vr.end) {
+            let targetOffset = currentTime - vr.duration * 0.25;
+            tlScrollOffset += (targetOffset - tlScrollOffset) * 0.15; // ease toward target
             clampScroll();
             refreshTimeline();
         }
@@ -227,6 +341,17 @@ function formatTime(s) {
     return m + ':' + String(sec).padStart(2, '0');
 }
 
+function parseTimeInput(str) {
+    str = str.trim();
+    let parts = str.split(':');
+    if (parts.length === 2) {
+        let m = parseInt(parts[0]) || 0;
+        let s = parseFloat(parts[1]) || 0;
+        return m * 60 + s;
+    }
+    return parseFloat(str) || 0;
+}
+
 function getTimelineDuration() {
     if (tlRulerMode === 'audio' && audioDuration > 0) return audioDuration;
     return videoDuration || audioDuration;
@@ -241,6 +366,23 @@ function updateOffsetLabel() {
         let sign = audioOffset >= 0 ? '+' : '';
         ui.tlOffsetLabel.textContent = 'OFFSET: ' + sign + audioOffset.toFixed(1) + 's';
     }
+    updateAudioSectionIndicator();
+}
+
+function updateAudioSectionIndicator() {
+    let el = document.getElementById('tl-audio-section');
+    if (!el) return;
+    if (!audioLoaded || audioDuration <= 0 || videoDuration <= 0) {
+        el.classList.add('hidden');
+        return;
+    }
+    el.classList.remove('hidden');
+    let audioStart = Math.max(0, -audioOffset);
+    let audioEnd = Math.min(audioDuration, videoDuration - audioOffset);
+    document.getElementById('tl-audio-start').textContent = formatTime(audioStart);
+    document.getElementById('tl-audio-end').textContent = formatTime(Math.max(audioStart, audioEnd));
+    document.getElementById('tl-audio-total').textContent = formatTime(audioDuration);
+    updateSongOverviewWindow();
 }
 
 function getAudioTimeForVideo(videoTime) {
@@ -274,9 +416,11 @@ function renderTimelineRuler() {
     let vr = getVisibleTimeRange();
     if (vr.duration <= 0) return;
 
-    // Adaptive tick interval
+    // Adaptive tick interval — finer at high zoom
     let majorInterval;
-    if (vr.duration < 5) majorInterval = 1;
+    if (vr.duration < 1.5) majorInterval = 0.25;
+    else if (vr.duration < 3) majorInterval = 0.5;
+    else if (vr.duration < 5) majorInterval = 1;
     else if (vr.duration < 15) majorInterval = 2;
     else if (vr.duration < 30) majorInterval = 5;
     else if (vr.duration < 120) majorInterval = 10;
@@ -477,6 +621,61 @@ function renderTimelineWaveform() {
     }
 }
 
+// ── Mini Song Overview Bar ──────────────────
+
+let _overviewCanvasDrawn = false;
+
+function renderSongOverview() {
+    let container = document.getElementById('tl-song-overview');
+    let canvas = document.getElementById('tl-overview-canvas');
+    if (!container || !canvas) return;
+
+    if (!audioLoaded || !tlWaveform || tlWaveform.length === 0 || audioDuration <= 0 || videoDuration <= 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+
+    // Only redraw canvas when needed (waveform is static)
+    if (!_overviewCanvasDrawn) {
+        let rect = container.getBoundingClientRect();
+        let dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+        let ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, rect.width, rect.height);
+
+        ctx.fillStyle = 'rgba(200, 200, 200, 0.35)';
+        let barCount = Math.min(Math.floor(rect.width), tlWaveform.length);
+        let barW = rect.width / barCount;
+        for (let i = 0; i < barCount; i++) {
+            let idx = Math.floor(i / barCount * tlWaveform.length);
+            let val = Math.sqrt(tlWaveform[idx].full);
+            let barH = val * rect.height * 0.9;
+            ctx.fillRect(i * barW, rect.height - barH, Math.max(barW, 1), barH);
+        }
+        _overviewCanvasDrawn = true;
+    }
+
+    updateSongOverviewWindow();
+}
+
+function updateSongOverviewWindow() {
+    let windowEl = document.getElementById('tl-overview-window');
+    let container = document.getElementById('tl-song-overview');
+    if (!windowEl || !container || audioDuration <= 0 || videoDuration <= 0) return;
+
+    let audioStart = Math.max(0, -audioOffset);
+    let audioEnd = Math.min(audioDuration, videoDuration - audioOffset);
+    let leftPct = (audioStart / audioDuration) * 100;
+    let widthPct = ((audioEnd - audioStart) / audioDuration) * 100;
+    windowEl.style.left = leftPct + '%';
+    windowEl.style.width = Math.max(widthPct, 0.5) + '%';
+}
+
 function snapToBeat(time) {
     if (tlBeats.length === 0) return time;
     let closest = time;
@@ -529,7 +728,8 @@ function assignLanes() {
 function segLabel(seg) {
     if (seg.type === 'blob') {
         let p = seg.params;
-        return 'BLOB Q:' + Math.round(p[0]) + ' S:' + Math.round(p[4]) + ' R:' + Math.round(p[5]) + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
+        let modeName = (seg.modeValue !== undefined && MODE_NAMES[seg.modeValue]) ? MODE_NAMES[seg.modeValue] : '';
+        return 'BLOB' + (modeName ? ' [' + modeName + ']' : '') + ' Q:' + Math.round(p[0]) + ' S:' + Math.round(p[4]) + ' R:' + Math.round(p[5]) + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
     }
     if (seg.type === 'mode') {
         return (MODE_NAMES[seg.modeValue] || 'MODE') + ' ' + formatTime(seg.startTime) + '-' + formatTime(seg.endTime);
@@ -581,6 +781,7 @@ function renderTimelineSegments() {
     let container = ui.tlTrackInner || ui.tlTrack;
     container.querySelectorAll('.timeline-segment').forEach(el => el.remove());
     container.querySelectorAll('.tl-lane-line').forEach(el => el.remove());
+    if (typeof updateEmptyHint === 'function') updateEmptyHint();
     let tlDur = getTimelineDuration();
     if (!tlDur) return;
 
@@ -638,6 +839,8 @@ function renderTimelineSegments() {
             }
             syncSelectedSegment();
             renderTimelineSegments();
+            // Refocus canvas so keyboard shortcuts (Delete, arrows) work
+            if (p5Canvas) p5Canvas.focus();
         });
 
         // Double-click to delete
@@ -660,8 +863,9 @@ function renderTimelineSegments() {
         el.addEventListener('mouseenter', (e) => {
             let tooltip = document.getElementById('tl-tooltip');
             if (!tooltip) return;
+            let blobMode = (seg.modeValue !== undefined && MODE_NAMES[seg.modeValue]) ? ' [' + MODE_NAMES[seg.modeValue] + ']' : '';
             let label = seg.type === 'blob'
-                ? 'BLOB — Q:' + Math.round(seg.params[0]) + ' S:' + Math.round(seg.params[4]) + ' R:' + Math.round(seg.params[5])
+                ? 'BLOB' + blobMode + ' — Q:' + Math.round(seg.params[0]) + ' S:' + Math.round(seg.params[4]) + ' R:' + Math.round(seg.params[5])
                 : seg.type === 'mode'
                 ? 'Mode: ' + (MODE_NAMES[seg.modeValue] || 'MODE')
                 : 'FX: ' + seg.effect.toUpperCase();
@@ -809,18 +1013,45 @@ function setupSegmentDrag(el, seg) {
 
 // ── Timeline Effect Application ───
 
+// Saved user param values — restored when no blob/mode segments are active
+let _userParamValues = null;
+
 function applyTimelineEffects() {
     if (timelineSegments.length === 0) return;
     let currentTime = (tlRulerMode === 'audio' && audioElement && audioLoaded)
         ? audioElement.currentTime
-        : videoEl.time();
-    let active = timelineSegments.filter(s => currentTime >= s.startTime && currentTime <= s.endTime);
-    if (active.length === 0) return;
+        : (videoEl ? videoEl.time() : 0);
+    let active = timelineSegments.filter(s => currentTime >= s.startTime && currentTime < s.endTime);
 
-    // Apply blob segments: override paramValues (last one wins)
+    // Reset to user's live mode so overrides revert when segments end
+    currentMode = _userMode;
+    customHue = _userCustomHue;
+
     let blobSegs = active.filter(s => s.type === 'blob');
+    let modeSegs = active.filter(s => s.type === 'mode');
+    let fxSegs = active.filter(s => s.type !== 'mode' && s.type !== 'blob');
+    let hasBlobsOnTimeline = timelineSegments.some(s => s.type === 'blob');
+
+    // Handle blob/mode param overrides
+    if (blobSegs.length > 0 || modeSegs.length > 0) {
+        if (!_userParamValues) _userParamValues = [...paramValues];
+    } else {
+        // Restore user params when no blob/mode segments active
+        if (_userParamValues) {
+            for (let i = 0; i < _userParamValues.length; i++) paramValues[i] = _userParamValues[i];
+            _userParamValues = null;
+        }
+        // PULSE: suppress blobs between blob segments (on/off pulsing)
+        if (hasBlobsOnTimeline) {
+            currentMode = 0;
+        }
+    }
+
+    // Apply blob segments: override paramValues + tracking mode (last one wins)
     if (blobSegs.length > 0) {
         let blobSeg = blobSegs[blobSegs.length - 1];
+        if (blobSeg.modeValue !== undefined) currentMode = blobSeg.modeValue;
+        if (blobSeg.customHue !== undefined) customHue = blobSeg.customHue;
         if (blobSeg.params && Array.isArray(blobSeg.params)) {
             for (let i = 0; i < blobSeg.params.length; i++) {
                 paramValues[i] = blobSeg.params[i];
@@ -829,9 +1060,8 @@ function applyTimelineEffects() {
     }
 
     // Apply mode segments: last one wins (override currentMode + params)
-    let modeSegs = active.filter(s => s.type === 'mode');
     if (modeSegs.length > 0) {
-        let modeSeg = modeSegs[modeSegs.length - 1]; // last = highest priority
+        let modeSeg = modeSegs[modeSegs.length - 1];
         currentMode = modeSeg.modeValue;
         if (modeSeg.params && Array.isArray(modeSeg.params)) {
             for (let i = 0; i < modeSeg.params.length; i++) {
@@ -840,9 +1070,13 @@ function applyTimelineEffects() {
         }
     }
 
-    // Apply effect segments (exclude mode and blob segments)
-    let fxSegs = active.filter(s => s.type !== 'mode' && s.type !== 'blob');
+    // Apply FX effect segments (always, regardless of blob/mode state)
     if (fxSegs.length === 0) return;
+    if (!window._fxDebugThrottle) window._fxDebugThrottle = 0;
+    if (++window._fxDebugThrottle % 60 === 1) {
+        console.log('[TL-FX] t=' + currentTime.toFixed(2) + ' active=' + active.length +
+            ' fx=' + fxSegs.map(s => s.effect + '[' + s.startTime.toFixed(1) + '-' + s.endTime.toFixed(1) + ']').join(','));
+    }
     const catOrder = ['color', 'distortion', 'pattern', 'overlay'];
     fxSegs.sort((a, b) => catOrder.indexOf(FX_CATEGORIES[a.effect]) - catOrder.indexOf(FX_CATEGORIES[b.effect]));
     const drawOnly = new Set(['grid', 'scanlines', 'vignette']);
@@ -857,6 +1091,169 @@ function applyTimelineEffects() {
         }
         restoreEffectParams(seg.effect, saved);
     }
+}
+
+// ── Beat-Synced Blob Generator ──────────────────
+
+function detectBandPeaks(band, sensitivity, startRange, endRange) {
+    if (!tlWaveform || tlWaveform.length === 0) {
+        console.log('[SYNC] No waveform data — load audio first');
+        return [];
+    }
+
+    // Step 1: Find ALL local maxima within the time range
+    let candidates = [];
+    for (let i = 2; i < tlWaveform.length - 2; i++) {
+        let t = tlWaveform[i].time;
+        if (startRange !== undefined && t < startRange) continue;
+        if (endRange !== undefined && t > endRange) continue;
+        let val = tlWaveform[i][band];
+        if (val > tlWaveform[i-1][band] && val > tlWaveform[i+1][band] &&
+            val > tlWaveform[i-2][band] && val > tlWaveform[i+2][band]) {
+            candidates.push({ time: t, val: val, idx: i });
+        }
+    }
+
+    if (candidates.length === 0) {
+        console.log('[SYNC] No local maxima in band=' + band + ' range=[' + (startRange||0).toFixed(1) + ',' + (endRange||'end') + ']');
+        return [];
+    }
+
+    // Step 2: Sort by amplitude (strongest first)
+    candidates.sort((a, b) => b.val - a.val);
+
+    // Step 3: Threshold — keep top % based on sensitivity
+    // sens 1 = top 10%, sens 10 = top 80%
+    let keepRatio = 0.10 + (sensitivity - 1) * 0.078; // 10%→80%
+    let totalCandidates = candidates.length;
+    let maxKeep = Math.max(1, Math.floor(totalCandidates * keepRatio));
+    candidates = candidates.slice(0, maxKeep);
+
+    // Step 4: Filter for minimum spacing (stronger peaks win)
+    let minSpacing = 0.25 - (sensitivity - 1) * 0.02; // sens 1→0.25s, 10→0.07s
+    minSpacing = Math.max(minSpacing, 0.06);
+
+    // Sort back by time
+    candidates.sort((a, b) => a.time - b.time);
+
+    let peaks = [];
+    for (let c of candidates) {
+        if (peaks.length === 0 || c.time - peaks[peaks.length - 1] >= minSpacing) {
+            peaks.push(c.time);
+        }
+    }
+
+    console.log('[SYNC] band=' + band + ' sens=' + sensitivity + ' range=[' + (startRange||0).toFixed(1) + '-' + (endRange||'end') + '] candidates=' + maxKeep + '/' + totalCandidates + ' peaks=' + peaks.length);
+    return peaks;
+}
+
+function generateSyncedBlobs(sensitivity, duration) {
+    let bandMap = { full: 'full', kick: 'bass', vocal: 'mid', hats: 'high' };
+    let band = bandMap[tlBandView] || 'full';
+    let tlDur = getTimelineDuration();
+    if (!tlDur) { console.log('[SYNC] No timeline duration'); return 0; }
+
+    // Guard: no waveform data yet
+    if (!tlWaveform || tlWaveform.length === 0) {
+        console.log('[SYNC] No waveform data — load audio first');
+        return 0;
+    }
+
+    // Figure out which audio time range maps to the timeline
+    let audioStart, audioEnd;
+    if (tlRulerMode === 'audio') {
+        audioStart = 0; audioEnd = tlDur;
+    } else {
+        audioStart = Math.max(0, -audioOffset);
+        audioEnd = Math.min(audioDuration || Infinity, tlDur - audioOffset);
+    }
+    if (audioEnd <= audioStart) {
+        console.log('[SYNC] Audio does not overlap video at current offset');
+        return 0;
+    }
+
+    // Detect peaks only within the playable audio range
+    let peaks = detectBandPeaks(band, sensitivity, audioStart, audioEnd);
+
+    if (peaks.length === 0) {
+        return 0;
+    }
+
+    tlSaveState();
+
+    // Remove previously generated blobs (keeps manually placed ones)
+    timelineSegments = timelineSegments.filter(s => !s.synced);
+    selectedSegments.clear();
+    syncSelectedSegment();
+
+    // Convert peak times to timeline times first
+    let peakStarts = [];
+    for (let peakTime of peaks) {
+        let startTime = (tlRulerMode === 'audio') ? peakTime : peakTime + audioOffset;
+        if (startTime >= 0 && startTime < tlDur) peakStarts.push(startTime);
+    }
+    peakStarts.sort((a, b) => a - b);
+
+    // Compute median gap between peaks to auto-scale pulse duration
+    let gaps = [];
+    for (let i = 1; i < peakStarts.length; i++) {
+        gaps.push(peakStarts[i] - peakStarts[i - 1]);
+    }
+    gaps.sort((a, b) => a - b);
+    let medianGap = gaps.length > 0 ? gaps[Math.floor(gaps.length / 2)] : 1;
+    // Pulse = 35% of median gap, capped by user duration, min 0.05s
+    let pulseDur = Math.max(0.05, Math.min(duration, medianGap * 0.35));
+
+    let count = 0;
+    for (let i = 0; i < peakStarts.length; i++) {
+        let startTime = peakStarts[i];
+        // Use pulse duration, but also ensure no overlap with next peak
+        let segDur = pulseDur;
+        if (i < peakStarts.length - 1) {
+            let gap = peakStarts[i + 1] - startTime;
+            // Never exceed 50% of the gap to next beat
+            segDur = Math.min(segDur, gap * 0.5);
+            segDur = Math.max(segDur, 0.05);
+        }
+        let endTime = Math.min(startTime + segDur, tlDur);
+        // If user mode is OFF, default to BLUE (1) so blobs are actually visible
+        let segMode = _userMode === 0 ? 1 : _userMode;
+        timelineSegments.push({
+            id: nextSegId++,
+            type: 'blob',
+            effect: 'blob',
+            synced: true,
+            modeValue: segMode,
+            customHue: _userCustomHue,
+            startTime: startTime,
+            endTime: endTime,
+            params: _userParamValues ? [..._userParamValues] : [...paramValues],
+            lane: 0,
+            color: BLOB_SEG_COLOR
+        });
+        count++;
+    }
+    // All synced segments go on same lane since they no longer overlap
+    // (assignLanes will still separate any actual overlaps)
+    assignLanes();
+    renderTimelineSegments();
+    return count;
+}
+
+function countSyncPeaks(sensitivity) {
+    let bandMap = { full: 'full', kick: 'bass', vocal: 'mid', hats: 'high' };
+    let band = bandMap[tlBandView] || 'full';
+    let tlDur = getTimelineDuration();
+    if (!tlDur) return 0;
+    let audioStart, audioEnd;
+    if (tlRulerMode === 'audio') {
+        audioStart = 0; audioEnd = tlDur;
+    } else {
+        audioStart = Math.max(0, -audioOffset);
+        audioEnd = Math.min(audioDuration || Infinity, tlDur - audioOffset);
+    }
+    if (audioEnd <= audioStart) return 0;
+    return detectBandPeaks(band, sensitivity, audioStart, audioEnd).length;
 }
 
 // ── TIMELINE UI LISTENERS ──────────────────────
@@ -885,13 +1282,72 @@ function setupTimelineUIListeners() {
         });
     }
 
-    // Timeline band selector
+    // ⚡ SYNC button + config row
+    let syncBtn = document.getElementById('tl-btn-sync');
+    let syncRow = document.getElementById('tl-sync-row');
+    let syncSens = document.getElementById('tl-sync-sens');
+    let syncDur = document.getElementById('tl-sync-dur');
+    let syncSensVal = document.getElementById('tl-sync-sens-val');
+    let syncDurVal = document.getElementById('tl-sync-dur-val');
+    let syncCount = document.getElementById('tl-sync-count');
+    let syncBandLabel = document.getElementById('tl-sync-band');
+    let syncGenerate = document.getElementById('tl-sync-generate');
+
+    let _syncPreviewTimer = null;
+    window._updateSyncPreview = function() {
+        if (!syncRow || syncRow.classList.contains('hidden')) return;
+        clearTimeout(_syncPreviewTimer);
+        _syncPreviewTimer = setTimeout(() => {
+            if (!tlWaveform || tlWaveform.length === 0) {
+                if (syncCount) syncCount.textContent = 'no audio';
+                return;
+            }
+            let count = countSyncPeaks(parseInt(syncSens.value));
+            if (syncCount) syncCount.textContent = count;
+            if (syncBandLabel) syncBandLabel.textContent = tlBandView.toUpperCase();
+        }, 80);
+    };
+    function updateSyncPreview() { window._updateSyncPreview(); }
+
+    if (syncBtn && syncRow) {
+        syncBtn.addEventListener('click', () => {
+            syncRow.classList.toggle('hidden');
+            syncBtn.classList.toggle('active');
+            if (!syncRow.classList.contains('hidden')) updateSyncPreview();
+        });
+    }
+    if (syncSens) {
+        syncSens.addEventListener('input', () => {
+            syncSensVal.textContent = syncSens.value;
+            updateSyncPreview();
+        });
+    }
+    if (syncDur) {
+        syncDur.addEventListener('input', () => {
+            syncDurVal.textContent = parseFloat(syncDur.value).toFixed(1) + 's';
+        });
+    }
+    if (syncGenerate) {
+        syncGenerate.addEventListener('click', () => {
+            if (!tlWaveform || tlWaveform.length === 0) {
+                if (syncCount) syncCount.textContent = 'no audio';
+                return;
+            }
+            let sens = parseInt(syncSens.value);
+            let dur = parseFloat(syncDur.value);
+            let count = generateSyncedBlobs(sens, dur);
+            if (syncCount) syncCount.textContent = count > 0 ? count + ' placed' : '0 peaks';
+        });
+    }
+
+    // Timeline band selector — also update sync preview
     ui.tlBandButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             tlBandView = e.target.dataset.band;
             ui.tlBandButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             renderTimelineWaveform();
+            updateSyncPreview();
         });
     });
 
@@ -902,6 +1358,7 @@ function setupTimelineUIListeners() {
             ui.tlRulerButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             refreshTimeline();
+            updateSyncPreview();
         });
     });
 
@@ -919,37 +1376,74 @@ function setupTimelineUIListeners() {
     if (ui.tlZoomSlider) {
         ui.tlZoomSlider.addEventListener('input', (e) => {
             tlZoom = parseFloat(e.target.value);
+            _tlTargetZoom = tlZoom;
             clampScroll();
             refreshTimeline();
         });
     }
 
-    // Ctrl+scroll = zoom, scroll = pan
+    // Ctrl/Cmd+scroll or pinch = zoom, scroll = pan
     let trackEl = ui.tlTrackInner || ui.tlTrack;
+    let _tlTargetZoom = tlZoom;
+    let _tlZoomAnimId = null;
+
+    function animateZoom(targetZoom, anchorRatio) {
+        _tlTargetZoom = Math.max(1, Math.min(50, targetZoom));
+        if (_tlZoomAnimId) return; // already animating
+        function step() {
+            let diff = _tlTargetZoom - tlZoom;
+            if (Math.abs(diff) < 0.01) {
+                tlZoom = _tlTargetZoom;
+                _tlZoomAnimId = null;
+            } else {
+                tlZoom += diff * 0.3; // ease toward target
+                _tlZoomAnimId = requestAnimationFrame(step);
+            }
+            let newVisDur = getTimelineDuration() / tlZoom;
+            tlScrollOffset = _tlZoomAnchorTime - anchorRatio * newVisDur;
+            clampScroll();
+            if (ui.tlZoomSlider) ui.tlZoomSlider.value = Math.min(tlZoom, 50);
+            refreshTimeline();
+        }
+        _tlZoomAnimId = requestAnimationFrame(step);
+    }
+
+    let _tlZoomAnchorTime = 0;
+
     trackEl.addEventListener('wheel', (e) => {
         e.preventDefault();
-        if (_tlWheelRAF) return; // debounce
-        _tlWheelRAF = requestAnimationFrame(() => {
-            _tlWheelRAF = null;
-            if (e.ctrlKey || e.metaKey) {
-                // Zoom centered on cursor
-                let rect = trackEl.getBoundingClientRect();
-                let cursorRatio = (e.clientX - rect.left) / rect.width;
-                let cursorTime = percentToTime(cursorRatio * 100);
-                tlZoom = Math.max(1, Math.min(20, tlZoom * (1 - e.deltaY * 0.005)));
-                let newVisDur = getTimelineDuration() / tlZoom;
-                tlScrollOffset = cursorTime - cursorRatio * newVisDur;
-                clampScroll();
-                if (ui.tlZoomSlider) ui.tlZoomSlider.value = tlZoom;
-            } else {
-                // Horizontal pan
+        if (e.ctrlKey || e.metaKey) {
+            // Zoom centered on cursor — smooth animated
+            let rect = trackEl.getBoundingClientRect();
+            let cursorRatio = (e.clientX - rect.left) / rect.width;
+            _tlZoomAnchorTime = percentToTime(cursorRatio * 100);
+            // Trackpad pinch sends small deltas; mouse wheel sends large — normalize
+            let zoomFactor = Math.abs(e.deltaY) < 10
+                ? 1 - e.deltaY * 0.02   // trackpad pinch (fine)
+                : 1 - e.deltaY * 0.004; // mouse wheel (coarse)
+            animateZoom(_tlTargetZoom * zoomFactor, cursorRatio);
+        } else {
+            // Horizontal pan
+            if (_tlWheelRAF) return;
+            _tlWheelRAF = requestAnimationFrame(() => {
+                _tlWheelRAF = null;
                 let panAmount = (e.deltaX || e.deltaY) * 0.05 * (getTimelineDuration() / tlZoom);
                 tlScrollOffset += panAmount;
                 clampScroll();
-            }
+                refreshTimeline();
+            });
+        }
+    }, { passive: false });
+
+    // Double-click zoom slider = reset to 1x
+    if (ui.tlZoomSlider) {
+        ui.tlZoomSlider.addEventListener('dblclick', () => {
+            tlZoom = 1; _tlTargetZoom = 1;
+            tlScrollOffset = 0;
+            ui.tlZoomSlider.value = 1;
             refreshTimeline();
         });
-    }, { passive: false });
+    }
 
     // Ruler click = scrub
     if (ui.tlRulerCanvas) {
@@ -990,6 +1484,7 @@ function setupTimelineUIListeners() {
                 waveformDragging = false;
                 document.removeEventListener('mousemove', onWfMove);
                 document.removeEventListener('mouseup', onWfUp);
+                if (window._updateSyncPreview) window._updateSyncPreview();
             }
             document.addEventListener('mousemove', onWfMove);
             document.addEventListener('mouseup', onWfUp);
@@ -1024,7 +1519,89 @@ function setupTimelineUIListeners() {
     });
 
     // Re-render on resize
-    window.addEventListener('resize', () => { if (tlWaveform) refreshTimeline(); });
+    window.addEventListener('resize', () => {
+        if (tlWaveform) { _overviewCanvasDrawn = false; refreshTimeline(); }
+    });
+
+    // ── Audio Section Indicator + Start Time Input ──
+    let audioSectionEl = document.getElementById('tl-audio-section');
+    let audioStartInput = document.getElementById('tl-audio-start-input');
+    if (audioSectionEl && audioStartInput) {
+        audioSectionEl.addEventListener('click', (e) => {
+            if (e.target === audioStartInput) return;
+            let currentStart = Math.max(0, -audioOffset);
+            audioStartInput.value = formatTime(currentStart);
+            audioStartInput.classList.remove('hidden');
+            audioStartInput.focus();
+            audioStartInput.select();
+        });
+
+        function commitStartTime() {
+            let newStart = parseTimeInput(audioStartInput.value);
+            newStart = Math.max(0, Math.min(newStart, Math.max(0, audioDuration - 1)));
+            audioOffset = -newStart;
+            audioStartInput.classList.add('hidden');
+            updateOffsetLabel();
+            _overviewCanvasDrawn = false;
+            refreshTimeline();
+            if (audioElement && audioLoaded && videoPlaying) {
+                audioElement.currentTime = Math.max(0, getAudioTimeForVideo(videoEl.time()));
+            }
+        }
+
+        audioStartInput.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') { commitStartTime(); audioStartInput.blur(); }
+            if (e.key === 'Escape') { audioStartInput.classList.add('hidden'); }
+        });
+        audioStartInput.addEventListener('blur', commitStartTime);
+    }
+
+    // ── Mini Song Overview — drag window ──
+    let overviewContainer = document.getElementById('tl-song-overview');
+    let overviewWindowEl = document.getElementById('tl-overview-window');
+    if (overviewContainer && overviewWindowEl) {
+        overviewWindowEl.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            let rect = overviewContainer.getBoundingClientRect();
+            let startX = e.clientX;
+            let origOffset = audioOffset;
+
+            function onDrag(ev) {
+                let dx = (ev.clientX - startX) / rect.width;
+                let timeDelta = dx * audioDuration;
+                audioOffset = origOffset - timeDelta;
+                updateOffsetLabel();
+                renderTimelineWaveform();
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', onUp);
+                if (audioElement && audioLoaded && videoPlaying) {
+                    audioElement.currentTime = Math.max(0, getAudioTimeForVideo(videoEl.time()));
+                }
+            }
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        overviewContainer.addEventListener('mousedown', (e) => {
+            if (e.target === overviewWindowEl) return;
+            let rect = overviewContainer.getBoundingClientRect();
+            let clickRatio = (e.clientX - rect.left) / rect.width;
+            let clickAudioTime = clickRatio * audioDuration;
+            let windowDur = Math.min(videoDuration, audioDuration);
+            let newStart = clickAudioTime - windowDur / 2;
+            newStart = Math.max(0, Math.min(newStart, Math.max(0, audioDuration - windowDur)));
+            audioOffset = -newStart;
+            updateOffsetLabel();
+            refreshTimeline();
+            if (audioElement && audioLoaded && videoPlaying) {
+                audioElement.currentTime = Math.max(0, getAudioTimeForVideo(videoEl.time()));
+            }
+        });
+    }
 
     // Resize handle
     setupTimelineResize();
