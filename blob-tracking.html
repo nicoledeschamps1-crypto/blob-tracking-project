@@ -277,6 +277,46 @@
             color: var(--btn-active-text);
         }
 
+        /* Panel Tabs */
+        .panel-tabs {
+            display: flex;
+            gap: 1px;
+            background: var(--slider-track);
+            padding: 1px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .panel-tab {
+            flex: 1;
+            background: var(--panel-bg);
+            border: none;
+            color: var(--text-muted);
+            font-size: 9px;
+            font-weight: 700;
+            padding: 7px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+        }
+        .panel-tab:hover {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.05);
+        }
+        .panel-tab.active {
+            background: var(--btn-active-bg);
+            color: var(--btn-active-text);
+        }
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+
         /* File Upload */
         .source-row {
             display: flex;
@@ -1355,7 +1395,15 @@
             </div>
         </div>
 
+        <div class="panel-tabs">
+            <button class="panel-tab active" data-tab="track">TRACK</button>
+            <button class="panel-tab" data-tab="fx">FX</button>
+            <button class="panel-tab" data-tab="audio">AUDIO</button>
+        </div>
+
         <div id="ui-controls">
+
+            <div class="tab-content active" data-tab="track">
 
             <div class="source-row">
                 <div id="file-input-container" onclick="document.getElementById('videoUpload').click()">
@@ -1460,6 +1508,20 @@
                     <button class="selector-btn" data-value="10">ZOOM</button>
                 </div>
             </div>
+
+            <div class="playback-row">
+                <button id="btn-play" class="action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button id="btn-restart" class="action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                    Restart
+                </button>
+            </div>
+
+            </div><!-- /tab-content track -->
+
+            <div class="tab-content" data-tab="fx">
 
             <!-- Effects (Effecto-style category strips) -->
             <div class="control-group" id="group-fx">
@@ -1741,100 +1803,9 @@
                 </div>
             </div>
 
-            <div class="playback-row">
-                <button id="btn-play" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-                <button id="btn-restart" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
-                    Restart
-                </button>
-            </div>
+            </div><!-- /tab-content fx -->
 
-        </div>
-    </div>
-
-    <!-- RIGHT PANEL -->
-    <div id="right-panel" class="panel">
-        <div class="header-section">
-            <div class="title-row">
-                <h1>Parameters</h1>
-                <div id="toggle-btn-right" class="toggle-chevron" title="Toggle Controls">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <div id="ui-controls-right">
-            <div id="blob-edit-banner">editing blob segment</div>
-
-            <div class="control-group" id="group-0">
-                <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-1">
-                <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-4">
-                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-5">
-                <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-5" min="0" max="100" value="4" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-6">
-                <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-6" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Lines</label>
-                <div class="selector-row" id="line-buttons">
-                    <button class="selector-btn active" data-value="off">OFF</button>
-                    <button class="selector-btn" data-value="on">ON</button>
-                </div>
-            </div>
-
-            <div class="control-group" id="group-2">
-                <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-3">
-                <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
-                </div>
-            </div>
-
-            <div class="control-group" id="product-info-group">
-                <label>Product Info</label>
-                <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
-                <input type="text" class="text-input" id="product-name" placeholder="Product Name">
-                <input type="text" class="text-input" id="product-material" placeholder="Material">
-                <input type="text" class="text-input" id="product-price" placeholder="Price">
-                <input type="text" class="text-input" id="product-size" placeholder="Size">
-            </div>
+            <div class="tab-content" data-tab="audio">
 
             <!-- Audio Upload -->
             <div class="control-group">
@@ -1947,6 +1918,93 @@
                         <button class="selector-btn" data-value="on">ON</button>
                     </div>
                 </div>
+            </div>
+
+            </div><!-- /tab-content audio -->
+
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div id="right-panel" class="panel">
+        <div class="header-section">
+            <div class="title-row">
+                <h1>Parameters</h1>
+                <div id="toggle-btn-right" class="toggle-chevron" title="Toggle Controls">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div id="ui-controls-right">
+            <div id="blob-edit-banner">editing blob segment</div>
+
+            <div class="control-group" id="group-0">
+                <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-1">
+                <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-4">
+                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-5">
+                <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-5" min="0" max="100" value="4" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-6">
+                <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-6" min="0" max="100" value="40" step="1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Lines</label>
+                <div class="selector-row" id="line-buttons">
+                    <button class="selector-btn active" data-value="off">OFF</button>
+                    <button class="selector-btn" data-value="on">ON</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="group-2">
+                <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-3">
+                <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-group" id="product-info-group">
+                <label>Product Info</label>
+                <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
+                <input type="text" class="text-input" id="product-name" placeholder="Product Name">
+                <input type="text" class="text-input" id="product-material" placeholder="Material">
+                <input type="text" class="text-input" id="product-price" placeholder="Price">
+                <input type="text" class="text-input" id="product-size" placeholder="Size">
             </div>
 
             <!-- Record & Save -->

@@ -689,7 +689,21 @@ function draw() {
 
 // ── CORE UI LISTENERS ─────────────────────
 
+function switchToTab(tabName) {
+    document.querySelectorAll('.panel-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.tab-content').forEach(tc => {
+        tc.classList.toggle('active', tc.dataset.tab === tabName);
+    });
+}
+
 function setupCoreUIListeners() {
+
+    // Panel tab switching
+    document.querySelectorAll('.panel-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
+    });
 
     [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         ui.sliders[idx] = document.getElementById(`slider-${idx}`);
@@ -1447,6 +1461,8 @@ function keyPressed(event) {
     if (key === '8') { exitMaskMode(); currentMode = 8; _userMode = 8; ui.customColorGroup.style.display = 'none'; changed = true; }
     if (key === '9') { exitMaskMode(); currentMode = 9; _userMode = 9; ui.customColorGroup.style.display = 'none'; changed = true; }
     if (key === 'm' || key === 'M') { currentMode = 14; _userMode = 14; enterMaskSelecting(); changed = true; }
+    // Auto-switch to TRACK tab when mode keys pressed
+    if (/^[0-9zxm]$/i.test(key) && !e.metaKey && !e.ctrlKey && changed) switchToTab('track');
     if (key === 'l' || key === 'L') { showLines = !showLines; changed = true; }
 
     if (keyCode === ESCAPE && currentMode === 14) {
@@ -1461,6 +1477,7 @@ function keyPressed(event) {
         if (audioSync) {
             audioBaseValues = { 0: paramValues[0], 1: paramValues[1], 5: paramValues[5], 6: paramValues[6] };
         }
+        switchToTab('audio');
         changed = true;
     }
 
@@ -1495,6 +1512,7 @@ function keyPressed(event) {
         autoGainMax = { band: AUTO_GAIN_FLOOR, bass: AUTO_GAIN_FLOOR, mid: AUTO_GAIN_FLOOR, treble: AUTO_GAIN_FLOOR };
         smoothBand = 0;
         resetBandDetectors();
+        switchToTab('audio');
         changed = true;
     }
 
@@ -1659,11 +1677,13 @@ function keyPressed(event) {
         const targets = ['all', 'qty', 'size', 'color', 'flash', 'pulse', 'rate'];
         let curIdx = targets.indexOf(audioSyncTarget);
         audioSyncTarget = targets[(curIdx + 1) % targets.length];
+        switchToTab('audio');
         changed = true;
     }
 
     if (key === 'b' || key === 'B') {
         bpmLocked = !bpmLocked;
+        switchToTab('audio');
         changed = true;
     }
 
