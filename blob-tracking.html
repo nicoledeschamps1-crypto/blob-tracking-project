@@ -486,6 +486,15 @@
             margin-left: 4px;
         }
         .cat-count:empty { display: none; }
+
+        /* Collapsible sections (right panel) */
+        .collapsible.collapsed .collapsible-body { display: none; }
+        .collapsible-toggle { cursor: pointer; user-select: none; }
+        .disc-chevron { float: right; font-size: 8px; transition: transform 0.2s; color: var(--text-muted); }
+        .collapsible.collapsed .disc-chevron { transform: rotate(-90deg); }
+
+        /* Contextual param dimming */
+        .param-dimmed { opacity: 0.35; transition: opacity 0.3s; }
         .cat-count[data-cat="color"] { background: rgba(108, 92, 231, 0.3); color: #c4b8ff; }
         .cat-count[data-cat="distortion"] { background: rgba(0, 184, 148, 0.3); color: #7dffd4; }
         .cat-count[data-cat="pattern"] { background: rgba(253, 203, 110, 0.3); color: #fff0c0; }
@@ -2042,13 +2051,15 @@
                 </div>
             </div>
 
-            <div class="control-group" id="product-info-group">
-                <label>Product Info</label>
-                <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
-                <input type="text" class="text-input" id="product-name" placeholder="Product Name">
-                <input type="text" class="text-input" id="product-material" placeholder="Material">
-                <input type="text" class="text-input" id="product-price" placeholder="Price">
-                <input type="text" class="text-input" id="product-size" placeholder="Size">
+            <div class="control-group collapsible collapsed" id="product-info-group">
+                <label class="collapsible-toggle">Product Info <span class="disc-chevron">&#9662;</span></label>
+                <div class="collapsible-body">
+                    <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
+                    <input type="text" class="text-input" id="product-name" placeholder="Product Name">
+                    <input type="text" class="text-input" id="product-material" placeholder="Material">
+                    <input type="text" class="text-input" id="product-price" placeholder="Price">
+                    <input type="text" class="text-input" id="product-size" placeholder="Size">
+                </div>
             </div>
 
             <!-- Record & Save -->

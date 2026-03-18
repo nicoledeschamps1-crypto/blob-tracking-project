@@ -705,6 +705,13 @@ function setupCoreUIListeners() {
         tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
     });
 
+    // Collapsible section toggles
+    document.querySelectorAll('.collapsible-toggle').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            toggle.closest('.collapsible').classList.toggle('collapsed');
+        });
+    });
+
     [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         ui.sliders[idx] = document.getElementById(`slider-${idx}`);
         ui.inputs[idx] = document.getElementById(`val-${idx}`);
@@ -1048,6 +1055,11 @@ function updateButtonStates() {
 
     // Keep FX param groups in sync with active effects
     updateFxParamVisibility();
+
+    // Contextual param dimming
+    const colorModes = new Set([1, 2, 5, 10, 11, 13]);
+    let g1 = document.getElementById('group-1');
+    if (g1) g1.classList.toggle('param-dimmed', !colorModes.has(currentMode));
 }
 
 function updateFxParamVisibility() {
