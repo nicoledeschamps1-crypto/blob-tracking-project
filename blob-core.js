@@ -22,6 +22,9 @@ const wordBank = [
 const specialChars = "ㄱㄴㄷㄹㅁㅂㅅㅈㅊㅋㅌㅍイカクケコシスソテトナニヌノハヒフヘマミメモヤユヨラリルロワヲンгптшиилнхкевзсмяч".split('');
 
 let showLines = false;
+let lineColor = '#ffffff';
+let lineWeight = 1;
+let lineStraight = false;
 let currentMode = 1;
 let _userMode = 1;        // user's UI-selected mode (survives timeline overrides)
 let _userCustomHue = 195; // user's UI-selected custom hue
@@ -240,9 +243,9 @@ let _cachedBeatMarkers = [];
 let _cachedBeatKey = '';
 
 const MODE_NAMES = {
-    0:'OFF', 1:'BLUE', 2:'RED', 3:'MOT', 4:'SKIN', 5:'CUST',
-    6:'BRI', 7:'DARK', 8:'EDGE', 9:'CHRM', 10:'WARM', 11:'COOL',
-    12:'FLKR', 13:'INV', 14:'MASK', 15:'EYES', 16:'LIPS', 17:'FACE'
+    0:'Off', 1:'Blue', 2:'Red', 3:'Motion', 4:'Skin', 5:'Custom',
+    6:'Bright', 7:'Dark', 8:'Edge', 9:'Chroma', 10:'Warm', 11:'Cool',
+    12:'Flicker', 13:'Invert', 14:'Mask', 15:'Eyes', 16:'Lips', 17:'Face'
 };
 
 // Face landmark tracking state (MediaPipe Face Landmarker)
@@ -373,6 +376,212 @@ const FX_DEFAULTS = {
     led: {ledCellSize:8,ledGap:2,ledGlow:30,ledBrightness:100},
     crt: {crtScanWeight:2,crtCurvature:30,crtGlow:50,crtChroma:3,crtStatic:20}
 };
+
+// ── FX_UI_CONFIG — UI control definitions for JS-generated FX panel ──
+// Single source of truth for effect labels, controls, and DOM IDs.
+// Control types: slider, selector, color, shape, swatch, toggle
+const FX_UI_CONFIG = {
+    sepia: { label:'Sepia', controls:[
+        {type:'slider',sid:'slider-sepia-intensity',vid:'val-sepia-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>sepiaIntensity=v}
+    ]},
+    tint: { label:'Tint', hasRandomize:true, controls:[
+        {type:'selector',cid:'tint-preset-buttons',label:'Preset',setter:v=>tintPreset=v,
+         opts:[{v:'green',l:'GREEN'},{v:'amber',l:'AMBER'},{v:'cyan',l:'CYAN'},{v:'blue',l:'BLUE'},{v:'custom',l:'CUSTOM'}]},
+        {type:'color',cid:'tint-custom-color',hid:'tint-custom-hex',label:'Custom Color',setter:v=>tintCustomColor=v},
+        {type:'slider',sid:'slider-tint-intensity',vid:'val-tint-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>tintIntensity=v}
+    ]},
+    palette: { label:'Palette', controls:[
+        {type:'selector',cid:'palette-preset-buttons',label:'Preset',setter:v=>palettePreset=v,
+         opts:[{v:'noir',l:'NOIR'},{v:'terminal',l:'TERM'},{v:'gameboy',l:'GMBOY'},{v:'synthwave',l:'SYNTH'},{v:'cyberpunk',l:'CYBER'},{v:'amber',l:'AMBER'},{v:'arctic',l:'ARTIC'},{v:'rose',l:'ROSE'},{v:'neon',l:'NEON'},{v:'forest',l:'FORST'},{v:'sunset',l:'SUNST'},{v:'ocean',l:'OCEAN'}]},
+        {type:'slider',sid:'slider-palette-intensity',vid:'val-palette-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>paletteIntensity=v}
+    ]},
+    bricon: { label:'Bri/Con', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-bri',vid:'val-bri',label:'Brightness',min:-100,max:100,step:1,setter:v=>briValue=v},
+        {type:'slider',sid:'slider-con',vid:'val-con',label:'Contrast',min:0,max:200,step:1,setter:v=>conValue=v},
+        {type:'slider',sid:'slider-sat',vid:'val-sat',label:'Saturation',min:0,max:200,step:1,setter:v=>satValue=v}
+    ]},
+    thermal: { label:'Thermal', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-thermal-intensity',vid:'val-thermal-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>thermalIntensity=v}
+    ]},
+    gradmap: { label:'Grad Map', hasRandomize:true, controls:[
+        {type:'color',cid:'grad-color1',hid:'grad-color1-hex',label:'Shadow',setter:v=>gradColor1=v},
+        {type:'color',cid:'grad-color2',hid:'grad-color2-hex',label:'Highlight',setter:v=>gradColor2=v},
+        {type:'slider',sid:'slider-grad-intensity',vid:'val-grad-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>gradIntensity=v}
+    ]},
+    duotone: { label:'Duotone', hasRandomize:true, controls:[
+        {type:'color',cid:'duo-shadow',hid:'duo-shadow-hex',label:'Shadow',setter:v=>duoShadow=v},
+        {type:'color',cid:'duo-highlight',hid:'duo-highlight-hex',label:'Highlight',setter:v=>duoHighlight=v},
+        {type:'slider',sid:'slider-duo-intensity',vid:'val-duo-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>duoIntensity=v}
+    ]},
+    chroma: { label:'Chromatic', controls:[
+        {type:'slider',sid:'slider-chroma-offset',vid:'val-chroma-offset',label:'Offset',min:1,max:25,step:1,setter:v=>chromaOffset=v}
+    ]},
+    rgbshift: { label:'RGB Shift', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-rgbshift-rx',vid:'val-rgbshift-rx',label:'Red X',min:-25,max:25,step:1,setter:v=>rgbShiftRX=v},
+        {type:'slider',sid:'slider-rgbshift-ry',vid:'val-rgbshift-ry',label:'Red Y',min:-25,max:25,step:1,setter:v=>rgbShiftRY=v},
+        {type:'slider',sid:'slider-rgbshift-bx',vid:'val-rgbshift-bx',label:'Blue X',min:-25,max:25,step:1,setter:v=>rgbShiftBX=v},
+        {type:'slider',sid:'slider-rgbshift-by',vid:'val-rgbshift-by',label:'Blue Y',min:-25,max:25,step:1,setter:v=>rgbShiftBY=v},
+        {type:'slider',sid:'slider-rgbshift-intensity',vid:'val-rgbshift-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>rgbShiftIntensity=v}
+    ]},
+    curve: { label:'Curve', controls:[
+        {type:'slider',sid:'slider-curve-intensity',vid:'val-curve-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>curveIntensity=v},
+        {type:'selector',cid:'curve-dir-buttons',label:'Direction',setter:v=>curveDirection=v,
+         opts:[{v:'barrel',l:'BARREL'},{v:'pinch',l:'PINCH'}]}
+    ]},
+    wave: { label:'Wave', controls:[
+        {type:'slider',sid:'slider-wave-amp',vid:'val-wave-amp',label:'Amplitude',min:1,max:100,step:1,setter:v=>waveAmp=v},
+        {type:'slider',sid:'slider-wave-freq',vid:'val-wave-freq',label:'Frequency',min:1,max:20,step:1,setter:v=>waveFreq=v},
+        {type:'slider',sid:'slider-wave-speed',vid:'val-wave-speed',label:'Speed',min:0,max:5,step:0.1,setter:v=>waveSpeed=v}
+    ]},
+    jitter: { label:'Jitter', controls:[
+        {type:'slider',sid:'slider-jitter-intensity',vid:'val-jitter-intensity',label:'Intensity',min:1,max:100,step:1,setter:v=>jitterIntensity=v},
+        {type:'slider',sid:'slider-jitter-block',vid:'val-jitter-block',label:'Block Size',min:1,max:16,step:1,setter:v=>jitterBlockSize=v},
+        {type:'selector',cid:'jitter-mode-buttons',label:'Mode',setter:v=>jitterMode=v,
+         opts:[{v:'random',l:'RANDOM'},{v:'perlin',l:'PERLIN'},{v:'shake',l:'SHAKE'}]}
+    ]},
+    mblur: { label:'Motion Blur', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-mblur-intensity',vid:'val-mblur-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>mblurIntensity=v},
+        {type:'slider',sid:'slider-mblur-angle',vid:'val-mblur-angle',label:'Angle',min:0,max:360,step:1,setter:v=>mblurAngle=v}
+    ]},
+    emboss: { label:'Emboss', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-emboss-angle',vid:'val-emboss-angle',label:'Angle',min:0,max:360,step:1,setter:v=>embossAngle=v},
+        {type:'slider',sid:'slider-emboss-strength',vid:'val-emboss-strength',label:'Strength',min:5,max:100,step:1,setter:v=>embossStrength=v}
+    ]},
+    bloom: { label:'Bloom', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-bloom-intensity',vid:'val-bloom-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>bloomIntensity=v},
+        {type:'slider',sid:'slider-bloom-radius',vid:'val-bloom-radius',label:'Radius',min:10,max:100,step:1,setter:v=>bloomRadius=v},
+        {type:'slider',sid:'slider-bloom-thresh',vid:'val-bloom-thresh',label:'Threshold',min:0,max:100,step:1,setter:v=>bloomThreshold=v},
+        {type:'slider',sid:'slider-bloom-spread',vid:'val-bloom-spread',label:'Spread',min:10,max:100,step:1,setter:v=>bloomSpread=v},
+        {type:'slider',sid:'slider-bloom-exposure',vid:'val-bloom-exposure',label:'Exposure',min:50,max:200,step:1,setter:v=>bloomExposure=v},
+        {type:'selector',cid:'bloom-blend-buttons',label:'Blend',setter:v=>bloomBlendMode=v,
+         opts:[{v:'additive',l:'ADD'},{v:'screen',l:'SCREEN'},{v:'soft',l:'SOFT'}]}
+    ]},
+    dither: { label:'Dither', hasRandomize:true, controls:[
+        {type:'selector',cid:'dither-algo-buttons',label:'Algorithm',setter:v=>ditherAlgorithm=v,
+         opts:[{v:'bayer2',l:'2x2'},{v:'bayer4',l:'4x4'},{v:'bayer8',l:'8x8'},{v:'floyd',l:'FLOYD'},{v:'ordered',l:'ORDER'}]},
+        {type:'selector',cid:'dither-palette-buttons',label:'Palette',setter:v=>ditherPalette=v,
+         opts:[{v:'bw',l:'B&W'},{v:'grayscale',l:'GRAY'},{v:'noir',l:'NOIR'},{v:'terminal',l:'TERM'},{v:'gameboy',l:'GMBOY'},{v:'synthwave',l:'SYNTH'},{v:'cyberpunk',l:'CYBER'},{v:'neon',l:'NEON'}]},
+        {type:'slider',sid:'slider-dither-count',vid:'val-dither-count',label:'Colors',min:2,max:18,step:1,setter:v=>ditherColorCount=v},
+        {type:'slider',sid:'slider-dither-pixelation',vid:'val-dither-pixelation',label:'Pixelation',min:1,max:8,step:1,setter:v=>ditherPixelation=v},
+        {type:'slider',sid:'slider-dither-strength',vid:'val-dither-strength',label:'Strength',min:0,max:100,step:1,setter:v=>ditherStrength=v},
+        {type:'selector',cid:'dither-color-buttons',label:'Color',setter:v=>ditherColorMode=v,
+         opts:[{v:'bw',l:'B&W'},{v:'color',l:'COLOR'}]}
+    ]},
+    atkinson: { label:'Atkinson', hasRandomize:true, controls:[
+        {type:'selector',cid:'atkinson-color-buttons',label:'Color',setter:v=>atkinsonColorMode=v,
+         opts:[{v:'bw',l:'B&W'},{v:'color',l:'COLOR'}]},
+        {type:'slider',sid:'slider-atkinson-threshold',vid:'val-atkinson-threshold',label:'Threshold',min:0,max:255,step:1,setter:v=>atkinsonThreshold=v},
+        {type:'slider',sid:'slider-atkinson-spread',vid:'val-atkinson-spread',label:'Spread',min:0,max:100,step:1,setter:v=>atkinsonSpread=v},
+        {type:'slider',sid:'slider-atkinson-strength',vid:'val-atkinson-strength',label:'Strength',min:0,max:100,step:1,setter:v=>atkinsonStrength=v}
+    ]},
+    halftone: { label:'Halftone', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-half-spacing',vid:'val-half-spacing',label:'Dot Size',min:3,max:20,step:1,setter:v=>halfSpacing=v},
+        {type:'slider',sid:'slider-half-angle',vid:'val-half-angle',label:'Angle',min:0,max:360,step:1,setter:v=>halfAngle=v},
+        {type:'slider',sid:'slider-half-contrast',vid:'val-half-contrast',label:'Contrast',min:0,max:100,step:1,setter:v=>halfContrast=v},
+        {type:'slider',sid:'slider-half-spread',vid:'val-half-spread',label:'Spread',min:0,max:50,step:1,setter:v=>halfSpread=v},
+        {type:'shape',cid:'half-shape-buttons',label:'Shape',setter:v=>halfShape=v,
+         opts:[{v:'circle',icon:'\u25CF',t:'Circle'},{v:'square',icon:'\u25A0',t:'Square'},{v:'diamond',icon:'\u25C6',t:'Diamond'},{v:'triangle',icon:'\u25B2',t:'Triangle'},{v:'line',icon:'\u2501',t:'Line'}]},
+        {type:'swatch',cid:'half-presets',label:'Presets',
+         swatches:[
+            {ink:'#000000',paper:'#ffffff',t:'Classic'},
+            {ink:'#1a1a2e',paper:'#f0e6d3',t:'Newsprint'},
+            {ink:'#0d2b45',paper:'#d4c5a9',t:'Navy'},
+            {ink:'#2b0033',paper:'#f5e6ff',t:'Purple'},
+            {ink:'#003300',paper:'#ccffcc',t:'Matrix'},
+            {ink:'#4a0000',paper:'#ffcccc',t:'Rose'},
+            {ink:'#ff6600',paper:'#000033',t:'Neon'},
+            {ink:'#00ffff',paper:'#0a0a0a',t:'Cyan'},
+            {ink:'#ffffff',paper:'#000000',t:'Inverted'},
+            {ink:'#ff0066',paper:'#001133',t:'Cyber'},
+            {ink:'#ffd700',paper:'#1a0a00',t:'Gold'},
+            {ink:'#39ff14',paper:'#0d0d0d',t:'Toxic'}
+         ]},
+        {type:'color',cid:'half-ink-color',hid:'half-ink-hex',label:'Ink',setter:v=>halfInkColor=v},
+        {type:'color',cid:'half-paper-color',hid:'half-paper-hex',label:'Paper',setter:v=>halfPaperColor=v},
+        {type:'selector',cid:'half-color-buttons',label:'Color Mode',setter:v=>halfColorMode=v,
+         opts:[{v:'bw',l:'B&W'},{v:'color',l:'COLOR'}]},
+        {type:'toggle',tid:'half-inverted-toggle',label:'Inverted',setter:v=>halfInverted=v}
+    ]},
+    pxsort: { label:'Pixel Sort', controls:[
+        {type:'slider',sid:'slider-pxsort-lo',vid:'val-pxsort-lo',label:'Low',min:0,max:255,step:1,setter:v=>pxsortLo=v},
+        {type:'slider',sid:'slider-pxsort-hi',vid:'val-pxsort-hi',label:'High',min:0,max:255,step:1,setter:v=>pxsortHi=v},
+        {type:'selector',cid:'pxsort-dir-buttons',label:'Direction',setter:v=>pxsortDir=v,
+         opts:[{v:'horizontal',l:'HORIZ'},{v:'vertical',l:'VERT'}]}
+    ]},
+    pixel: { label:'Pixelate', controls:[
+        {type:'slider',sid:'slider-pixel-size',vid:'val-pixel-size',label:'Size',min:2,max:50,step:1,setter:v=>pixelSize=v}
+    ]},
+    led: { label:'LED Screen', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-led-cellsize',vid:'val-led-cellsize',label:'Cell Size',min:4,max:20,step:1,setter:v=>ledCellSize=v},
+        {type:'slider',sid:'slider-led-gap',vid:'val-led-gap',label:'Gap',min:1,max:5,step:1,setter:v=>ledGap=v},
+        {type:'slider',sid:'slider-led-glow',vid:'val-led-glow',label:'Glow',min:0,max:100,step:1,setter:v=>ledGlow=v},
+        {type:'slider',sid:'slider-led-brightness',vid:'val-led-brightness',label:'Brightness',min:50,max:150,step:1,setter:v=>ledBrightness=v}
+    ]},
+    ascii: { label:'ASCII', controls:[
+        {type:'slider',sid:'slider-ascii-cell',vid:'val-ascii-cell',label:'Cell Size',min:4,max:24,step:1,setter:v=>asciiCellSize=v},
+        {type:'selector',cid:'ascii-charset-buttons',label:'Charset',setter:v=>asciiCharSet=v,
+         opts:[{v:'classic',l:'CLASSIC'},{v:'blocks',l:'BLOCKS'},{v:'dots',l:'DOTS'},{v:'binary',l:'BINARY'},{v:'braille',l:'BRAILLE'},{v:'symbols',l:'SYMBOLS'},{v:'katakana',l:'KATA'}]},
+        {type:'selector',cid:'ascii-color-buttons',label:'Color',setter:v=>asciiColorMode=v,
+         opts:[{v:'mono',l:'MONO'},{v:'color',l:'COLOR'},{v:'green',l:'GREEN'},{v:'amber',l:'AMBER'},{v:'cyan',l:'CYAN'}]},
+        {type:'selector',cid:'ascii-invert-buttons',label:'Invert',setter:v=>asciiInvert=(v==='on'),
+         opts:[{v:'off',l:'OFF'},{v:'on',l:'ON'}]}
+    ]},
+    glitch: { label:'Glitch', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-glitch-intensity',vid:'val-glitch-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>glitchIntensity=v},
+        {type:'slider',sid:'slider-glitch-freq',vid:'val-glitch-freq',label:'Frequency',min:1,max:100,step:1,setter:v=>glitchFreq=v},
+        {type:'slider',sid:'slider-glitch-chshift',vid:'val-glitch-chshift',label:'Ch. Shift',min:0,max:100,step:1,setter:v=>glitchChannelShift=v},
+        {type:'slider',sid:'slider-glitch-blocksize',vid:'val-glitch-blocksize',label:'Block Size',min:10,max:100,step:1,setter:v=>glitchBlockSize=v},
+        {type:'slider',sid:'slider-glitch-seed',vid:'val-glitch-seed',label:'Seed',min:0,max:999,step:1,setter:v=>glitchSeed=v},
+        {type:'slider',sid:'slider-glitch-speed',vid:'val-glitch-speed',label:'Speed',min:0,max:100,step:1,setter:v=>glitchSpeed=v},
+        {type:'selector',cid:'glitch-mode-buttons',label:'Style',setter:v=>glitchMode=v,
+         opts:[{v:'shift',l:'SHIFT'},{v:'tear',l:'TEAR'},{v:'corrupt',l:'CORRUPT'}]}
+    ]},
+    noise: { label:'Noise', controls:[
+        {type:'slider',sid:'slider-noise-intensity',vid:'val-noise-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>noiseIntensity=v},
+        {type:'slider',sid:'slider-noise-scale',vid:'val-noise-scale',label:'Scale',min:1,max:10,step:1,setter:v=>noiseScale=v},
+        {type:'selector',cid:'noise-color-buttons',label:'Color',setter:v=>noiseColorMode=v,
+         opts:[{v:'mono',l:'MONO'},{v:'color',l:'COLOR'}]}
+    ]},
+    grain: { label:'Grain', controls:[
+        {type:'slider',sid:'slider-grain-intensity',vid:'val-grain-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>grainIntensity=v},
+        {type:'slider',sid:'slider-grain-size',vid:'val-grain-size',label:'Size',min:5,max:40,step:1,setter:v=>grainSize=v},
+        {type:'selector',cid:'grain-color-buttons',label:'Color',setter:v=>grainColorMode=v,
+         opts:[{v:'mono',l:'MONO'},{v:'color',l:'COLOR'}]}
+    ]},
+    dots: { label:'Dots', controls:[
+        {type:'slider',sid:'slider-dots-angle',vid:'val-dots-angle',label:'Angle',min:0,max:360,step:1,setter:v=>dotsAngle=v},
+        {type:'slider',sid:'slider-dots-scale',vid:'val-dots-scale',label:'Scale',min:2,max:20,step:1,setter:v=>dotsScale=v}
+    ]},
+    grid: { label:'Grid', controls:[
+        {type:'slider',sid:'slider-grid-scale',vid:'val-grid-scale',label:'Scale',min:5,max:50,step:1,setter:v=>gridScale=v},
+        {type:'slider',sid:'slider-grid-width',vid:'val-grid-width',label:'Width',min:1,max:5,step:0.5,setter:v=>gridWidth=v},
+        {type:'slider',sid:'slider-grid-opacity',vid:'val-grid-opacity',label:'Opacity',min:5,max:100,step:1,setter:v=>gridOpacity=v}
+    ]},
+    scanlines: { label:'Scanlines', controls:[
+        {type:'slider',sid:'slider-scan-intensity',vid:'val-scan-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>scanIntensity=v},
+        {type:'slider',sid:'slider-scan-count',vid:'val-scan-count',label:'Count',min:50,max:800,step:10,setter:v=>scanCount=v}
+    ]},
+    vignette: { label:'Vignette', controls:[
+        {type:'slider',sid:'slider-vig-intensity',vid:'val-vig-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>vigIntensity=v},
+        {type:'slider',sid:'slider-vig-radius',vid:'val-vig-radius',label:'Radius',min:20,max:100,step:1,setter:v=>vigRadius=v}
+    ]},
+    crt: { label:'CRT Screen', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-crt-scanweight',vid:'val-crt-scanweight',label:'Scan Weight',min:1,max:5,step:1,setter:v=>crtScanWeight=v},
+        {type:'slider',sid:'slider-crt-curvature',vid:'val-crt-curvature',label:'Curvature',min:0,max:100,step:1,setter:v=>crtCurvature=v},
+        {type:'slider',sid:'slider-crt-glow',vid:'val-crt-glow',label:'Phosphor Glow',min:0,max:100,step:1,setter:v=>crtGlow=v},
+        {type:'slider',sid:'slider-crt-chroma',vid:'val-crt-chroma',label:'Chroma Fringe',min:0,max:10,step:1,setter:v=>crtChroma=v},
+        {type:'slider',sid:'slider-crt-static',vid:'val-crt-static',label:'Static Noise',min:0,max:100,step:1,setter:v=>crtStatic=v}
+    ]}
+};
+
+// FX panel state
+let currentFxCat = 'color';
+let currentViewedEffect = 'sepia';
+
+function getEffectsForCategory(cat) {
+    return Object.keys(FX_CATEGORIES).filter(k => FX_CATEGORIES[k] === cat);
+}
+
 let nextSegId = 1;
 
 // Audio state
@@ -426,7 +635,7 @@ const ui = {
     audioMeterFill: document.getElementById('audio-meter-fill'),
     modeButtons: document.querySelectorAll('#group-modes .selector-btn'),
     vizButtons: document.querySelectorAll('#viz-buttons .selector-btn'),
-    fxCards: document.querySelectorAll('.fx-card'),
+    fxCards: [], // FX cards replaced by Effecto dropdown — now JS-generated
     fxLayerButtons: document.querySelectorAll('#fx-layer-buttons .selector-btn'),
     lineButtons: document.querySelectorAll('#line-buttons .selector-btn'),
     syncButtons: document.querySelectorAll('#sync-buttons .selector-btn'),
@@ -471,9 +680,9 @@ const ui = {
 let smoothBass = 0, smoothMid = 0, smoothTreble = 0, smoothOverall = 0, smoothBand = 0;
 
 // Auto-gain: track rolling max per band for normalization
-let autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
 const AUTO_GAIN_DECAY = 0.993;
 const AUTO_GAIN_FLOOR = 0.05;
+let autoGainMax = { band: AUTO_GAIN_FLOOR, bass: AUTO_GAIN_FLOOR, mid: AUTO_GAIN_FLOOR, treble: AUTO_GAIN_FLOOR };
 
 // Debug panel visibility (toggle with 'D' key)
 let debugVisible = false;
@@ -996,6 +1205,11 @@ function setupCoreUIListeners() {
                 if (activeVizModes.has(val)) activeVizModes.delete(val);
                 else activeVizModes.add(val);
             }
+            // Auto-expand Product Info when TAG viz is active
+            let pig = document.getElementById('product-info-group');
+            if (activeVizModes.has(8)) {
+                pig.classList.remove('collapsed');
+            }
             updateButtonStates();
         });
     });
@@ -1003,7 +1217,34 @@ function setupCoreUIListeners() {
     ui.lineButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             showLines = (e.target.dataset.value === 'on');
+            document.getElementById('line-options-group').style.display = showLines ? '' : 'none';
             updateButtonStates();
+        });
+    });
+
+    // Line color picker
+    const lineColorPicker = document.getElementById('line-color-picker');
+    const lineColorHex = document.getElementById('line-color-hex');
+    lineColorPicker.addEventListener('input', (e) => { lineColor = e.target.value; lineColorHex.value = e.target.value; });
+    lineColorHex.addEventListener('input', (e) => {
+        let v = e.target.value;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) { lineColor = v; lineColorPicker.value = v; }
+    });
+    lineColorHex.addEventListener('keydown', (e) => e.stopPropagation());
+
+    // Line weight
+    const lineWeightSlider = document.getElementById('slider-line-weight');
+    const lineWeightInput = document.getElementById('val-line-weight');
+    lineWeightSlider.addEventListener('input', (e) => { lineWeight = parseFloat(e.target.value); lineWeightInput.value = e.target.value; });
+    lineWeightInput.addEventListener('input', (e) => { lineWeight = parseFloat(e.target.value) || 1; lineWeightSlider.value = lineWeight; });
+    lineWeightInput.addEventListener('keydown', (e) => e.stopPropagation());
+
+    // Line style (curved/straight)
+    document.querySelectorAll('#line-style-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            lineStraight = (e.target.dataset.value === 'straight');
+            document.querySelectorAll('#line-style-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
         });
     });
 
@@ -1201,40 +1442,37 @@ function updateButtonStates() {
 }
 
 function updateFxParamVisibility() {
-    const map = {
-        ascii: 'fx-params-ascii', chroma: 'fx-params-chroma', atkinson: 'fx-params-atkinson',
-        scanlines: 'fx-params-scanlines', vignette: 'fx-params-vignette', grain: 'fx-params-grain',
-        bloom: 'fx-params-bloom', tint: 'fx-params-tint', sepia: 'fx-params-sepia',
-        pixel: 'fx-params-pixel', wave: 'fx-params-wave', glitch: 'fx-params-glitch',
-        jitter: 'fx-params-jitter', noise: 'fx-params-noise', curve: 'fx-params-curve',
-        bricon: 'fx-params-bricon', grid: 'fx-params-grid', dots: 'fx-params-dots',
-        mblur: 'fx-params-mblur', palette: 'fx-params-palette',
-        halftone: 'fx-params-halftone', dither: 'fx-params-dither', pxsort: 'fx-params-pxsort',
-        thermal: 'fx-params-thermal', gradmap: 'fx-params-gradmap', duotone: 'fx-params-duotone',
-        emboss: 'fx-params-emboss', rgbshift: 'fx-params-rgbshift',
-        led: 'fx-params-led', crt: 'fx-params-crt'
-    };
-    for (let [fx, id] of Object.entries(map)) {
-        let el = document.getElementById(id);
-        if (el) el.classList.toggle('visible', activeEffects.has(fx));
+    // In Effecto UI: show params for the currently viewed effect (one at a time)
+    if (typeof showFxParams === 'function' && currentViewedEffect) {
+        showFxParams(currentViewedEffect);
     }
 }
 
 function updateEffectCardStates() {
+    // Update tab active indicators (dot + count)
     const catCounts = { color: 0, distortion: 0, pattern: 0, overlay: 0 };
-    ui.fxCards.forEach(card => {
-        let name = card.dataset.effect;
-        let cat = card.dataset.cat;
-        card.classList.remove('active-color', 'active-distortion', 'active-pattern', 'active-overlay');
-        if (activeEffects.has(name)) {
-            card.classList.add('active-' + cat);
-            catCounts[cat]++;
-        }
+    activeEffects.forEach(name => {
+        let cat = FX_CATEGORIES[name];
+        if (cat) catCounts[cat]++;
     });
-    document.querySelectorAll('.cat-count').forEach(badge => {
-        let count = catCounts[badge.dataset.cat] || 0;
-        badge.textContent = count > 0 ? count : '';
+    document.querySelectorAll('.fx-tab').forEach(tab => {
+        let cat = tab.dataset.cat;
+        tab.classList.toggle('has-active', catCounts[cat] > 0);
+        let badge = tab.querySelector('.tab-count');
+        if (badge) badge.textContent = catCounts[cat] > 0 ? catCounts[cat] : '';
     });
+    // Update dropdown markers
+    let sel = document.getElementById('fx-effect-select');
+    if (sel) {
+        Array.from(sel.options).forEach(opt => {
+            let name = opt.value;
+            let cfg = FX_UI_CONFIG[name];
+            let prefix = activeEffects.has(name) ? '\u2022 ' : '  ';
+            opt.textContent = prefix + (cfg ? cfg.label : name.toUpperCase());
+        });
+    }
+    // Update ON/OFF button
+    if (typeof updateFxOnButton === 'function') updateFxOnButton();
 }
 
 // ── HELP OVERLAY ─────────────────────────
@@ -1493,9 +1731,10 @@ function startRecording() {
                     ? 'video/webm;codecs=vp8,opus'
                     : 'video/webm';
 
-    // Scale bitrate to resolution: ~12 Mbps for 1080p, ~20 Mbps for 4K
+    // Scale bitrate to resolution: ~20 Mbps for 1080p, ~35 Mbps for 4K
+    // Higher multiplier reduces VP9/VP8 quality fluctuation between keyframes
     let pixels = recordingCanvas.width * recordingCanvas.height;
-    let bitrate = Math.max(8000000, Math.round(pixels * 6));
+    let bitrate = Math.max(12000000, Math.round(pixels * 10));
 
     mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: bitrate });
 
@@ -1510,7 +1749,8 @@ function startRecording() {
         ui.btnSave.style.borderColor = '#e5e5e5';
     };
 
-    mediaRecorder.start(100);
+    // No timeslice — collect all data on stop to avoid chunk boundary quality drops
+    mediaRecorder.start();
     isRecording = true;
     ui.btnRecord.classList.add('recording');
     ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg> Stop`;

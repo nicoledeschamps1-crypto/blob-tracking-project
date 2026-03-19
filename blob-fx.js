@@ -1565,13 +1565,287 @@ function syncFxControlsForEffect(effectName) {
 }
 
 // ---------------------------------------------------------------------------
-// setupFxUIListeners() — FX card interaction + all FX param slider wiring
+// buildFxPanel() — JS-generate the Effecto-style FX panel
+// ---------------------------------------------------------------------------
+function buildFxPanel() {
+    const cats = ['color','distortion','pattern','overlay'];
+    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay'};
+
+    // ── TAB BAR ──
+    let tabBar = document.getElementById('fx-cat-tabs');
+    tabBar.className = 'fx-tab-bar';
+    cats.forEach(cat => {
+        let btn = document.createElement('button');
+        btn.className = 'fx-tab' + (cat === currentFxCat ? ' active' : '');
+        btn.dataset.cat = cat;
+        btn.style.setProperty('--tab-color', FX_CAT_COLORS[cat]);
+        btn.innerHTML = `<span class="tab-dot"></span>${catLabels[cat]}<span class="tab-count"></span>`;
+        btn.addEventListener('click', () => switchFxCategory(cat));
+        tabBar.appendChild(btn);
+    });
+
+    // ── DROPDOWN ROW ──
+    let selRow = document.getElementById('fx-selector-row');
+    selRow.className = 'fx-dropdown-row';
+    let arrowL = document.createElement('button');
+    arrowL.className = 'fx-dropdown-arrow';
+    arrowL.textContent = '\u2039';
+    arrowL.title = 'Previous effect';
+    arrowL.addEventListener('click', () => cycleFxEffect(-1));
+    let sel = document.createElement('select');
+    sel.id = 'fx-effect-select';
+    sel.className = 'fx-dropdown-select';
+    sel.addEventListener('change', () => selectFxEffect(sel.value));
+    let arrowR = document.createElement('button');
+    arrowR.className = 'fx-dropdown-arrow';
+    arrowR.textContent = '\u203A';
+    arrowR.title = 'Next effect';
+    arrowR.addEventListener('click', () => cycleFxEffect(1));
+    let onBtn = document.createElement('button');
+    onBtn.className = 'fx-on-btn';
+    onBtn.id = 'fx-on-btn';
+    onBtn.textContent = 'ON';
+    onBtn.title = 'Toggle effect on/off';
+    onBtn.addEventListener('click', () => toggleCurrentFxEffect());
+    let dragH = document.createElement('div');
+    dragH.className = 'fx-drag-handle';
+    dragH.title = 'Drag to timeline';
+    dragH.innerHTML = '&#x2630;';
+    dragH.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || !currentViewedEffect) return;
+        fxDragState = {
+            effect: currentViewedEffect,
+            cat: FX_CATEGORIES[currentViewedEffect],
+            startX: e.clientX,
+            startY: e.clientY,
+            dragging: false
+        };
+    });
+    selRow.append(arrowL, sel, arrowR, onBtn, dragH);
+
+    // ── PARAM GROUPS (generate all, show one at a time) ──
+    let container = document.getElementById('fx-params-container');
+    for (let [effectName, cfg] of Object.entries(FX_UI_CONFIG)) {
+        let group = document.createElement('div');
+        group.className = 'fx-param-group';
+        group.id = 'fx-params-' + effectName;
+
+        // Header with randomize/reset
+        if (cfg.hasRandomize) {
+            let hdr = document.createElement('div');
+            hdr.className = 'fx-param-header';
+            hdr.innerHTML = `<span class="fx-param-title">${cfg.label}</span>` +
+                `<button class="fx-action-btn" data-action="randomize" data-effect="${effectName}" title="Randomize">&#x1F3B2;</button>` +
+                `<button class="fx-action-btn" data-action="reset" data-effect="${effectName}" title="Reset">&#x21BB;</button>`;
+            group.appendChild(hdr);
+        }
+
+        // Controls
+        cfg.controls.forEach(ctrl => {
+            if (ctrl.type === 'slider') {
+                let row = document.createElement('div');
+                row.className = 'fx-inline-slider';
+                row.innerHTML = `<span class="fx-slider-label">${ctrl.label}</span>` +
+                    `<input type="range" id="${ctrl.sid}" min="${ctrl.min}" max="${ctrl.max}" step="${ctrl.step}" value="${ctrl.min}">` +
+                    `<input type="number" class="value-input" id="${ctrl.vid}" value="${ctrl.min}">`;
+                group.appendChild(row);
+            } else if (ctrl.type === 'selector') {
+                let lbl = document.createElement('label');
+                lbl.textContent = ctrl.label;
+                lbl.style.fontSize = '9px';
+                lbl.style.fontWeight = '600';
+                lbl.style.color = 'var(--text-muted)';
+                lbl.style.marginTop = '4px';
+                lbl.style.display = 'block';
+                group.appendChild(lbl);
+                let row = document.createElement('div');
+                row.className = 'selector-row';
+                row.id = ctrl.cid;
+                ctrl.opts.forEach((opt, i) => {
+                    let btn = document.createElement('button');
+                    btn.className = 'selector-btn' + (i === 0 ? ' active' : '');
+                    btn.dataset.value = opt.v;
+                    btn.textContent = opt.l;
+                    row.appendChild(btn);
+                });
+                group.appendChild(row);
+            } else if (ctrl.type === 'color') {
+                let lbl = document.createElement('label');
+                lbl.textContent = ctrl.label;
+                lbl.style.fontSize = '9px';
+                lbl.style.fontWeight = '600';
+                lbl.style.color = 'var(--text-muted)';
+                lbl.style.marginTop = '4px';
+                lbl.style.display = 'block';
+                group.appendChild(lbl);
+                let picker = document.createElement('div');
+                picker.className = 'fx-color-picker';
+                let defColor = '#000000';
+                // Find default from FX_DEFAULTS
+                let defs = FX_DEFAULTS[effectName];
+                if (defs) {
+                    for (let k of Object.keys(defs)) {
+                        if (typeof defs[k] === 'string' && defs[k].startsWith('#') &&
+                            k.toLowerCase().includes(ctrl.cid.split('-').pop().replace('color',''))) {
+                            defColor = defs[k]; break;
+                        }
+                    }
+                    // Fallback: match by order
+                    if (defColor === '#000000') {
+                        let colorKeys = Object.keys(defs).filter(k => typeof defs[k] === 'string' && defs[k].startsWith('#'));
+                        let colorIdx = cfg.controls.filter(c => c.type === 'color').indexOf(ctrl);
+                        if (colorKeys[colorIdx]) defColor = defs[colorKeys[colorIdx]];
+                    }
+                }
+                picker.innerHTML = `<input type="color" class="fx-color-input" id="${ctrl.cid}" value="${defColor}">` +
+                    `<input type="text" class="fx-hex-input" id="${ctrl.hid}" value="${defColor}" maxlength="7">`;
+                group.appendChild(picker);
+            } else if (ctrl.type === 'shape') {
+                let lbl = document.createElement('label');
+                lbl.textContent = ctrl.label;
+                lbl.style.cssText = 'font-size:9px;font-weight:600;color:var(--text-muted);margin-top:4px;display:block';
+                group.appendChild(lbl);
+                let row = document.createElement('div');
+                row.className = 'fx-shape-selector';
+                row.id = ctrl.cid;
+                ctrl.opts.forEach((opt, i) => {
+                    let btn = document.createElement('button');
+                    btn.className = 'fx-shape-btn' + (i === 0 ? ' active' : '');
+                    btn.dataset.value = opt.v;
+                    btn.title = opt.t;
+                    btn.textContent = opt.icon;
+                    row.appendChild(btn);
+                });
+                group.appendChild(row);
+            } else if (ctrl.type === 'swatch') {
+                let lbl = document.createElement('label');
+                lbl.textContent = ctrl.label;
+                lbl.style.cssText = 'font-size:9px;font-weight:600;color:var(--text-muted);margin-top:4px;display:block';
+                group.appendChild(lbl);
+                let grid = document.createElement('div');
+                grid.className = 'fx-swatch-grid';
+                grid.id = ctrl.cid;
+                ctrl.swatches.forEach((sw, i) => {
+                    let div = document.createElement('div');
+                    div.className = 'fx-swatch' + (i === 0 ? ' active' : '');
+                    div.dataset.ink = sw.ink;
+                    div.dataset.paper = sw.paper;
+                    div.title = sw.t;
+                    div.style.background = `linear-gradient(135deg,${sw.ink} 50%,${sw.paper} 50%)`;
+                    grid.appendChild(div);
+                });
+                group.appendChild(grid);
+            } else if (ctrl.type === 'toggle') {
+                let row = document.createElement('div');
+                row.className = 'fx-toggle-row';
+                row.innerHTML = `<label style="font-size:9px;font-weight:600;color:var(--text-muted)">${ctrl.label}</label>` +
+                    `<label class="fx-toggle-switch"><input type="checkbox" id="${ctrl.tid}"><span class="toggle-slider"></span></label>`;
+                group.appendChild(row);
+            }
+        });
+        container.appendChild(group);
+    }
+
+    // Sync all controls with current global values
+    for (let name of Object.keys(FX_UI_CONFIG)) {
+        syncFxControlsForEffect(name);
+    }
+
+    // Set initial state
+    switchFxCategory('color');
+}
+
+function switchFxCategory(cat) {
+    currentFxCat = cat;
+    // Update tab active state
+    document.querySelectorAll('.fx-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
+    // Populate dropdown
+    let sel = document.getElementById('fx-effect-select');
+    let effects = getEffectsForCategory(cat);
+    sel.innerHTML = '';
+    effects.forEach(name => {
+        let opt = document.createElement('option');
+        opt.value = name;
+        let cfg = FX_UI_CONFIG[name];
+        let prefix = activeEffects.has(name) ? '\u2022 ' : '  ';
+        opt.textContent = prefix + (cfg ? cfg.label : name.toUpperCase());
+        sel.appendChild(opt);
+    });
+    // Select first effect or keep current if it's in this category
+    if (effects.includes(currentViewedEffect)) {
+        sel.value = currentViewedEffect;
+    } else {
+        currentViewedEffect = effects[0];
+        sel.value = effects[0];
+    }
+    showFxParams(currentViewedEffect);
+    updateFxOnButton();
+}
+
+function selectFxEffect(name) {
+    currentViewedEffect = name;
+    showFxParams(name);
+    updateFxOnButton();
+}
+
+function cycleFxEffect(dir) {
+    let effects = getEffectsForCategory(currentFxCat);
+    let idx = effects.indexOf(currentViewedEffect);
+    idx = (idx + dir + effects.length) % effects.length;
+    currentViewedEffect = effects[idx];
+    document.getElementById('fx-effect-select').value = currentViewedEffect;
+    showFxParams(currentViewedEffect);
+    updateFxOnButton();
+}
+
+function toggleCurrentFxEffect() {
+    if (!currentViewedEffect) return;
+    if (activeEffects.has(currentViewedEffect)) {
+        activeEffects.delete(currentViewedEffect);
+    } else {
+        activeEffects.add(currentViewedEffect);
+    }
+    updateEffectCardStates();
+    updateFxOnButton();
+    // Update dropdown marker
+    let sel = document.getElementById('fx-effect-select');
+    let effects = getEffectsForCategory(currentFxCat);
+    effects.forEach(name => {
+        let opt = sel.querySelector(`option[value="${name}"]`);
+        if (opt) {
+            let cfg = FX_UI_CONFIG[name];
+            let prefix = activeEffects.has(name) ? '\u2022 ' : '  ';
+            opt.textContent = prefix + (cfg ? cfg.label : name.toUpperCase());
+        }
+    });
+}
+
+function showFxParams(effectName) {
+    // Hide all param groups, show the selected one
+    document.querySelectorAll('#fx-params-container .fx-param-group').forEach(g => {
+        g.classList.toggle('visible', g.id === 'fx-params-' + effectName);
+    });
+}
+
+function updateFxOnButton() {
+    let btn = document.getElementById('fx-on-btn');
+    if (!btn || !currentViewedEffect) return;
+    let isActive = activeEffects.has(currentViewedEffect);
+    btn.classList.toggle('active', isActive);
+    btn.textContent = isActive ? 'ON' : 'OFF';
+    let catColor = FX_CAT_COLORS[FX_CATEGORIES[currentViewedEffect]] || '#6C5CE7';
+    btn.style.setProperty('--cat-color', catColor);
+}
+
+// ---------------------------------------------------------------------------
+// setupFxUIListeners() — Effecto-style panel build + event wiring
 // ---------------------------------------------------------------------------
 function setupFxUIListeners() {
 
     function wireSlider(sliderId, inputId, setter) {
         let sl = document.getElementById(sliderId);
         let inp = document.getElementById(inputId);
+        if (!sl || !inp) return;
         sl.addEventListener('input', (e) => { let v = parseFloat(e.target.value); setter(v); inp.value = v; });
         inp.addEventListener('change', (e) => {
             let v = parseFloat(e.target.value) || 0;
@@ -1581,28 +1855,80 @@ function setupFxUIListeners() {
         inp.addEventListener('keydown', (e) => { e.stopPropagation(); });
     }
 
-    // Collapsible FX categories
-    document.querySelectorAll('.cat-toggle').forEach(label => {
-        label.addEventListener('click', (e) => {
-            // Don't collapse if clicking on an fx-card inside (shouldn't happen, but safety)
-            if (e.target.closest('.fx-card')) return;
-            label.closest('.fx-category').classList.toggle('collapsed');
+    function wireColorPicker(colorId, hexId, setter) {
+        let cp = document.getElementById(colorId);
+        let hi = document.getElementById(hexId);
+        if (!cp || !hi) return;
+        cp.addEventListener('input', (e) => { setter(e.target.value); hi.value = e.target.value; });
+        hi.addEventListener('change', (e) => {
+            let v = e.target.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) { setter(v); cp.value = v; }
+            else { e.target.value = cp.value; }
+        });
+        hi.addEventListener('keydown', e => e.stopPropagation());
+    }
+
+    function wireSelector(containerId, setter) {
+        document.querySelectorAll('#' + containerId + ' .selector-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                setter(e.target.dataset.value);
+                document.querySelectorAll('#' + containerId + ' .selector-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+            });
+        });
+    }
+
+    function wireShapeSelector(containerId, setter) {
+        document.querySelectorAll('#' + containerId + ' .fx-shape-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                setter(e.currentTarget.dataset.value);
+                document.querySelectorAll('#' + containerId + ' .fx-shape-btn').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+            });
+        });
+    }
+
+    // ── BUILD THE PANEL ──
+    buildFxPanel();
+
+    // ── WIRE ALL CONTROLS FROM FX_UI_CONFIG ──
+    for (let [effectName, cfg] of Object.entries(FX_UI_CONFIG)) {
+        cfg.controls.forEach(ctrl => {
+            if (ctrl.type === 'slider') {
+                wireSlider(ctrl.sid, ctrl.vid, ctrl.setter);
+            } else if (ctrl.type === 'color') {
+                wireColorPicker(ctrl.cid, ctrl.hid, ctrl.setter);
+            } else if (ctrl.type === 'selector') {
+                wireSelector(ctrl.cid, ctrl.setter);
+            } else if (ctrl.type === 'shape') {
+                wireShapeSelector(ctrl.cid, ctrl.setter);
+            } else if (ctrl.type === 'toggle') {
+                let cb = document.getElementById(ctrl.tid);
+                if (cb) cb.addEventListener('change', e => ctrl.setter(e.target.checked));
+            }
+        });
+    }
+
+    // ── SWATCH GRIDS ──
+    // Halftone presets (special: sets ink + paper colors)
+    document.querySelectorAll('#half-presets .fx-swatch').forEach(sw => {
+        sw.addEventListener('click', () => {
+            halfInkColor = sw.dataset.ink || '#000000';
+            halfPaperColor = sw.dataset.paper || '#ffffff';
+            let ci = document.getElementById('half-ink-color');
+            let ch = document.getElementById('half-ink-hex');
+            let pi = document.getElementById('half-paper-color');
+            let ph = document.getElementById('half-paper-hex');
+            if (ci) ci.value = halfInkColor;
+            if (ch) ch.value = halfInkColor;
+            if (pi) pi.value = halfPaperColor;
+            if (ph) ph.value = halfPaperColor;
+            document.querySelectorAll('#half-presets .fx-swatch').forEach(s => s.classList.remove('active'));
+            sw.classList.add('active');
         });
     });
 
-    // Effect cards — click to toggle, drag to timeline
-    ui.fxCards.forEach(card => {
-        card.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
-            fxDragState = {
-                effect: card.dataset.effect,
-                cat: card.dataset.cat,
-                startX: e.clientX,
-                startY: e.clientY,
-                dragging: false
-            };
-        });
-    });
+    // ── DRAG TO TIMELINE (mousemove/mouseup — same as before) ──
     document.addEventListener('mousemove', (e) => {
         if (!fxDragState) return;
         let dx = e.clientX - fxDragState.startX;
@@ -1655,318 +1981,10 @@ function setupFxUIListeners() {
                 addTimelineSegmentAt(fxDragState.effect, dropTime);
             }
         } else {
-            // Click (not drag) — toggle effect globally
-            let effectName = fxDragState.effect;
-            if (activeEffects.has(effectName)) {
-                activeEffects.delete(effectName);
-            } else {
-                activeEffects.add(effectName);
-            }
-            updateEffectCardStates();
-            updateFxParamVisibility();
+            // Click on drag handle without dragging — no-op (toggle is via ON/OFF btn)
         }
         fxDragState = null;
     });
-
-    // ASCII params
-    let asciiCellSlider = document.getElementById('slider-ascii-cell');
-    let asciiCellInput = document.getElementById('val-ascii-cell');
-    asciiCellSlider.addEventListener('input', (e) => {
-        asciiCellSize = parseInt(e.target.value);
-        asciiCellInput.value = asciiCellSize;
-    });
-    asciiCellInput.addEventListener('change', (e) => {
-        asciiCellSize = Math.max(4, Math.min(24, parseInt(e.target.value) || 10));
-        asciiCellSlider.value = asciiCellSize;
-        e.target.value = asciiCellSize;
-        e.target.blur();
-    });
-    asciiCellInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
-
-    document.querySelectorAll('#ascii-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            asciiColorMode = e.target.dataset.value;
-            document.querySelectorAll('#ascii-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    document.querySelectorAll('#ascii-charset-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            asciiCharSet = e.target.dataset.value;
-            document.querySelectorAll('#ascii-charset-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    document.querySelectorAll('#ascii-invert-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            asciiInvert = (e.target.dataset.value === 'on');
-            document.querySelectorAll('#ascii-invert-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // Chroma params
-    let chromaSlider = document.getElementById('slider-chroma-offset');
-    let chromaInput = document.getElementById('val-chroma-offset');
-    chromaSlider.addEventListener('input', (e) => {
-        chromaOffset = parseInt(e.target.value);
-        chromaInput.value = chromaOffset;
-    });
-    chromaInput.addEventListener('change', (e) => {
-        chromaOffset = Math.max(1, Math.min(25, parseInt(e.target.value) || 5));
-        chromaSlider.value = chromaOffset;
-        e.target.value = chromaOffset;
-        e.target.blur();
-    });
-    chromaInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
-
-    // Atkinson color mode
-    document.querySelectorAll('#atkinson-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            atkinsonColorMode = e.target.dataset.value;
-            document.querySelectorAll('#atkinson-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // --- High-impact FX params ---
-    wireSlider('slider-scan-intensity', 'val-scan-intensity', v => scanIntensity = v);
-    wireSlider('slider-scan-count', 'val-scan-count', v => scanCount = v);
-    wireSlider('slider-vig-intensity', 'val-vig-intensity', v => vigIntensity = v);
-    wireSlider('slider-vig-radius', 'val-vig-radius', v => vigRadius = v);
-    wireSlider('slider-grain-intensity', 'val-grain-intensity', v => grainIntensity = v);
-    wireSlider('slider-grain-size', 'val-grain-size', v => grainSize = v);
-    wireSlider('slider-bloom-intensity', 'val-bloom-intensity', v => bloomIntensity = v);
-    wireSlider('slider-bloom-radius', 'val-bloom-radius', v => bloomRadius = v);
-    wireSlider('slider-bloom-thresh', 'val-bloom-thresh', v => bloomThreshold = v);
-    wireSlider('slider-tint-intensity', 'val-tint-intensity', v => tintIntensity = v);
-    wireSlider('slider-sepia-intensity', 'val-sepia-intensity', v => sepiaIntensity = v);
-
-    // Grain color mode
-    document.querySelectorAll('#grain-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            grainColorMode = e.target.dataset.value;
-            document.querySelectorAll('#grain-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // Tint preset
-    document.querySelectorAll('#tint-preset-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            tintPreset = e.target.dataset.value;
-            document.querySelectorAll('#tint-preset-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    wireSlider('slider-pixel-size', 'val-pixel-size', v => pixelSize = v);
-    wireSlider('slider-wave-amp', 'val-wave-amp', v => waveAmp = v);
-    wireSlider('slider-wave-freq', 'val-wave-freq', v => waveFreq = v);
-    wireSlider('slider-wave-speed', 'val-wave-speed', v => waveSpeed = v);
-    wireSlider('slider-glitch-intensity', 'val-glitch-intensity', v => glitchIntensity = v);
-    wireSlider('slider-glitch-freq', 'val-glitch-freq', v => glitchFreq = v);
-    document.querySelectorAll('#glitch-mode-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            glitchMode = e.target.dataset.value;
-            document.querySelectorAll('#glitch-mode-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-jitter-intensity', 'val-jitter-intensity', v => jitterIntensity = v);
-    wireSlider('slider-jitter-block', 'val-jitter-block', v => jitterBlockSize = v);
-    document.querySelectorAll('#jitter-mode-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            jitterMode = e.target.dataset.value;
-            document.querySelectorAll('#jitter-mode-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-half-spacing', 'val-half-spacing', v => halfSpacing = v);
-    document.querySelectorAll('#half-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            halfColorMode = e.target.dataset.value;
-            document.querySelectorAll('#half-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    document.querySelectorAll('#dither-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            ditherColorMode = e.target.dataset.value;
-            document.querySelectorAll('#dither-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-pxsort-lo', 'val-pxsort-lo', v => pxsortLo = v);
-    wireSlider('slider-pxsort-hi', 'val-pxsort-hi', v => pxsortHi = v);
-    document.querySelectorAll('#pxsort-dir-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            pxsortDir = e.target.dataset.value;
-            document.querySelectorAll('#pxsort-dir-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-noise-intensity', 'val-noise-intensity', v => noiseIntensity = v);
-    wireSlider('slider-noise-scale', 'val-noise-scale', v => noiseScale = v);
-    wireSlider('slider-curve-intensity', 'val-curve-intensity', v => curveIntensity = v);
-    document.querySelectorAll('#curve-dir-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            curveDirection = e.target.dataset.value;
-            document.querySelectorAll('#curve-dir-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-bri', 'val-bri', v => briValue = v);
-    wireSlider('slider-con', 'val-con', v => conValue = v);
-    wireSlider('slider-sat', 'val-sat', v => satValue = v);
-    wireSlider('slider-grid-scale', 'val-grid-scale', v => gridScale = v);
-    wireSlider('slider-grid-width', 'val-grid-width', v => gridWidth = v);
-    wireSlider('slider-grid-opacity', 'val-grid-opacity', v => gridOpacity = v);
-    wireSlider('slider-dots-angle', 'val-dots-angle', v => dotsAngle = v);
-    wireSlider('slider-dots-scale', 'val-dots-scale', v => dotsScale = v);
-    wireSlider('slider-mblur-intensity', 'val-mblur-intensity', v => mblurIntensity = v);
-    wireSlider('slider-mblur-angle', 'val-mblur-angle', v => mblurAngle = v);
-    wireSlider('slider-palette-intensity', 'val-palette-intensity', v => paletteIntensity = v);
-
-    // Noise color mode
-    document.querySelectorAll('#noise-color-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            noiseColorMode = e.target.dataset.value;
-            document.querySelectorAll('#noise-color-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // Palette preset
-    document.querySelectorAll('#palette-preset-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            palettePreset = e.target.dataset.value;
-            document.querySelectorAll('#palette-preset-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // ── ENRICHED EFFECT PARAMS ──
-
-    // Halftone enriched
-    wireSlider('slider-half-angle', 'val-half-angle', v => halfAngle = v);
-    wireSlider('slider-half-contrast', 'val-half-contrast', v => halfContrast = v);
-    wireSlider('slider-half-spread', 'val-half-spread', v => halfSpread = v);
-    document.querySelectorAll('#half-shape-buttons .fx-shape-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            halfShape = e.currentTarget.dataset.value;
-            document.querySelectorAll('#half-shape-buttons .fx-shape-btn').forEach(b => b.classList.remove('active'));
-            e.currentTarget.classList.add('active');
-        });
-    });
-    wireColorPicker('half-ink-color', 'half-ink-hex', v => halfInkColor = v);
-    wireColorPicker('half-paper-color', 'half-paper-hex', v => halfPaperColor = v);
-    let halfInvToggle = document.getElementById('half-inverted-toggle');
-    if (halfInvToggle) halfInvToggle.addEventListener('change', e => halfInverted = e.target.checked);
-    // Halftone presets
-    document.querySelectorAll('#half-presets .fx-swatch').forEach(sw => {
-        sw.addEventListener('click', () => {
-            halfInkColor = sw.dataset.ink || '#000000';
-            halfPaperColor = sw.dataset.paper || '#ffffff';
-            let ci = document.getElementById('half-ink-color');
-            let ch = document.getElementById('half-ink-hex');
-            let pi = document.getElementById('half-paper-color');
-            let ph = document.getElementById('half-paper-hex');
-            if (ci) ci.value = halfInkColor;
-            if (ch) ch.value = halfInkColor;
-            if (pi) pi.value = halfPaperColor;
-            if (ph) ph.value = halfPaperColor;
-            document.querySelectorAll('#half-presets .fx-swatch').forEach(s => s.classList.remove('active'));
-            sw.classList.add('active');
-        });
-    });
-
-    // Dither enriched
-    document.querySelectorAll('#dither-algo-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            ditherAlgorithm = e.target.dataset.value;
-            document.querySelectorAll('#dither-algo-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    document.querySelectorAll('#dither-palette-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            ditherPalette = e.target.dataset.value;
-            document.querySelectorAll('#dither-palette-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-    wireSlider('slider-dither-count', 'val-dither-count', v => ditherColorCount = v);
-    wireSlider('slider-dither-pixelation', 'val-dither-pixelation', v => ditherPixelation = v);
-    wireSlider('slider-dither-strength', 'val-dither-strength', v => ditherStrength = v);
-
-    // Atkinson enriched
-    wireSlider('slider-atkinson-threshold', 'val-atkinson-threshold', v => atkinsonThreshold = v);
-    wireSlider('slider-atkinson-spread', 'val-atkinson-spread', v => atkinsonSpread = v);
-    wireSlider('slider-atkinson-strength', 'val-atkinson-strength', v => atkinsonStrength = v);
-
-    // Bloom enriched
-    wireSlider('slider-bloom-spread', 'val-bloom-spread', v => bloomSpread = v);
-    wireSlider('slider-bloom-exposure', 'val-bloom-exposure', v => bloomExposure = v);
-    document.querySelectorAll('#bloom-blend-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            bloomBlendMode = e.target.dataset.value;
-            document.querySelectorAll('#bloom-blend-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-        });
-    });
-
-    // Glitch enriched
-    wireSlider('slider-glitch-chshift', 'val-glitch-chshift', v => glitchChannelShift = v);
-    wireSlider('slider-glitch-blocksize', 'val-glitch-blocksize', v => glitchBlockSize = v);
-    wireSlider('slider-glitch-seed', 'val-glitch-seed', v => glitchSeed = v);
-    wireSlider('slider-glitch-speed', 'val-glitch-speed', v => glitchSpeed = v);
-
-    // Tint custom color
-    wireColorPicker('tint-custom-color', 'tint-custom-hex', v => tintCustomColor = v);
-
-    // ── NEW EFFECT PARAMS ──
-
-    // Thermal
-    wireSlider('slider-thermal-intensity', 'val-thermal-intensity', v => thermalIntensity = v);
-
-    // Gradient Map
-    wireColorPicker('grad-color1', 'grad-color1-hex', v => gradColor1 = v);
-    wireColorPicker('grad-color2', 'grad-color2-hex', v => gradColor2 = v);
-    wireSlider('slider-grad-intensity', 'val-grad-intensity', v => gradIntensity = v);
-
-    // Duotone
-    wireColorPicker('duo-shadow', 'duo-shadow-hex', v => duoShadow = v);
-    wireColorPicker('duo-highlight', 'duo-highlight-hex', v => duoHighlight = v);
-    wireSlider('slider-duo-intensity', 'val-duo-intensity', v => duoIntensity = v);
-
-    // RGB Shift
-    wireSlider('slider-rgbshift-rx', 'val-rgbshift-rx', v => rgbShiftRX = v);
-    wireSlider('slider-rgbshift-ry', 'val-rgbshift-ry', v => rgbShiftRY = v);
-    wireSlider('slider-rgbshift-bx', 'val-rgbshift-bx', v => rgbShiftBX = v);
-    wireSlider('slider-rgbshift-by', 'val-rgbshift-by', v => rgbShiftBY = v);
-    wireSlider('slider-rgbshift-intensity', 'val-rgbshift-intensity', v => rgbShiftIntensity = v);
-
-    // Emboss
-    wireSlider('slider-emboss-angle', 'val-emboss-angle', v => embossAngle = v);
-    wireSlider('slider-emboss-strength', 'val-emboss-strength', v => embossStrength = v);
-
-    // LED Screen
-    wireSlider('slider-led-cellsize', 'val-led-cellsize', v => ledCellSize = v);
-    wireSlider('slider-led-gap', 'val-led-gap', v => ledGap = v);
-    wireSlider('slider-led-glow', 'val-led-glow', v => ledGlow = v);
-    wireSlider('slider-led-brightness', 'val-led-brightness', v => ledBrightness = v);
-
-    // CRT Screen
-    wireSlider('slider-crt-scanweight', 'val-crt-scanweight', v => crtScanWeight = v);
-    wireSlider('slider-crt-curvature', 'val-crt-curvature', v => crtCurvature = v);
-    wireSlider('slider-crt-glow', 'val-crt-glow', v => crtGlow = v);
-    wireSlider('slider-crt-chroma', 'val-crt-chroma', v => crtChroma = v);
-    wireSlider('slider-crt-static', 'val-crt-static', v => crtStatic = v);
-
-    // ── MASTER FX TOGGLE ──
-    let masterToggle = document.getElementById('master-fx-toggle');
-    if (masterToggle) masterToggle.addEventListener('change', e => masterFxEnabled = e.target.checked);
 
     // ── RANDOMIZE / RESET BUTTONS ──
     document.querySelectorAll('.fx-action-btn').forEach(btn => {
@@ -1978,17 +1996,7 @@ function setupFxUIListeners() {
         });
     });
 
-    // ── COLOR PICKER HELPER ──
-    function wireColorPicker(colorId, hexId, setter) {
-        let cp = document.getElementById(colorId);
-        let hi = document.getElementById(hexId);
-        if (!cp || !hi) return;
-        cp.addEventListener('input', (e) => { setter(e.target.value); hi.value = e.target.value; });
-        hi.addEventListener('change', (e) => {
-            let v = e.target.value;
-            if (/^#[0-9a-fA-F]{6}$/.test(v)) { setter(v); cp.value = v; }
-            else { e.target.value = cp.value; }
-        });
-        hi.addEventListener('keydown', e => e.stopPropagation());
-    }
+    // ── MASTER FX TOGGLE ──
+    let masterToggle = document.getElementById('master-fx-toggle');
+    if (masterToggle) masterToggle.addEventListener('change', e => masterFxEnabled = e.target.checked);
 }

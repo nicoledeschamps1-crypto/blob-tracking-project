@@ -31,7 +31,7 @@ function handleAudioFile(event) {
     analyzeAudioForTimeline(file);
 
     // Reset auto-gain for new audio source
-    autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
+    autoGainMax = { band: AUTO_GAIN_FLOOR, bass: AUTO_GAIN_FLOOR, mid: AUTO_GAIN_FLOOR, treble: AUTO_GAIN_FLOOR };
 
     audioElement = new Audio();
     audioElement.src = url;
@@ -139,7 +139,9 @@ function getAudioEnergy() {
     bass = bass > gate ? (bass - gate) * gateScale : 0;
     mid = mid > gate ? (mid - gate) * gateScale : 0;
     treble = treble > gate ? (treble - gate) * gateScale : 0;
-    overall = (bass + mid + treble) / 3;
+    // Average only over bands that passed the gate (avoid underdriving MIX)
+    let activeBands = (bass > 0 ? 1 : 0) + (mid > 0 ? 1 : 0) + (treble > 0 ? 1 : 0);
+    overall = activeBands > 0 ? (bass + mid + treble) / activeBands : 0;
 
     return { band, bass, mid, treble, overall };
 }
@@ -255,7 +257,7 @@ function updateMultiBandBeats() {
                             let iv = bpmBeatTimes[k] - bpmBeatTimes[k-1];
                             if (iv > 300 && iv < 2000) intervals.push(iv);
                         }
-                        if (intervals.length >= 6) {
+                        if (intervals.length >= 3) {
                             let iSum = 0;
                             for (let iv of intervals) iSum += iv;
                             bpmValue = 60000 / (iSum / intervals.length);
@@ -524,7 +526,7 @@ function setupAudioUIListeners() {
         btn.addEventListener('click', (e) => {
             autoGainEnabled = (e.target.dataset.value === 'on');
             if (!autoGainEnabled) {
-                autoGainMax = { band: 0.01, bass: 0.01, mid: 0.01, treble: 0.01 };
+                autoGainMax = { band: AUTO_GAIN_FLOOR, bass: AUTO_GAIN_FLOOR, mid: AUTO_GAIN_FLOOR, treble: AUTO_GAIN_FLOOR };
             }
             updateButtonStates();
         });

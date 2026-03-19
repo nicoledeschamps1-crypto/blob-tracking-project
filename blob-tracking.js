@@ -290,8 +290,12 @@ function trackPoints() {
 
 function drawLines() {
     let opacity = map(paramValues[2], 0, 100, 0, 255);
-    let curvatureLevel = paramValues[3];
-    stroke(255, opacity); strokeWeight(1); noFill();
+    let curvatureLevel = lineStraight ? 0 : paramValues[3];
+    // Parse line color and apply opacity
+    let c = color(lineColor);
+    stroke(red(c), green(c), blue(c), opacity);
+    strokeWeight(lineWeight);
+    noFill();
 
     beginShape();
     if (curvatureLevel === 0) {

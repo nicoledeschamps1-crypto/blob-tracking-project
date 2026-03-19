@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-    Browser Blob Tracking
-    Made by @pbltrr
+    Hues of Dispositions
+    Made by HUESOFSATURN
     Built with Claude.ai
     Free source code on Patreon: https://www.patreon.com/pbltrr
 -->
@@ -9,14 +9,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Browser Blob Tracking</title>
+    <title>Hues of Dispositions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Commit+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <style>
         :root {
             --bg-color: #0b0b0b;
-            --panel-bg: rgba(12, 12, 12, 0.95);
+            --panel-bg: rgba(18, 18, 18, 0.92);
             --text-main: #e5e5e5;
-            --text-muted: #666666;
+            --text-muted: #888;
             --accent: #d4d4d4;
             --active-bg: rgba(255, 255, 255, 0.05);
             --slider-track: #2a2a2a;
@@ -25,6 +27,8 @@
             --btn-active-bg: #e5e5e5;
             --btn-active-text: #0b0b0b;
             --save-btn-color: #4a4a4a;
+            --panel-radius: 12px;
+            --card-radius: 6px;
 
             /* Timeline sizing */
             --tl-height: 280px;
@@ -69,11 +73,12 @@
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--panel-radius);
             z-index: 10;
             display: flex;
             flex-direction: column;
             gap: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
             transition: all 0.3s ease;
             max-height: 90vh;
             overflow-y: auto;
@@ -167,7 +172,7 @@
             background: transparent;
             border: none;
             color: var(--accent);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             font-size: 10px;
             text-align: right;
             width: 40px;
@@ -213,32 +218,32 @@
 
         input[type="range"]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 2px;
+            height: 3px;
             background: var(--slider-track);
             border: none;
-            border-radius: 0;
+            border-radius: 2px;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 14px;
-            width: 8px;
+            height: 10px;
+            width: 10px;
             background: var(--slider-thumb);
             border: none;
-            border-radius: 1px;
-            margin-top: -6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            border-radius: 50%;
+            margin-top: -3.5px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
             transition: transform 0.1s;
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
             background: #ffffff;
-            transform: scale(1.1);
+            transform: scale(1.15);
         }
-        
+
         input[type="range"]:active::-webkit-slider-thumb {
             background: #fff;
-            transform: scale(1.1);
+            transform: scale(1.15);
         }
 
         input[type="range"]:focus { outline: none; }
@@ -246,67 +251,74 @@
         /* Selector Buttons Row */
         .selector-row {
             display: flex;
+            flex-wrap: wrap;
             width: 100%;
-            gap: 1px;
-            background: var(--slider-track);
-            padding: 1px;
-            border-radius: 2px;
+            gap: 3px;
+            padding: 0;
+            border-radius: 6px;
         }
 
         .selector-btn {
             flex: 1;
-            background: var(--panel-bg);
-            border: none;
-            color: var(--text-muted);
-            font-size: 9px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: #aaa;
+            font-size: 10px;
             font-weight: 700;
-            padding: 6px 0;
+            padding: 8px 6px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s;
             text-transform: uppercase;
             font-family: inherit;
+            border-radius: 5px;
         }
 
         .selector-btn:hover {
-            color: var(--text-main);
-            background: rgba(255,255,255,0.05);
+            color: #fff;
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.35);
         }
 
         .selector-btn.active {
-            background: var(--btn-active-bg);
-            color: var(--btn-active-text);
+            background: rgba(255,255,255,0.16);
+            color: #fff;
+            border-color: rgba(255,255,255,0.40);
         }
 
         /* Panel Tabs */
         .panel-tabs {
             display: flex;
-            gap: 1px;
-            background: var(--slider-track);
-            padding: 1px;
-            border-radius: 2px;
+            gap: 3px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 3px;
+            border-radius: 8px;
             flex-shrink: 0;
         }
         .panel-tab {
             flex: 1;
-            background: var(--panel-bg);
-            border: none;
+            background: transparent;
+            border: 1px solid transparent;
             color: var(--text-muted);
             font-size: 9px;
             font-weight: 700;
-            padding: 7px 0;
+            padding: 8px 0;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s;
             text-transform: uppercase;
             font-family: inherit;
             letter-spacing: 0.5px;
+            border-radius: 6px;
         }
         .panel-tab:hover {
             color: var(--text-main);
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.10);
         }
         .panel-tab.active {
-            background: var(--btn-active-bg);
-            color: var(--btn-active-text);
+            background: rgba(108,92,231,0.2);
+            color: #c4b8ff;
+            border-color: rgba(108,92,231,0.35);
         }
         .tab-content {
             display: none;
@@ -316,161 +328,6 @@
         .tab-content.active {
             display: flex;
         }
-
-        /* AI Assistant */
-        .tab-content[data-tab="ai"].active {
-            height: calc(90vh - 200px);
-        }
-        #ai-setup {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        #ai-chat {
-            flex-direction: column;
-            flex: 1;
-            min-height: 0;
-        }
-        #ai-messages {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding-right: 4px;
-            min-height: 0;
-        }
-        #ai-messages::-webkit-scrollbar { width: 3px; }
-        #ai-messages::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-        .ai-msg {
-            font-size: 11px;
-            line-height: 1.55;
-            padding: 8px 10px;
-            border-radius: 6px;
-            max-width: 95%;
-            word-wrap: break-word;
-            flex-shrink: 0;
-        }
-        .ai-msg-user {
-            background: rgba(255,255,255,0.08);
-            align-self: flex-end;
-            color: var(--text-main);
-        }
-        .ai-msg-ai {
-            background: rgba(255,255,255,0.03);
-            align-self: flex-start;
-            color: var(--text-main);
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-        .ai-msg-ai code {
-            background: rgba(255,255,255,0.08);
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 10px;
-            font-family: 'Roboto Mono', monospace;
-        }
-        .ai-msg-ai pre {
-            background: rgba(0,0,0,0.3);
-            padding: 8px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin: 4px 0;
-        }
-        .ai-msg-ai pre code { background: none; padding: 0; }
-        .ai-msg-ai strong { color: var(--accent); }
-        .ai-msg-ai a { color: #74b9ff; text-decoration: none; }
-        .ai-msg-ai a:hover { text-decoration: underline; }
-        .ai-sources {
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-        .ai-source-link {
-            display: inline-block;
-            font-size: 9px;
-            color: #74b9ff;
-            text-decoration: none;
-            margin-right: 8px;
-            margin-bottom: 2px;
-        }
-        .ai-source-link:hover { text-decoration: underline; }
-        .ai-chip {
-            font-size: 9px;
-            padding: 4px 8px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 12px;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .ai-chip:hover {
-            color: var(--text-main);
-            background: rgba(255,255,255,0.1);
-            border-color: rgba(255,255,255,0.15);
-        }
-        .ai-typing {
-            font-size: 11px;
-            color: var(--text-muted);
-            padding: 6px 10px;
-            flex-shrink: 0;
-        }
-        .ai-typing span {
-            animation: aiDots 1.4s infinite;
-            display: inline-block;
-        }
-        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
-        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes aiDots {
-            0%, 20% { opacity: 0.2; }
-            50% { opacity: 1; }
-            100% { opacity: 0.2; }
-        }
-        .ai-error {
-            font-size: 10px;
-            color: #E17055;
-            padding: 6px 8px;
-            background: rgba(225, 112, 85, 0.1);
-            border-radius: 4px;
-            flex-shrink: 0;
-        }
-        #ai-suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            flex-shrink: 0;
-        }
-        #ai-input-row {
-            display: flex;
-            gap: 6px;
-            flex-shrink: 0;
-            margin-top: 6px;
-        }
-        #ai-input {
-            flex: 1;
-            background: var(--slider-track);
-            border: 1px solid #333;
-            border-radius: 3px;
-            padding: 8px;
-            color: var(--text-main);
-            font-size: 11px;
-            font-family: inherit;
-            outline: none;
-        }
-        #ai-input:focus { border-color: #555; }
-        #ai-send-btn {
-            background: var(--btn-active-bg);
-            color: var(--btn-active-text);
-            border: none;
-            border-radius: 3px;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        #ai-send-btn:disabled { opacity: 0.4; cursor: default; }
-        #ai-send-btn:hover:not(:disabled) { background: #fff; }
 
         /* File Upload */
         .source-row {
@@ -486,6 +343,7 @@
             flex-shrink: 0;
             width: 52px;
             border: 1px dashed var(--slider-track);
+            border-radius: 8px;
             background: rgba(0,0,0,0.2);
             display: flex;
             flex-direction: column;
@@ -529,11 +387,13 @@
             transition: all 0.2s ease;
             background: rgba(0,0,0,0.2);
             position: relative;
+            border-radius: 8px;
         }
 
         #file-input-container:hover {
             border-color: var(--text-muted);
             background: rgba(255,255,255,0.02);
+            box-shadow: 0 0 12px rgba(108,92,231,0.1);
         }
 
         input[type="file"] { display: none; }
@@ -585,14 +445,7 @@
         }
         .toggle-chevron.rotated svg { transform: rotate(180deg); }
 
-        /* Effects buttons */
-        #fx-buttons {
-            flex-wrap: wrap;
-            row-gap: 1px;
-        }
-        #fx-buttons .selector-btn {
-            flex: 1 0 calc(33.33% - 1px);
-        }
+        /* (fx-buttons CSS removed — replaced by Effecto dropdown) */
         #palette-preset-buttons .selector-btn {
             flex: 1 0 calc(25% - 1px);
         }
@@ -783,39 +636,7 @@
             color: var(--text-muted);
         }
 
-        /* Collapsible FX categories */
-        .cat-toggle {
-            cursor: pointer;
-            user-select: none;
-            display: flex;
-            align-items: center;
-        }
-        .cat-toggle:hover { color: var(--text-main); }
-        .cat-chevron {
-            margin-left: auto;
-            font-size: 8px;
-            transition: transform 0.2s;
-            color: var(--text-muted);
-        }
-        .fx-category.collapsed .cat-chevron {
-            transform: rotate(-90deg);
-        }
-        .fx-category.collapsed .fx-cat-body {
-            display: none;
-        }
-        .cat-count {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 14px;
-            height: 14px;
-            border-radius: 7px;
-            font-size: 8px;
-            font-weight: 700;
-            padding: 0 4px;
-            margin-left: 4px;
-        }
-        .cat-count:empty { display: none; }
+        /* (FX categories now use tabs + dropdown, old accordion CSS removed) */
 
         /* Collapsible sections (right panel) */
         .collapsible.collapsed .collapsible-body { display: none; }
@@ -825,10 +646,7 @@
 
         /* Contextual param dimming */
         .param-dimmed { opacity: 0.35; transition: opacity 0.3s; }
-        .cat-count[data-cat="color"] { background: rgba(108, 92, 231, 0.3); color: #c4b8ff; }
-        .cat-count[data-cat="distortion"] { background: rgba(0, 184, 148, 0.3); color: #7dffd4; }
-        .cat-count[data-cat="pattern"] { background: rgba(253, 203, 110, 0.3); color: #fff0c0; }
-        .cat-count[data-cat="overlay"] { background: rgba(225, 112, 85, 0.3); color: #ffb8a8; }
+        /* (cat-count badges replaced by tab dots) */
 
         /* Playback Buttons */
         .playback-row {
@@ -838,17 +656,18 @@
         }
 
         .action-btn {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--slider-track);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: var(--card-radius);
             color: var(--text-main);
-            padding: 8px;
+            padding: 9px 8px;
             flex: 1;
             font-family: inherit;
             font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -856,8 +675,8 @@
         }
 
         .action-btn:hover {
-            background: var(--btn-hover);
-            border-color: var(--text-muted);
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.25);
         }
 
         .action-btn svg {
@@ -881,6 +700,7 @@
         /* Audio Section */
         #audio-input-container {
             border: 1px dashed var(--slider-track);
+            border-radius: 8px;
             padding: 12px;
             text-align: center;
             cursor: pointer;
@@ -890,6 +710,7 @@
         #audio-input-container:hover {
             border-color: var(--text-muted);
             background: rgba(255,255,255,0.02);
+            box-shadow: 0 0 12px rgba(108,92,231,0.1);
         }
         #audio-name {
             margin-top: 6px;
@@ -948,28 +769,39 @@
         #debug-panel .warn { color: #f80; }
         #debug-panel .off { color: #f44; }
         #group-modes .mode-cat {
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+            padding: 6px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.04);
         }
         #group-modes .mode-cat-label {
-            font-size: 8px;
-            font-weight: 600;
+            font-size: 9px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: var(--text-muted);
-            margin-bottom: 3px;
-            margin-top: 2px;
+            color: rgba(255,255,255,0.50);
+            margin-bottom: 6px;
+            margin-top: 0;
         }
         #group-modes .mode-cat-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 1px;
+            gap: 4px;
         }
         #group-modes .mode-cat-row .selector-btn {
-            flex: 1 0 calc(16.66% - 1px);
+            flex: 1 0 calc(16.66% - 4px);
+            min-width: 38px;
         }
         #group-modes .mode-cat:last-child .selector-btn.active {
             background: rgba(108, 92, 231, 0.25);
             color: #c4b8ff;
+            border-color: rgba(108, 92, 231, 0.4);
+        }
+        #group-modes .mode-cat-off {
+            padding: 0;
+            background: none;
+            border: none;
         }
         #group-modes .mode-cat-off .selector-btn {
             width: 100%;
@@ -977,10 +809,15 @@
         }
         #viz-buttons {
             flex-wrap: wrap;
-            row-gap: 1px;
+            row-gap: 3px;
         }
         #viz-buttons .selector-btn {
-            flex: 1 0 calc(20% - 1px);
+            flex: 1 0 calc(16.66% - 3px);
+            padding: 6px 0;
+        }
+        #viz-buttons .viz-zoom-standalone {
+            flex: 1 0 100%;
+            margin-top: 2px;
         }
         .text-input {
             width: 100%;
@@ -1020,7 +857,7 @@
             background: rgba(10, 10, 10, 0.97);
             backdrop-filter: blur(14px);
             border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px;
+            border-radius: var(--panel-radius);
             z-index: 10;
             display: flex;
             flex-direction: column;
@@ -1058,7 +895,7 @@
             font-size: var(--tl-time-font);
             font-weight: 600;
             color: var(--text-muted);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             margin-left: auto;
         }
         .tl-spacer { flex: 1; }
@@ -1322,7 +1159,7 @@
             border: 1px solid rgba(255,255,255,0.15);
             color: var(--text-main);
             font-size: 10px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             padding: 4px 8px;
             border-radius: 4px;
             pointer-events: none;
@@ -1335,7 +1172,7 @@
             font-size: 9px;
             font-weight: 700;
             color: #6C5CE7;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             white-space: nowrap;
         }
         .tl-offset-label.hidden { display: none; }
@@ -1344,7 +1181,7 @@
             font-size: 10px;
             font-weight: 600;
             color: #6C5CE7;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             white-space: nowrap;
             cursor: pointer;
             padding: 2px 6px;
@@ -1363,7 +1200,7 @@
             border-radius: 3px;
             color: #fff;
             font-size: 10px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             font-weight: 600;
             padding: 1px 4px;
             outline: none;
@@ -1403,7 +1240,7 @@
             top: 2px; left: 4px;
             font-size: 8px;
             color: rgba(255,255,255,0.35);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             pointer-events: none;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -1457,7 +1294,7 @@
             background: rgba(108, 92, 231, 0.08);
             border-bottom: 1px solid rgba(108, 92, 231, 0.2);
             font-size: 9px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             color: var(--text-muted);
         }
         .tl-sync-row.hidden { display: none; }
@@ -1509,80 +1346,190 @@
             opacity: 1;
         }
 
-        /* ═══ CATEGORY STRIPS (in left panel) ═══ */
-        .fx-category {
+        /* ═══ EFFECTO-STYLE FX TABS & DROPDOWN ═══ */
+        .fx-tab-bar {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
             margin-bottom: 8px;
         }
-        .cat-label {
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .cat-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .fx-strip {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
-
-        /* Effect cards in strips */
-        .fx-card {
-            background: var(--panel-bg);
-            border: 1px solid #2a2a2a;
+        .fx-tab {
+            flex: 1;
+            background: none;
+            border: none;
             color: var(--text-muted);
             font-size: 9px;
             font-weight: 700;
-            padding: 9px 12px;
-            cursor: pointer;
-            transition: all 0.2s;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 2px;
+            cursor: pointer;
+            position: relative;
             font-family: inherit;
+            transition: color 0.15s;
+        }
+        .fx-tab:hover { color: var(--text-main); }
+        .fx-tab.active { color: var(--text-main); }
+        .fx-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--tab-color, #6C5CE7);
+        }
+        .fx-tab .tab-dot {
+            display: inline-block;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            margin-right: 3px;
+            vertical-align: middle;
+            opacity: 0;
+            transition: opacity 0.2s;
+            background: var(--tab-color, #6C5CE7);
+        }
+        .fx-tab.has-active .tab-dot { opacity: 1; }
+        .fx-tab .tab-count {
+            font-size: 8px;
+            margin-left: 2px;
+            opacity: 0.6;
+        }
+        .fx-dropdown-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .fx-dropdown-arrow {
+            width: 24px;
+            height: 24px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: inherit;
+            transition: all 0.15s;
+            padding: 0;
+        }
+        .fx-dropdown-arrow:hover {
+            color: var(--text-main);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .fx-dropdown-select {
+            flex: 1;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            color: var(--text-main);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+        .fx-dropdown-select option {
+            background: #1a1a1a;
+            color: #ccc;
+        }
+        .fx-on-btn {
+            width: 32px;
+            height: 24px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            background: none;
+            color: var(--text-muted);
+            font-size: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .fx-on-btn:hover {
+            border-color: rgba(255,255,255,0.3);
+            color: var(--text-main);
+        }
+        .fx-on-btn.active {
+            background: var(--cat-color, rgba(108,92,231,0.3));
+            border-color: var(--cat-color, #6C5CE7);
+            color: #fff;
+        }
+        .fx-drag-handle {
+            width: 24px;
+            height: 24px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 3px;
+            background: none;
+            color: var(--text-muted);
+            font-size: 10px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            padding: 0;
+            transition: all 0.15s;
+        }
+        .fx-drag-handle:hover {
+            color: var(--text-main);
+            border-color: rgba(255,255,255,0.25);
+        }
+        .fx-drag-handle:active { cursor: grabbing; }
+
+        /* ═══ INLINE SLIDERS (Effecto-style: label-slider-value on one row) ═══ */
+        .fx-inline-slider {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 26px;
+            margin: 1px 0;
+        }
+        .fx-inline-slider .fx-slider-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+            min-width: 52px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .fx-inline-slider input[type="range"] {
+            flex: 1;
+            min-width: 0;
+        }
+        .fx-inline-slider input[type="range"]::-webkit-slider-runnable-track {
+            height: 5px;
             border-radius: 3px;
         }
-        .fx-card:hover {
-            color: var(--text-main);
-            background: rgba(255,255,255,0.05);
+        .fx-inline-slider input[type="range"]::-webkit-slider-thumb {
+            height: 14px;
+            width: 14px;
+            margin-top: -4.5px;
         }
-        .fx-card.active-color {
-            background: rgba(108, 92, 231, 0.2);
-            border-color: #6C5CE7;
-            color: #c4b8ff;
+        .fx-inline-slider .value-input {
+            width: 34px;
+            flex-shrink: 0;
         }
-        .fx-card.active-distortion {
-            background: rgba(0, 184, 148, 0.2);
-            border-color: #00B894;
-            color: #7dffd4;
-        }
-        .fx-card.active-pattern {
-            background: rgba(253, 203, 110, 0.2);
-            border-color: #FDCB6E;
-            color: #fff0c0;
-        }
-        .fx-card.active-overlay {
-            background: rgba(225, 112, 85, 0.2);
-            border-color: #E17055;
-            color: #ffb8a8;
-        }
-        /* FX card drag cursor */
-        .fx-card { cursor: grab; }
-        .fx-card:active { cursor: grabbing; }
 
         /* ═══ HELP OVERLAY ═══ */
         #help-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(12px);
             z-index: 500;
             display: none;
             justify-content: center;
@@ -1593,7 +1540,7 @@
         #help-content {
             background: rgba(18, 18, 18, 0.98);
             border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
+            border-radius: 16px;
             max-width: 720px;
             width: 100%;
             max-height: 80vh;
@@ -1626,8 +1573,8 @@
             color: var(--text-muted);
             font-size: 11px;
             cursor: pointer;
-            padding: 4px 10px;
-            border-radius: 4px;
+            padding: 5px 14px;
+            border-radius: 20px;
             font-family: inherit;
             transition: all 0.15s;
         }
@@ -1655,7 +1602,7 @@
         .help-section dt {
             font-size: 10px;
             font-weight: 700;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
             color: var(--text-main);
             background: rgba(255,255,255,0.06);
             padding: 1px 5px;
@@ -1756,7 +1703,7 @@
     <div id="left-panel" class="panel">
         <div class="header-section">
             <div class="title-row">
-                <h1>Browser Blob Tracking</h1>
+                <h1>Hues of Dispositions</h1>
                 <div style="display:flex;align-items:center;gap:6px">
                     <button class="help-btn" id="help-btn" title="Help (?)">?</button>
                     <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls">
@@ -1774,9 +1721,7 @@
 
         <div class="panel-tabs">
             <button class="panel-tab active" data-tab="track">TRACK</button>
-            <button class="panel-tab" data-tab="fx">FX</button>
             <button class="panel-tab" data-tab="audio">AUDIO</button>
-            <button class="panel-tab" data-tab="ai">AI</button>
         </div>
 
         <div id="ui-controls">
@@ -1813,8 +1758,8 @@
                     <div class="mode-cat-row">
                         <button class="selector-btn active" data-value="1">BLUE</button>
                         <button class="selector-btn" data-value="2">RED</button>
-                        <button class="selector-btn" data-value="5">CUST</button>
-                        <button class="selector-btn" data-value="13">INV</button>
+                        <button class="selector-btn" data-value="5">Custom</button>
+                        <button class="selector-btn" data-value="13">Invert</button>
                         <button class="selector-btn" data-value="10">WARM</button>
                         <button class="selector-btn" data-value="11">COOL</button>
                     </div>
@@ -1822,12 +1767,12 @@
                 <div class="mode-cat">
                     <div class="mode-cat-label">Analysis</div>
                     <div class="mode-cat-row">
-                        <button class="selector-btn" data-value="3">MOT</button>
-                        <button class="selector-btn" data-value="6">BRI</button>
+                        <button class="selector-btn" data-value="3">Motion</button>
+                        <button class="selector-btn" data-value="6">Bright</button>
                         <button class="selector-btn" data-value="7">DARK</button>
                         <button class="selector-btn" data-value="8">EDGE</button>
-                        <button class="selector-btn" data-value="9">CHRM</button>
-                        <button class="selector-btn" data-value="12">FLKR</button>
+                        <button class="selector-btn" data-value="9">Chroma</button>
+                        <button class="selector-btn" data-value="12">Flicker</button>
                         <button class="selector-btn" data-value="4">SKIN</button>
                     </div>
                 </div>
@@ -1883,7 +1828,93 @@
                     <button class="selector-btn" data-value="6">BRI</button>
                     <button class="selector-btn" data-value="9">PLT</button>
                     <button class="selector-btn" data-value="7">NONE</button>
-                    <button class="selector-btn" data-value="10">ZOOM</button>
+                    <button class="selector-btn viz-zoom-standalone" data-value="10">ZOOM</button>
+                </div>
+            </div>
+
+            <!-- Blob Parameters -->
+            <div id="blob-edit-banner">editing blob segment</div>
+
+            <div class="control-group" id="group-0">
+                <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-1">
+                <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-4">
+                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-5">
+                <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-5" min="0" max="100" value="4" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-6">
+                <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-6" min="0" max="100" value="40" step="1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Lines</label>
+                <div class="selector-row" id="line-buttons">
+                    <button class="selector-btn active" data-value="off">OFF</button>
+                    <button class="selector-btn" data-value="on">ON</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="line-options-group" style="display:none">
+                <label>Line Color</label>
+                <div class="fx-color-picker">
+                    <input type="color" class="fx-color-input" id="line-color-picker" value="#ffffff">
+                    <input type="text" class="fx-hex-input" id="line-color-hex" value="#ffffff" maxlength="7">
+                </div>
+                <label>Stroke Weight <input type="number" class="value-input" id="val-line-weight" value="1"></label>
+                <div class="slider-wrapper"><input type="range" id="slider-line-weight" min="0.5" max="8" value="1" step="0.5"></div>
+                <label>Style</label>
+                <div class="selector-row" id="line-style-buttons">
+                    <button class="selector-btn active" data-value="curved">CURVED</button>
+                    <button class="selector-btn" data-value="straight">STRAIGHT</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="group-2">
+                <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
+                </div>
+            </div>
+
+            <div class="control-group" id="group-3">
+                <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-group collapsible collapsed" id="product-info-group">
+                <label class="collapsible-toggle">Product Info <span class="disc-chevron">&#9662;</span></label>
+                <div class="collapsible-body">
+                    <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
+                    <input type="text" class="text-input" id="product-name" placeholder="Product Name">
+                    <input type="text" class="text-input" id="product-material" placeholder="Material">
+                    <input type="text" class="text-input" id="product-price" placeholder="Price">
+                    <input type="text" class="text-input" id="product-size" placeholder="Size">
                 </div>
             </div>
 
@@ -1897,493 +1928,25 @@
                 </button>
             </div>
 
+            <!-- Record & Save -->
+            <div class="playback-row">
+                <button id="btn-record" class="action-btn">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+                    Record
+                </button>
+                <button id="btn-save" class="action-btn">
+                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    Save
+                </button>
+            </div>
+            <button id="btn-photo" class="action-btn" style="width:100%">
+                <svg viewBox="0 0 24 24"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
+                Photo
+            </button>
+
             </div><!-- /tab-content track -->
 
-            <div class="tab-content" data-tab="fx">
-
-            <!-- Effects (Effecto-style category strips with collapsible bodies) -->
-            <div class="control-group" id="group-fx">
-                <div class="fx-master-row">
-                    <span>Effects</span>
-                    <label class="fx-toggle-switch"><input type="checkbox" id="master-fx-toggle" checked><span class="toggle-slider"></span></label>
-                </div>
-                <div style="font-size:8px;color:var(--text-muted);margin-bottom:6px">click = toggle · drag to timeline</div>
-                <div class="fx-category" data-cat="color">
-                    <div class="cat-label cat-toggle"><span class="cat-dot" style="background:#6C5CE7"></span> Color <span class="cat-count" data-cat="color"></span><span class="cat-chevron">&#9662;</span></div>
-                    <div class="fx-cat-body">
-                        <div class="fx-strip">
-                            <button class="fx-card" data-effect="sepia" data-cat="color">SEPIA</button>
-                            <button class="fx-card" data-effect="tint" data-cat="color">TINT</button>
-                            <button class="fx-card" data-effect="palette" data-cat="color">PALETTE</button>
-                            <button class="fx-card" data-effect="bricon" data-cat="color">BRI/CON</button>
-                            <button class="fx-card" data-effect="thermal" data-cat="color">THERMAL</button>
-                            <button class="fx-card" data-effect="gradmap" data-cat="color">GRADMAP</button>
-                            <button class="fx-card" data-effect="duotone" data-cat="color">DUOTONE</button>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-sepia">
-                            <label>Intensity <input type="number" class="value-input" id="val-sepia-intensity" value="70"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-sepia-intensity" min="5" max="100" value="70" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-tint">
-                            <div class="fx-param-header"><span class="fx-param-title">Tint</span><button class="fx-action-btn" data-action="randomize" data-effect="tint" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="tint" title="Reset">&#x21BB;</button></div>
-                            <label>Tint Preset</label>
-                            <div class="selector-row" id="tint-preset-buttons">
-                                <button class="selector-btn active" data-value="green">GREEN</button>
-                                <button class="selector-btn" data-value="amber">AMBER</button>
-                                <button class="selector-btn" data-value="cyan">CYAN</button>
-                                <button class="selector-btn" data-value="blue">BLUE</button>
-                                <button class="selector-btn" data-value="custom">CUSTOM</button>
-                            </div>
-                            <label>Custom Color</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="tint-custom-color" value="#00ff00">
-                                <input type="text" class="fx-hex-input" id="tint-custom-hex" value="#00ff00" maxlength="7">
-                            </div>
-                            <label>Intensity <input type="number" class="value-input" id="val-tint-intensity" value="70"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-tint-intensity" min="5" max="100" value="70" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-palette">
-                            <label>Palette</label>
-                            <div class="selector-row" id="palette-preset-buttons" style="flex-wrap:wrap;row-gap:1px;">
-                                <button class="selector-btn active" data-value="noir">NOIR</button>
-                                <button class="selector-btn" data-value="terminal">TERM</button>
-                                <button class="selector-btn" data-value="gameboy">GMBOY</button>
-                                <button class="selector-btn" data-value="synthwave">SYNTH</button>
-                                <button class="selector-btn" data-value="cyberpunk">CYBER</button>
-                                <button class="selector-btn" data-value="amber">AMBER</button>
-                                <button class="selector-btn" data-value="arctic">ARTIC</button>
-                                <button class="selector-btn" data-value="rose">ROSE</button>
-                                <button class="selector-btn" data-value="neon">NEON</button>
-                                <button class="selector-btn" data-value="forest">FORST</button>
-                                <button class="selector-btn" data-value="sunset">SUNST</button>
-                                <button class="selector-btn" data-value="ocean">OCEAN</button>
-                            </div>
-                            <label>Intensity <input type="number" class="value-input" id="val-palette-intensity" value="80"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-palette-intensity" min="5" max="100" value="80" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-bricon">
-                            <div class="fx-param-header"><span class="fx-param-title">Bri/Con</span><button class="fx-action-btn" data-action="randomize" data-effect="bricon" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="bricon" title="Reset">&#x21BB;</button></div>
-                            <label>Brightness <input type="number" class="value-input" id="val-bri" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bri" min="-100" max="100" value="0" step="1"></div>
-                            <label>Contrast <input type="number" class="value-input" id="val-con" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-con" min="0" max="200" value="100" step="1"></div>
-                            <label>Saturation <input type="number" class="value-input" id="val-sat" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-sat" min="0" max="200" value="100" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-thermal">
-                            <div class="fx-param-header"><span class="fx-param-title">Thermal</span><button class="fx-action-btn" data-action="randomize" data-effect="thermal" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="thermal" title="Reset">&#x21BB;</button></div>
-                            <label>Intensity <input type="number" class="value-input" id="val-thermal-intensity" value="80"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-thermal-intensity" min="5" max="100" value="80" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-gradmap">
-                            <div class="fx-param-header"><span class="fx-param-title">Gradient Map</span><button class="fx-action-btn" data-action="randomize" data-effect="gradmap" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="gradmap" title="Reset">&#x21BB;</button></div>
-                            <label>Shadow Color</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="grad-color1" value="#000033">
-                                <input type="text" class="fx-hex-input" id="grad-color1-hex" value="#000033" maxlength="7">
-                            </div>
-                            <label>Highlight Color</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="grad-color2" value="#ff6600">
-                                <input type="text" class="fx-hex-input" id="grad-color2-hex" value="#ff6600" maxlength="7">
-                            </div>
-                            <label>Intensity <input type="number" class="value-input" id="val-grad-intensity" value="80"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grad-intensity" min="5" max="100" value="80" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-duotone">
-                            <div class="fx-param-header"><span class="fx-param-title">Duotone</span><button class="fx-action-btn" data-action="randomize" data-effect="duotone" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="duotone" title="Reset">&#x21BB;</button></div>
-                            <label>Shadow</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="duo-shadow" value="#1a1a2e">
-                                <input type="text" class="fx-hex-input" id="duo-shadow-hex" value="#1a1a2e" maxlength="7">
-                            </div>
-                            <label>Highlight</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="duo-highlight" value="#e94560">
-                                <input type="text" class="fx-hex-input" id="duo-highlight-hex" value="#e94560" maxlength="7">
-                            </div>
-                            <label>Intensity <input type="number" class="value-input" id="val-duo-intensity" value="80"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-duo-intensity" min="5" max="100" value="80" step="1"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="fx-category" data-cat="distortion">
-                    <div class="cat-label cat-toggle"><span class="cat-dot" style="background:#00B894"></span> Distortion <span class="cat-count" data-cat="distortion"></span><span class="cat-chevron">&#9662;</span></div>
-                    <div class="fx-cat-body">
-                        <div class="fx-strip">
-                            <button class="fx-card" data-effect="chroma" data-cat="distortion">CHROMA</button>
-                            <button class="fx-card" data-effect="curve" data-cat="distortion">CURVE</button>
-                            <button class="fx-card" data-effect="wave" data-cat="distortion">WAVE</button>
-                            <button class="fx-card" data-effect="jitter" data-cat="distortion">JITTER</button>
-                            <button class="fx-card" data-effect="mblur" data-cat="distortion">MBLUR</button>
-                            <button class="fx-card" data-effect="emboss" data-cat="distortion">EMBOSS</button>
-                            <button class="fx-card" data-effect="rgbshift" data-cat="distortion">RGBSHFT</button>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-chroma">
-                            <label>Offset <input type="number" class="value-input" id="val-chroma-offset" value="5"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-chroma-offset" min="1" max="25" value="5" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-curve">
-                            <label>Intensity <input type="number" class="value-input" id="val-curve-intensity" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-curve-intensity" min="5" max="100" value="30" step="1"></div>
-                            <label>Direction</label>
-                            <div class="selector-row" id="curve-dir-buttons">
-                                <button class="selector-btn active" data-value="barrel">BARREL</button>
-                                <button class="selector-btn" data-value="pincushion">PINCH</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-wave">
-                            <label>Amplitude <input type="number" class="value-input" id="val-wave-amp" value="20"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-wave-amp" min="1" max="100" value="20" step="1"></div>
-                            <label>Frequency <input type="number" class="value-input" id="val-wave-freq" value="5"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-wave-freq" min="1" max="20" value="5" step="1"></div>
-                            <label>Speed <input type="number" class="value-input" id="val-wave-speed" value="2"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-wave-speed" min="0" max="5" value="2" step="0.1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-jitter">
-                            <label>Intensity <input type="number" class="value-input" id="val-jitter-intensity" value="20"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-jitter-intensity" min="1" max="100" value="20" step="1"></div>
-                            <label>Block Size <input type="number" class="value-input" id="val-jitter-block" value="2"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-jitter-block" min="1" max="16" value="2" step="1"></div>
-                            <label>Mode</label>
-                            <div class="selector-row" id="jitter-mode-buttons">
-                                <button class="selector-btn active" data-value="random">RANDOM</button>
-                                <button class="selector-btn" data-value="perlin">PERLIN</button>
-                                <button class="selector-btn" data-value="shake">SHAKE</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-mblur">
-                            <div class="fx-param-header"><span class="fx-param-title">Motion Blur</span><button class="fx-action-btn" data-action="randomize" data-effect="mblur" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="mblur" title="Reset">&#x21BB;</button></div>
-                            <label>Intensity <input type="number" class="value-input" id="val-mblur-intensity" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-mblur-intensity" min="5" max="100" value="30" step="1"></div>
-                            <label>Angle <input type="number" class="value-input" id="val-mblur-angle" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-mblur-angle" min="0" max="360" value="0" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-emboss">
-                            <div class="fx-param-header"><span class="fx-param-title">Emboss</span><button class="fx-action-btn" data-action="randomize" data-effect="emboss" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="emboss" title="Reset">&#x21BB;</button></div>
-                            <label>Light Angle <input type="number" class="value-input" id="val-emboss-angle" value="135"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-emboss-angle" min="0" max="360" value="135" step="1"></div>
-                            <label>Strength <input type="number" class="value-input" id="val-emboss-strength" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-emboss-strength" min="5" max="100" value="50" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-rgbshift">
-                            <div class="fx-param-header"><span class="fx-param-title">RGB Shift</span><button class="fx-action-btn" data-action="randomize" data-effect="rgbshift" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="rgbshift" title="Reset">&#x21BB;</button></div>
-                            <label>Red X <input type="number" class="value-input" id="val-rgbshift-rx" value="5"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-rgbshift-rx" min="-25" max="25" value="5" step="1"></div>
-                            <label>Red Y <input type="number" class="value-input" id="val-rgbshift-ry" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-rgbshift-ry" min="-25" max="25" value="0" step="1"></div>
-                            <label>Blue X <input type="number" class="value-input" id="val-rgbshift-bx" value="-5"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-rgbshift-bx" min="-25" max="25" value="-5" step="1"></div>
-                            <label>Blue Y <input type="number" class="value-input" id="val-rgbshift-by" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-rgbshift-by" min="-25" max="25" value="0" step="1"></div>
-                            <label>Intensity <input type="number" class="value-input" id="val-rgbshift-intensity" value="70"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-rgbshift-intensity" min="5" max="100" value="70" step="1"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="fx-category" data-cat="pattern">
-                    <div class="cat-label cat-toggle"><span class="cat-dot" style="background:#FDCB6E"></span> Pattern <span class="cat-count" data-cat="pattern"></span><span class="cat-chevron">&#9662;</span></div>
-                    <div class="fx-cat-body">
-                        <div class="fx-strip">
-                            <button class="fx-card" data-effect="bloom" data-cat="pattern">BLOOM</button>
-                            <button class="fx-card" data-effect="dither" data-cat="pattern">DITHER</button>
-                            <button class="fx-card" data-effect="atkinson" data-cat="pattern">ATKNSN</button>
-                            <button class="fx-card" data-effect="halftone" data-cat="pattern">HALF</button>
-                            <button class="fx-card" data-effect="pxsort" data-cat="pattern">PXSORT</button>
-                            <button class="fx-card" data-effect="pixel" data-cat="pattern">PIXEL</button>
-                            <button class="fx-card" data-effect="led" data-cat="pattern">LED</button>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-bloom">
-                            <div class="fx-param-header"><span class="fx-param-title">Bloom</span><button class="fx-action-btn" data-action="randomize" data-effect="bloom" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="bloom" title="Reset">&#x21BB;</button></div>
-                            <label>Intensity <input type="number" class="value-input" id="val-bloom-intensity" value="40"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bloom-intensity" min="5" max="100" value="40" step="1"></div>
-                            <label>Radius <input type="number" class="value-input" id="val-bloom-radius" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bloom-radius" min="10" max="100" value="50" step="1"></div>
-                            <label>Threshold <input type="number" class="value-input" id="val-bloom-thresh" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bloom-thresh" min="0" max="100" value="50" step="1"></div>
-                            <label>Spread <input type="number" class="value-input" id="val-bloom-spread" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bloom-spread" min="10" max="100" value="50" step="1"></div>
-                            <label>Exposure <input type="number" class="value-input" id="val-bloom-exposure" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-bloom-exposure" min="50" max="200" value="100" step="1"></div>
-                            <label>Blend Mode</label>
-                            <div class="selector-row" id="bloom-blend-buttons">
-                                <button class="selector-btn active" data-value="additive">ADD</button>
-                                <button class="selector-btn" data-value="screen">SCREEN</button>
-                                <button class="selector-btn" data-value="softlight">SOFT</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-dither">
-                            <div class="fx-param-header"><span class="fx-param-title">Dither</span><button class="fx-action-btn" data-action="randomize" data-effect="dither" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="dither" title="Reset">&#x21BB;</button></div>
-                            <label>Algorithm</label>
-                            <div class="selector-row" id="dither-algo-buttons" style="flex-wrap:wrap;row-gap:1px;">
-                                <button class="selector-btn" data-value="bayer2">2x2</button>
-                                <button class="selector-btn active" data-value="bayer4">4x4</button>
-                                <button class="selector-btn" data-value="bayer8">8x8</button>
-                                <button class="selector-btn" data-value="floyd">FLOYD</button>
-                                <button class="selector-btn" data-value="ordered">ORDER</button>
-                            </div>
-                            <label>Palette</label>
-                            <div class="selector-row" id="dither-palette-buttons" style="flex-wrap:wrap;row-gap:1px;">
-                                <button class="selector-btn active" data-value="bw">B&W</button>
-                                <button class="selector-btn" data-value="grayscale">GRAY</button>
-                                <button class="selector-btn" data-value="noir">NOIR</button>
-                                <button class="selector-btn" data-value="terminal">TERM</button>
-                                <button class="selector-btn" data-value="gameboy">GMBOY</button>
-                                <button class="selector-btn" data-value="synthwave">SYNTH</button>
-                                <button class="selector-btn" data-value="cyberpunk">CYBER</button>
-                                <button class="selector-btn" data-value="neon">NEON</button>
-                            </div>
-                            <label>Color Count <input type="number" class="value-input" id="val-dither-count" value="2"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-dither-count" min="2" max="18" value="2" step="1"></div>
-                            <label>Pixelation <input type="number" class="value-input" id="val-dither-pixelation" value="1"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-dither-pixelation" min="1" max="8" value="1" step="1"></div>
-                            <label>Strength <input type="number" class="value-input" id="val-dither-strength" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-dither-strength" min="0" max="100" value="100" step="1"></div>
-                            <label>Color</label>
-                            <div class="selector-row" id="dither-color-buttons">
-                                <button class="selector-btn active" data-value="bw">B&W</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-atkinson">
-                            <div class="fx-param-header"><span class="fx-param-title">Atkinson</span><button class="fx-action-btn" data-action="randomize" data-effect="atkinson" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="atkinson" title="Reset">&#x21BB;</button></div>
-                            <label>Atkinson Color</label>
-                            <div class="selector-row" id="atkinson-color-buttons">
-                                <button class="selector-btn active" data-value="bw">B&W</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                            </div>
-                            <label>Threshold <input type="number" class="value-input" id="val-atkinson-threshold" value="128"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-atkinson-threshold" min="0" max="255" value="128" step="1"></div>
-                            <label>Error Spread <input type="number" class="value-input" id="val-atkinson-spread" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-atkinson-spread" min="0" max="100" value="100" step="1"></div>
-                            <label>Strength <input type="number" class="value-input" id="val-atkinson-strength" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-atkinson-strength" min="0" max="100" value="100" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-halftone">
-                            <div class="fx-param-header"><span class="fx-param-title">Halftone</span><button class="fx-action-btn" data-action="randomize" data-effect="halftone" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="halftone" title="Reset">&#x21BB;</button></div>
-                            <label>Dot Size <input type="number" class="value-input" id="val-half-spacing" value="6"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-half-spacing" min="3" max="20" value="6" step="1"></div>
-                            <label>Angle <input type="number" class="value-input" id="val-half-angle" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-half-angle" min="0" max="360" value="0" step="1"></div>
-                            <label>Contrast <input type="number" class="value-input" id="val-half-contrast" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-half-contrast" min="0" max="100" value="50" step="1"></div>
-                            <label>Spread <input type="number" class="value-input" id="val-half-spread" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-half-spread" min="0" max="50" value="0" step="1"></div>
-                            <label>Shape</label>
-                            <div class="fx-shape-selector" id="half-shape-buttons">
-                                <button class="fx-shape-btn active" data-value="circle" title="Circle">&#x25CF;</button>
-                                <button class="fx-shape-btn" data-value="square" title="Square">&#x25A0;</button>
-                                <button class="fx-shape-btn" data-value="diamond" title="Diamond">&#x25C6;</button>
-                                <button class="fx-shape-btn" data-value="triangle" title="Triangle">&#x25B2;</button>
-                                <button class="fx-shape-btn" data-value="line" title="Line">&#x2501;</button>
-                            </div>
-                            <label>Presets</label>
-                            <div class="fx-swatch-grid" id="half-presets">
-                                <div class="fx-swatch active" data-ink="#000000" data-paper="#ffffff" style="background:linear-gradient(135deg,#000 50%,#fff 50%)" title="Classic"></div>
-                                <div class="fx-swatch" data-ink="#1a1a2e" data-paper="#f0e6d3" style="background:linear-gradient(135deg,#1a1a2e 50%,#f0e6d3 50%)" title="Newsprint"></div>
-                                <div class="fx-swatch" data-ink="#0d2b45" data-paper="#d4c5a9" style="background:linear-gradient(135deg,#0d2b45 50%,#d4c5a9 50%)" title="Navy"></div>
-                                <div class="fx-swatch" data-ink="#2b0033" data-paper="#f5e6ff" style="background:linear-gradient(135deg,#2b0033 50%,#f5e6ff 50%)" title="Purple"></div>
-                                <div class="fx-swatch" data-ink="#003300" data-paper="#ccffcc" style="background:linear-gradient(135deg,#003300 50%,#ccffcc 50%)" title="Matrix"></div>
-                                <div class="fx-swatch" data-ink="#4a0000" data-paper="#ffcccc" style="background:linear-gradient(135deg,#4a0000 50%,#ffcccc 50%)" title="Rose"></div>
-                                <div class="fx-swatch" data-ink="#ff6600" data-paper="#000033" style="background:linear-gradient(135deg,#ff6600 50%,#000033 50%)" title="Neon"></div>
-                                <div class="fx-swatch" data-ink="#00ffff" data-paper="#0a0a0a" style="background:linear-gradient(135deg,#00ffff 50%,#0a0a0a 50%)" title="Cyan"></div>
-                                <div class="fx-swatch" data-ink="#ffffff" data-paper="#000000" style="background:linear-gradient(135deg,#fff 50%,#000 50%)" title="Inverted"></div>
-                                <div class="fx-swatch" data-ink="#ff0066" data-paper="#001133" style="background:linear-gradient(135deg,#ff0066 50%,#001133 50%)" title="Cyber"></div>
-                                <div class="fx-swatch" data-ink="#ffd700" data-paper="#1a0a00" style="background:linear-gradient(135deg,#ffd700 50%,#1a0a00 50%)" title="Gold"></div>
-                                <div class="fx-swatch" data-ink="#39ff14" data-paper="#0d0d0d" style="background:linear-gradient(135deg,#39ff14 50%,#0d0d0d 50%)" title="Toxic"></div>
-                            </div>
-                            <label>Ink Color</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="half-ink-color" value="#000000">
-                                <input type="text" class="fx-hex-input" id="half-ink-hex" value="#000000" maxlength="7">
-                            </div>
-                            <label>Paper Color</label>
-                            <div class="fx-color-picker">
-                                <input type="color" class="fx-color-input" id="half-paper-color" value="#ffffff">
-                                <input type="text" class="fx-hex-input" id="half-paper-hex" value="#ffffff" maxlength="7">
-                            </div>
-                            <label>Color Mode</label>
-                            <div class="selector-row" id="half-color-buttons">
-                                <button class="selector-btn active" data-value="bw">B&W</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                            </div>
-                            <div class="fx-toggle-row">
-                                <label>Inverted</label>
-                                <label class="fx-toggle-switch"><input type="checkbox" id="half-inverted-toggle"><span class="toggle-slider"></span></label>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-pxsort">
-                            <label>Threshold Low <input type="number" class="value-input" id="val-pxsort-lo" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-pxsort-lo" min="0" max="255" value="30" step="1"></div>
-                            <label>Threshold High <input type="number" class="value-input" id="val-pxsort-hi" value="220"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-pxsort-hi" min="0" max="255" value="220" step="1"></div>
-                            <label>Direction</label>
-                            <div class="selector-row" id="pxsort-dir-buttons">
-                                <button class="selector-btn active" data-value="horizontal">HORIZ</button>
-                                <button class="selector-btn" data-value="vertical">VERT</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-pixel">
-                            <label>Pixel Size <input type="number" class="value-input" id="val-pixel-size" value="8"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-pixel-size" min="2" max="50" value="8" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-led">
-                            <div class="fx-param-header"><span class="fx-param-title">LED Screen</span><button class="fx-action-btn" data-action="randomize" data-effect="led" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="led" title="Reset">&#x21BB;</button></div>
-                            <label>Cell Size <input type="number" class="value-input" id="val-led-cellsize" value="8"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-led-cellsize" min="4" max="20" value="8" step="1"></div>
-                            <label>Gap <input type="number" class="value-input" id="val-led-gap" value="2"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-led-gap" min="1" max="5" value="2" step="1"></div>
-                            <label>Glow <input type="number" class="value-input" id="val-led-glow" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-led-glow" min="0" max="100" value="30" step="1"></div>
-                            <label>Brightness <input type="number" class="value-input" id="val-led-brightness" value="100"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-led-brightness" min="50" max="150" value="100" step="1"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="fx-category" data-cat="overlay">
-                    <div class="cat-label cat-toggle"><span class="cat-dot" style="background:#E17055"></span> Overlay <span class="cat-count" data-cat="overlay"></span><span class="cat-chevron">&#9662;</span></div>
-                    <div class="fx-cat-body">
-                        <div class="fx-strip">
-                            <button class="fx-card" data-effect="ascii" data-cat="overlay">ASCII</button>
-                            <button class="fx-card" data-effect="glitch" data-cat="overlay">GLITCH</button>
-                            <button class="fx-card" data-effect="noise" data-cat="overlay">NOISE</button>
-                            <button class="fx-card" data-effect="grain" data-cat="overlay">GRAIN</button>
-                            <button class="fx-card" data-effect="dots" data-cat="overlay">DOTS</button>
-                            <button class="fx-card" data-effect="grid" data-cat="overlay">GRID</button>
-                            <button class="fx-card" data-effect="scanlines" data-cat="overlay">SCAN</button>
-                            <button class="fx-card" data-effect="vignette" data-cat="overlay">VGNTE</button>
-                            <button class="fx-card" data-effect="crt" data-cat="overlay">CRT</button>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-ascii">
-                            <label>Cell Size <input type="number" class="value-input" id="val-ascii-cell" value="10"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-ascii-cell" min="4" max="24" value="10" step="1"></div>
-                            <label>Characters</label>
-                            <div class="selector-row" id="ascii-charset-buttons">
-                                <button class="selector-btn active" data-value="classic">CLASSIC</button>
-                                <button class="selector-btn" data-value="blocks">BLOCKS</button>
-                                <button class="selector-btn" data-value="dots">DOTS</button>
-                                <button class="selector-btn" data-value="binary">BINARY</button>
-                                <button class="selector-btn" data-value="braille">BRAILLE</button>
-                                <button class="selector-btn" data-value="symbols">SYMBOLS</button>
-                                <button class="selector-btn" data-value="katakana">KATA</button>
-                            </div>
-                            <label>Color</label>
-                            <div class="selector-row" id="ascii-color-buttons">
-                                <button class="selector-btn active" data-value="mono">MONO</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                                <button class="selector-btn" data-value="green">GREEN</button>
-                                <button class="selector-btn" data-value="amber">AMBER</button>
-                                <button class="selector-btn" data-value="cyan">CYAN</button>
-                            </div>
-                            <label>Invert</label>
-                            <div class="selector-row" id="ascii-invert-buttons">
-                                <button class="selector-btn active" data-value="off">OFF</button>
-                                <button class="selector-btn" data-value="on">ON</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-glitch">
-                            <div class="fx-param-header"><span class="fx-param-title">Glitch</span><button class="fx-action-btn" data-action="randomize" data-effect="glitch" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="glitch" title="Reset">&#x21BB;</button></div>
-                            <label>Intensity <input type="number" class="value-input" id="val-glitch-intensity" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-intensity" min="5" max="100" value="30" step="1"></div>
-                            <label>Frequency <input type="number" class="value-input" id="val-glitch-freq" value="20"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-freq" min="1" max="100" value="20" step="1"></div>
-                            <label>Channel Shift <input type="number" class="value-input" id="val-glitch-chshift" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-chshift" min="0" max="100" value="50" step="1"></div>
-                            <label>Block Size <input type="number" class="value-input" id="val-glitch-blocksize" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-blocksize" min="10" max="100" value="50" step="1"></div>
-                            <label>Seed (0=random) <input type="number" class="value-input" id="val-glitch-seed" value="0"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-seed" min="0" max="999" value="0" step="1"></div>
-                            <label>Speed <input type="number" class="value-input" id="val-glitch-speed" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-glitch-speed" min="0" max="100" value="50" step="1"></div>
-                            <label>Style</label>
-                            <div class="selector-row" id="glitch-mode-buttons">
-                                <button class="selector-btn active" data-value="shift">SHIFT</button>
-                                <button class="selector-btn" data-value="tear">TEAR</button>
-                                <button class="selector-btn" data-value="corrupt">CORRUPT</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-noise">
-                            <label>Intensity <input type="number" class="value-input" id="val-noise-intensity" value="25"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-noise-intensity" min="5" max="100" value="25" step="1"></div>
-                            <label>Scale <input type="number" class="value-input" id="val-noise-scale" value="1"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-noise-scale" min="1" max="10" value="1" step="1"></div>
-                            <label>Noise Color</label>
-                            <div class="selector-row" id="noise-color-buttons">
-                                <button class="selector-btn active" data-value="mono">MONO</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-grain">
-                            <label>Intensity <input type="number" class="value-input" id="val-grain-intensity" value="35"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grain-intensity" min="5" max="100" value="35" step="1"></div>
-                            <label>Size <input type="number" class="value-input" id="val-grain-size" value="15"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grain-size" min="5" max="40" value="15" step="1"></div>
-                            <label>Grain Color</label>
-                            <div class="selector-row" id="grain-color-buttons">
-                                <button class="selector-btn active" data-value="mono">MONO</button>
-                                <button class="selector-btn" data-value="color">COLOR</button>
-                            </div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-dots">
-                            <label>Angle <input type="number" class="value-input" id="val-dots-angle" value="45"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-dots-angle" min="0" max="360" value="45" step="1"></div>
-                            <label>Scale <input type="number" class="value-input" id="val-dots-scale" value="6"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-dots-scale" min="2" max="20" value="6" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-grid">
-                            <label>Scale <input type="number" class="value-input" id="val-grid-scale" value="20"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grid-scale" min="5" max="50" value="20" step="1"></div>
-                            <label>Line Width <input type="number" class="value-input" id="val-grid-width" value="1"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grid-width" min="1" max="5" value="1" step="0.5"></div>
-                            <label>Opacity <input type="number" class="value-input" id="val-grid-opacity" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-grid-opacity" min="5" max="100" value="30" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-scanlines">
-                            <label>Intensity <input type="number" class="value-input" id="val-scan-intensity" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-scan-intensity" min="5" max="100" value="50" step="1"></div>
-                            <label>Line Count <input type="number" class="value-input" id="val-scan-count" value="300"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-scan-count" min="50" max="800" value="300" step="10"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-vignette">
-                            <label>Intensity <input type="number" class="value-input" id="val-vig-intensity" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-vig-intensity" min="5" max="100" value="50" step="1"></div>
-                            <label>Radius <input type="number" class="value-input" id="val-vig-radius" value="70"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-vig-radius" min="20" max="100" value="70" step="1"></div>
-                        </div>
-                        <div class="fx-param-group" id="fx-params-crt">
-                            <div class="fx-param-header"><span class="fx-param-title">CRT Screen</span><button class="fx-action-btn" data-action="randomize" data-effect="crt" title="Randomize">&#x1F3B2;</button><button class="fx-action-btn" data-action="reset" data-effect="crt" title="Reset">&#x21BB;</button></div>
-                            <label>Scanline Weight <input type="number" class="value-input" id="val-crt-scanweight" value="2"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-crt-scanweight" min="1" max="5" value="2" step="1"></div>
-                            <label>Curvature <input type="number" class="value-input" id="val-crt-curvature" value="30"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-crt-curvature" min="0" max="100" value="30" step="1"></div>
-                            <label>Phosphor Glow <input type="number" class="value-input" id="val-crt-glow" value="50"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-crt-glow" min="0" max="100" value="50" step="1"></div>
-                            <label>Chroma Fringe <input type="number" class="value-input" id="val-crt-chroma" value="3"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-crt-chroma" min="0" max="10" value="3" step="1"></div>
-                            <label>Static Noise <input type="number" class="value-input" id="val-crt-static" value="20"></label>
-                            <div class="slider-wrapper"><input type="range" id="slider-crt-static" min="0" max="100" value="20" step="1"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- FX Layer toggle -->
-            <div class="control-group" id="group-fxlayer">
-                <label>FX Layer</label>
-                <div class="selector-row" id="fx-layer-buttons">
-                    <button class="selector-btn active" data-value="video">VIDEO</button>
-                    <button class="selector-btn" data-value="all">ALL</button>
-                </div>
-            </div>
-
-            <div class="control-group" id="group-bgdim">
-                <label>Background Dim <input type="number" class="value-input" id="val-bgdim" value="0"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-bgdim" min="0" max="100" value="0" step="1">
-                </div>
-            </div>
-
-            </div><!-- /tab-content fx -->
+            <!-- FX content moved to right panel -->
 
             <div class="tab-content" data-tab="audio">
 
@@ -2502,63 +2065,14 @@
 
             </div><!-- /tab-content audio -->
 
-            <div class="tab-content" data-tab="ai">
-
-            <!-- Setup (shown when no API key) -->
-            <div id="ai-setup">
-                <div style="font-size:10px;color:var(--text-muted);line-height:1.5">
-                    AI assistant for creative guidance, troubleshooting, and technique discovery. Free API key required.
-                </div>
-                <div class="control-group">
-                    <label>Provider</label>
-                    <div class="selector-row" id="ai-provider-btns">
-                        <button class="selector-btn active" data-value="gemini">GEMINI</button>
-                        <button class="selector-btn" data-value="openrouter">OPENROUTER</button>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>API Key <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" id="ai-key-link" style="color:var(--accent);font-weight:400;text-decoration:none;border-bottom:1px solid var(--text-muted)">Get free key</a></label>
-                    <input type="password" id="ai-key-input" placeholder="Paste Gemini API key" style="width:100%;background:var(--slider-track);border:1px solid #333;border-radius:3px;padding:8px;color:var(--text-main);font-size:11px;font-family:inherit;outline:none">
-                </div>
-                <div class="control-group">
-                    <label>Model</label>
-                    <select id="ai-model-select" style="width:100%;background:var(--slider-track);border:1px solid #333;border-radius:3px;padding:6px 8px;color:var(--text-main);font-size:10px;font-family:inherit;outline:none;cursor:pointer"></select>
-                </div>
-                <button id="ai-connect-btn" style="width:100%;padding:8px;background:var(--btn-active-bg);color:var(--btn-active-text);border:none;border-radius:3px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.5px">Connect</button>
-                <div style="font-size:9px;color:var(--text-muted);text-align:center">Key stored locally in your browser only</div>
-            </div>
-
-            <!-- Chat (shown when connected) -->
-            <div id="ai-chat" style="display:none">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #222;margin-bottom:8px;flex-shrink:0">
-                    <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px" id="ai-provider-label">GEMINI</span>
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;margin:0;font-size:inherit" id="ai-search-label" title="Search web for tutorials &amp; techniques">
-                            <input type="checkbox" id="ai-web-search-cb" checked style="margin:0;accent-color:var(--accent)">
-                            <span style="font-size:8px;color:var(--text-muted);font-weight:600">WEB</span>
-                        </label>
-                        <button id="ai-new-btn" title="New chat" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px 4px;font-family:inherit">&#x21BA;</button>
-                        <button id="ai-disc-btn" title="Disconnect" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px 4px;font-family:inherit">&times;</button>
-                    </div>
-                </div>
-                <div id="ai-messages"></div>
-                <div id="ai-suggestions"></div>
-                <div id="ai-input-row">
-                    <input type="text" id="ai-input" placeholder="Ask about effects, masking...">
-                    <button id="ai-send-btn">&rarr;</button>
-                </div>
-            </div>
-
-            </div><!-- /tab-content ai -->
-
         </div>
     </div>
 
-    <!-- RIGHT PANEL -->
+    <!-- RIGHT PANEL — EFFECTS -->
     <div id="right-panel" class="panel">
         <div class="header-section">
             <div class="title-row">
-                <h1>Parameters</h1>
+                <h1>Effects</h1>
                 <div id="toggle-btn-right" class="toggle-chevron" title="Toggle Controls">
                     <svg viewBox="0 0 24 24">
                         <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
@@ -2568,91 +2082,33 @@
         </div>
 
         <div id="ui-controls-right">
-            <div id="blob-edit-banner">editing blob segment</div>
+            <div class="control-group" id="group-fx">
+                <div class="fx-master-row">
+                    <span>Effects</span>
+                    <label class="fx-toggle-switch"><input type="checkbox" id="master-fx-toggle" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div id="fx-cat-tabs"></div>
+                <div id="fx-selector-row"></div>
+                <div id="fx-params-container"></div>
+            </div>
 
-            <div class="control-group" id="group-0">
-                <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
+            <!-- REMOVED: old static FX categories/cards/params — now JS-generated by buildFxPanel() -->
+
+            <!-- FX Layer toggle -->
+            <div class="control-group" id="group-fxlayer">
+                <label>FX Layer</label>
+                <div class="selector-row" id="fx-layer-buttons">
+                    <button class="selector-btn active" data-value="video">VIDEO</button>
+                    <button class="selector-btn" data-value="all">ALL</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="group-bgdim">
+                <label>Background Dim <input type="number" class="value-input" id="val-bgdim" value="0"></label>
                 <div class="slider-wrapper">
-                    <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
+                    <input type="range" id="slider-bgdim" min="0" max="100" value="0" step="1">
                 </div>
             </div>
-
-            <div class="control-group" id="group-1">
-                <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-4">
-                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-5">
-                <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-5" min="0" max="100" value="4" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-6">
-                <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-6" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Lines</label>
-                <div class="selector-row" id="line-buttons">
-                    <button class="selector-btn active" data-value="off">OFF</button>
-                    <button class="selector-btn" data-value="on">ON</button>
-                </div>
-            </div>
-
-            <div class="control-group" id="group-2">
-                <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-3">
-                <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
-                </div>
-            </div>
-
-            <div class="control-group collapsible collapsed" id="product-info-group">
-                <label class="collapsible-toggle">Product Info <span class="disc-chevron">&#9662;</span></label>
-                <div class="collapsible-body">
-                    <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
-                    <input type="text" class="text-input" id="product-name" placeholder="Product Name">
-                    <input type="text" class="text-input" id="product-material" placeholder="Material">
-                    <input type="text" class="text-input" id="product-price" placeholder="Price">
-                    <input type="text" class="text-input" id="product-size" placeholder="Size">
-                </div>
-            </div>
-
-            <!-- Record & Save -->
-            <div class="playback-row">
-                <button id="btn-record" class="action-btn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
-                    Record
-                </button>
-                <button id="btn-save" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                    Save
-                </button>
-            </div>
-            <button id="btn-photo" class="action-btn" style="width:100%">
-                <svg viewBox="0 0 24 24"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
-                Photo
-            </button>
 
         </div>
     </div>
@@ -2852,7 +2308,6 @@
 <script src="blob-timeline.js"></script>
 <script src="blob-mask.js"></script>
 <script src="blob-tracking.js"></script>
-<script src="blob-ai.js"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">
