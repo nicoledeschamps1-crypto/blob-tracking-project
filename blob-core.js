@@ -1265,10 +1265,10 @@ const ui = {
     toggleBtnRight: document.getElementById('toggle-btn-right'),
     uiControls: document.getElementById('ui-controls'),
     uiControlsRight: document.getElementById('ui-controls-right'),
-    btnPlay: document.getElementById('btn-play'),
-    btnRestart: document.getElementById('btn-restart'),
-    btnRecord: document.getElementById('btn-record'),
-    btnSave: document.getElementById('btn-save'),
+    btnPlay: null, // removed — top bar is sole transport
+    btnRestart: null,
+    btnRecord: null,
+    btnSave: null,
     audioUpload: document.getElementById('audioUpload'),
     audioName: document.getElementById('audio-name'),
     audioMeterFill: document.getElementById('audio-meter-fill'),
@@ -1284,7 +1284,7 @@ const ui = {
     bpmLockButtons: document.querySelectorAll('#bpm-lock-buttons .selector-btn'),
     customColorGroup: document.getElementById('custom-color-group'),
     customColorPicker: document.getElementById('custom-color-picker'),
-    btnPhoto: document.getElementById('btn-photo'),
+    btnPhoto: null, // removed — top bar is sole transport
     bgDimSlider: document.getElementById('slider-bgdim'),
     bgDimInput: document.getElementById('val-bgdim'),
     freqLowSlider: document.getElementById('slider-8'),
@@ -2191,6 +2191,63 @@ function setupCoreUIListeners() {
         });
     });
 
+    // Tracking category tab switching
+    document.querySelectorAll('.tracking-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabId = tab.dataset.trackTab;
+            document.querySelectorAll('.tracking-tab').forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+            document.querySelectorAll('.tracking-tab-content').forEach(panel => {
+                panel.classList.toggle('active', panel.dataset.trackTab === tabId);
+            });
+        });
+    });
+
+    // Tracking ON/OFF toggle
+    const trackingToggle = document.getElementById('tracking-toggle');
+    const trackingBody = document.getElementById('tracking-body');
+    const blobParamsSection = document.querySelector('section[aria-label="Blob parameters"]');
+    let _trackingLastMode = 1; // remember last mode when toggling back on (default: BLUE)
+    if (trackingToggle) {
+        trackingToggle.addEventListener('change', () => {
+            const isOn = trackingToggle.checked;
+            if (isOn) {
+                // Restore last mode
+                currentMode = _trackingLastMode;
+                _userMode = currentMode;
+                if (trackingBody) trackingBody.classList.remove('tracking-off');
+                if (blobParamsSection) blobParamsSection.style.display = '';
+            } else {
+                // Save current mode and turn off
+                if (currentMode > 0) _trackingLastMode = currentMode;
+                currentMode = 0;
+                _userMode = 0;
+                exitMaskMode();
+                if (trackingBody) trackingBody.classList.add('tracking-off');
+                if (blobParamsSection) blobParamsSection.style.display = 'none';
+            }
+            if (currentMode === 3) prevGridPixels = {};
+            if (currentMode === 12) flickerScores = {};
+            if (currentMode < 15 || currentMode > 17) { faceLandmarkCache = null; smoothedLandmarks = null; }
+            ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
+            updateButtonStates();
+        });
+    }
+
+    // Settings modal toggle (functions defined globally for keyPressed access)
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsClose = document.getElementById('settings-close');
+    if (settingsBtn) settingsBtn.addEventListener('click', toggleSettings);
+    if (settingsClose) settingsClose.addEventListener('click', toggleSettings);
+    if (settingsOverlay) settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === settingsOverlay) toggleSettings();
+    });
+
     // Off-canvas drawer toggle (responsive)
     const overlay = document.getElementById('panel-overlay');
     const leftPanel = document.getElementById('left-panel');
@@ -2377,11 +2434,9 @@ function setupCoreUIListeners() {
                 if (activeVizModes.has(val)) activeVizModes.delete(val);
                 else activeVizModes.add(val);
             }
-            // Auto-expand Product Info when TAG viz is active
+            // Show Product Info fields when TAG viz is active (data feeds canvas overlay)
             let pig = document.getElementById('product-info-group');
-            if (activeVizModes.has(8)) {
-                pig.classList.remove('collapsed');
-            }
+            if (pig) pig.style.display = activeVizModes.has(8) ? '' : 'none';
             // Show/hide zoom viz options
             let vzp = document.getElementById('viz-zoom-options');
             if (vzp) vzp.style.display = (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12)) ? '' : 'none';
@@ -2678,13 +2733,13 @@ function setupCoreUIListeners() {
     ui.fileInput.addEventListener('change', handleFile, false);
     ui.webcamBtn.addEventListener('click', toggleWebcam);
 
-    ui.btnPlay.addEventListener('click', togglePlay);
-    ui.btnRestart.addEventListener('click', restartVideo);
-    ui.btnRecord.addEventListener('click', toggleRecording);
-    ui.btnSave.addEventListener('click', saveRecording);
-    ui.btnPhoto.addEventListener('click', saveScreenshot);
+    // Microphone button
+    const micBtn = document.getElementById('mic-btn');
+    if (micBtn) micBtn.addEventListener('click', () => {
+        if (typeof toggleMicrophone === 'function') toggleMicrophone();
+    });
 
-    // Top bar transport buttons (mirror left panel controls)
+    // Top bar transport buttons (sole transport controls)
     const tbPlay = document.getElementById('tb-play');
     const tbRestart = document.getElementById('tb-restart');
     const tbRecord = document.getElementById('tb-record');
@@ -2699,14 +2754,10 @@ function setupCoreUIListeners() {
     // Cross-link navigation between panels
     let linkToCamera = document.getElementById('link-to-camera');
     if (linkToCamera) linkToCamera.addEventListener('click', () => {
-        let cg = document.getElementById('camera-group');
+        // Switch to Camera tab in FX panel
+        if (typeof switchFxCategory === 'function') switchFxCategory('camera');
         let rp = document.getElementById('right-panel');
-        if (cg && rp) {
-            cg.classList.remove('collapsed');
-            cg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            cg.classList.add('highlight-pulse');
-            setTimeout(() => cg.classList.remove('highlight-pulse'), 600);
-        }
+        if (rp) rp.scrollTo({ top: 0, behavior: 'smooth' });
     });
     let linkToZoom = document.getElementById('link-to-zoom');
     if (linkToZoom) linkToZoom.addEventListener('click', () => {
@@ -2789,6 +2840,34 @@ function updateButtonStates() {
         if (parseInt(btn.dataset.value) === currentMode) btn.classList.add('active');
         else btn.classList.remove('active');
     });
+
+    // Sync tracking toggle with current mode
+    const trackingToggle = document.getElementById('tracking-toggle');
+    if (trackingToggle) trackingToggle.checked = currentMode > 0;
+    // Sync tracking body visibility
+    const trackingBody = document.getElementById('tracking-body');
+    const blobParamsSection = document.querySelector('section[aria-label="Blob parameters"]');
+    if (trackingBody) trackingBody.classList.toggle('tracking-off', currentMode === 0);
+    if (blobParamsSection) blobParamsSection.style.display = currentMode === 0 ? 'none' : '';
+    // Auto-switch tracking tab to match current mode (skip if user is on VISUALIZE tab)
+    if (currentMode > 0) {
+        const currentTab = document.querySelector('.tracking-tab.active');
+        if (!currentTab || currentTab.dataset.trackTab !== 'visualize') {
+            const analysisModes = [3,6,7,8,9,12,4];
+            const aiModes = [14,15,16,17];
+            let targetTab = 'color';
+            if (analysisModes.includes(currentMode)) targetTab = 'analysis';
+            else if (aiModes.includes(currentMode)) targetTab = 'ai';
+            document.querySelectorAll('.tracking-tab').forEach(t => {
+                const isActive = t.dataset.trackTab === targetTab;
+                t.classList.toggle('active', isActive);
+                t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            document.querySelectorAll('.tracking-tab-content').forEach(p => {
+                p.classList.toggle('active', p.dataset.trackTab === targetTab);
+            });
+        }
+    }
 
     ui.vizButtons.forEach(btn => {
         let val = parseInt(btn.dataset.value);
@@ -2927,13 +3006,16 @@ function updateTopBar() {
         fpsEl.textContent = fps + ' FPS';
         fpsEl.className = 'tb-status tb-fps ' + (fps >= 30 ? 'good' : fps >= 15 ? 'warn' : 'bad');
     }
-    // Source
+    // Source — amber when no source loaded
     let srcEl = document.getElementById('tb-source');
     if (srcEl) {
-        if (usingWebcam) { srcEl.textContent = 'WEBCAM'; srcEl.classList.add('active'); }
-        else if (videoLoaded) { srcEl.textContent = 'VIDEO'; srcEl.classList.add('active'); }
-        else { srcEl.textContent = 'NO SOURCE'; srcEl.classList.remove('active'); }
+        if (usingWebcam) { srcEl.textContent = 'WEBCAM'; srcEl.classList.add('active'); srcEl.classList.remove('no-source'); }
+        else if (videoLoaded) { srcEl.textContent = 'VIDEO'; srcEl.classList.add('active'); srcEl.classList.remove('no-source'); }
+        else { srcEl.textContent = 'NO SOURCE'; srcEl.classList.remove('active'); srcEl.classList.add('no-source'); }
     }
+    // Canvas empty state
+    let emptyState = document.getElementById('canvas-empty-state');
+    if (emptyState) emptyState.classList.toggle('hidden', videoLoaded || usingWebcam);
     // Mode
     let modeEl = document.getElementById('tb-mode');
     if (modeEl) {
@@ -2999,10 +3081,17 @@ function updateEffectCardStates() {
 // ── HELP OVERLAY ─────────────────────────
 
 let _helpVisible = false;
+let _settingsVisible = false;
 
 function toggleHelp() {
     _helpVisible = !_helpVisible;
     document.getElementById('help-overlay').classList.toggle('visible', _helpVisible);
+}
+
+function toggleSettings() {
+    _settingsVisible = !_settingsVisible;
+    let overlay = document.getElementById('settings-overlay');
+    if (overlay) overlay.classList.toggle('visible', _settingsVisible);
 }
 
 function updateEmptyHint() {
@@ -3012,24 +3101,29 @@ function updateEmptyHint() {
 
 // ── PLAYBACK ──────────────────────────────
 
+const _playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+const _pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+function syncPlayIcon(playing) {
+    let icon = playing ? _pauseIcon : _playIcon;
+    if (ui.btnPlay) ui.btnPlay.innerHTML = icon;
+    let tbPlay = document.getElementById('tb-play');
+    if (tbPlay) tbPlay.innerHTML = icon;
+    if (ui.tlBtnPlay) ui.tlBtnPlay.innerHTML = icon;
+}
+
 function togglePlay() {
     if (videoEl && videoLoaded) {
         videoPlaying = !videoPlaying;
-        let pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-        let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
         if (videoPlaying) {
              videoEl.elt.loop = true;
              let playPromise = videoEl.elt.play();
              if (playPromise) {
                  playPromise.catch(() => {
-                     // Browser blocked autoplay — retry on next user gesture
                      videoPlaying = false;
-                     ui.btnPlay.innerHTML = playIcon;
-                     ui.tlBtnPlay.innerHTML = playIcon;
+                     syncPlayIcon(false);
                  });
              }
-             ui.btnPlay.innerHTML = pauseIcon;
-             ui.tlBtnPlay.innerHTML = pauseIcon;
+             syncPlayIcon(true);
              if (audioElement && audioLoaded) {
                  let audioTime = getAudioTimeForVideo(videoEl.time());
                  if (audioTime >= 0) {
@@ -3040,8 +3134,7 @@ function togglePlay() {
              }
         } else {
              videoEl.elt.pause();
-             ui.btnPlay.innerHTML = playIcon;
-             ui.tlBtnPlay.innerHTML = playIcon;
+             syncPlayIcon(false);
              if (audioElement && audioLoaded) { audioElement.pause(); audioPlaying = false; }
         }
     }
@@ -3106,9 +3199,7 @@ function startWebcam() {
         videoLoaded = true;
         videoPlaying = true;
         updateButtonStates();
-        let pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-        ui.btnPlay.innerHTML = pauseIcon;
-        ui.tlBtnPlay.innerHTML = pauseIcon;
+        syncPlayIcon(true);
     });
 }
 
@@ -3125,9 +3216,7 @@ function stopWebcam() {
     videoPlaying = false;
     ui.webcamBtn.classList.remove('active');
     ui.fileName.innerText = 'mp4 or mov';
-    let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
-    ui.btnPlay.innerHTML = playIcon;
-    ui.tlBtnPlay.innerHTML = playIcon;
+    syncPlayIcon(false);
 }
 
 function handleFile(event) {
@@ -3136,6 +3225,7 @@ function handleFile(event) {
         if (usingWebcam) stopWebcam();
         if (videoEl) { videoEl.stop(); videoEl.remove(); }
         ui.fileName.innerText = file.name;
+        ui.fileName.title = file.name;
         if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
         currentVideoUrl = URL.createObjectURL(file);
         const url = currentVideoUrl;
@@ -3145,9 +3235,7 @@ function handleFile(event) {
             videoLoaded = true; videoPlaying = true;
             currentMode = 1; _userMode = 1;
             updateButtonStates();
-            let pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-            ui.btnPlay.innerHTML = pauseIcon;
-            ui.tlBtnPlay.innerHTML = pauseIcon;
+            syncPlayIcon(true);
             // Keep audio in sync with video — handles offset and loop modes
             videoEl.elt.addEventListener('timeupdate', () => {
                 if (!audioElement || !audioLoaded || !videoPlaying) return;
@@ -3180,9 +3268,7 @@ function handleFile(event) {
                         audioElement.pause();
                         videoPlaying = false;
                         audioPlaying = false;
-                        let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
-                        ui.btnPlay.innerHTML = playIcon;
-                        ui.tlBtnPlay.innerHTML = playIcon;
+                        syncPlayIcon(false);
                     }
                 }
             });
@@ -3288,18 +3374,17 @@ function startRecording() {
         lastRecordedBlob = new Blob(recordedChunks, { type: mimeType });
         lastRecordedExt = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
         recordedChunks = [];
-        ui.btnSave.style.borderColor = '#e5e5e5';
+        if (ui.btnSave) ui.btnSave.style.borderColor = '#e5e5e5';
+        let tbSaveEl = document.getElementById('tb-save');
+        if (tbSaveEl) tbSaveEl.style.borderColor = '#e5e5e5';
     };
 
     // No timeslice — collect all data on stop to avoid chunk boundary quality drops
     mediaRecorder.start();
     isRecording = true;
     recordingStartTime = millis();
-    ui.btnRecord.classList.add('recording');
-    ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg> Stop`;
-    ui.tlBtnRecord.classList.add('recording');
-    ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>`;
-    // Top bar record button sync
+    if (ui.btnRecord) { ui.btnRecord.classList.add('recording'); ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg> Stop`; }
+    if (ui.tlBtnRecord) { ui.tlBtnRecord.classList.add('recording'); ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>`; }
     let tbRec = document.getElementById('tb-record');
     if (tbRec) tbRec.classList.add('recording');
 }
@@ -3317,19 +3402,16 @@ function stopRecording() {
     recordingCanvas = null;
     recordingCtx = null;
     recordingVideoTrack = null;
-    ui.btnRecord.classList.remove('recording');
-    ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg> Record`;
-    ui.tlBtnRecord.classList.remove('recording');
-    ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>`;
-    // Top bar record button sync
+    if (ui.btnRecord) { ui.btnRecord.classList.remove('recording'); ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg> Record`; }
+    if (ui.tlBtnRecord) { ui.tlBtnRecord.classList.remove('recording'); ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>`; }
     let tbRec = document.getElementById('tb-record');
     if (tbRec) tbRec.classList.remove('recording');
 }
 
 function saveRecording() {
     if (!lastRecordedBlob) {
-        ui.btnSave.style.borderColor = '#ff4444';
-        setTimeout(() => { ui.btnSave.style.borderColor = ''; }, 600);
+        let tbSave = document.getElementById('tb-save');
+        if (tbSave) { tbSave.style.borderColor = '#ff4444'; setTimeout(() => { tbSave.style.borderColor = ''; }, 600); }
         return;
     }
     const url = URL.createObjectURL(lastRecordedBlob);
@@ -3379,9 +3461,10 @@ function keyPressed(event) {
     // Help overlay: ? to toggle, Escape to close
     if (key === '?') { toggleHelp(); return false; }
     if (keyCode === ESCAPE && _helpVisible) { toggleHelp(); return false; }
+    if (keyCode === ESCAPE && _settingsVisible) { toggleSettings(); return false; }
 
-    // Block all other keys while help is open
-    if (_helpVisible) return false;
+    // Block all other keys while help or settings is open
+    if (_helpVisible || _settingsVisible) return false;
 
     let changed = false;
 

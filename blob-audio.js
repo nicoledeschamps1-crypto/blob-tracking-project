@@ -24,6 +24,9 @@ function handleAudioFile(event) {
     if (audioObjectUrl) { URL.revokeObjectURL(audioObjectUrl); }
 
     ui.audioName.innerText = file.name;
+    // Set tooltip for truncated names
+    let audioContainer = document.getElementById('audio-input-container');
+    if (audioContainer) audioContainer.title = file.name;
     const url = URL.createObjectURL(file);
     audioObjectUrl = url;
 
@@ -50,9 +53,7 @@ function handleAudioFile(event) {
         if (loopMode === 'once' && videoEl) {
             videoEl.elt.pause();
             videoPlaying = false;
-            let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
-            ui.btnPlay.innerHTML = playIcon;
-            ui.tlBtnPlay.innerHTML = playIcon;
+            if (typeof syncPlayIcon === 'function') syncPlayIcon(false);
         }
     });
 
@@ -694,4 +695,69 @@ function setupAudioUIListeners() {
         });
         beatDecayInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
     }
+}
+
+// ═══ MICROPHONE INPUT ═══
+let micStream = null;
+let micSource = null;
+let micActive = false;
+
+function toggleMicrophone() {
+    if (micActive) {
+        stopMicrophone();
+    } else {
+        startMicrophone();
+    }
+}
+
+function startMicrophone() {
+    initAudioContext();
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        micStream = stream;
+        micSource = audioContext.createMediaStreamSource(stream);
+        audioAnalyser = audioContext.createAnalyser();
+        audioAnalyser.fftSize = 4096;
+        audioAnalyser.smoothingTimeConstant = 0;
+        audioGainNode = audioContext.createGain();
+        micSource.connect(audioAnalyser);
+        audioAnalyser.connect(audioGainNode);
+        // Don't connect to destination — avoid feedback
+
+        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        floatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+        prevFloatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+        resetBandDetectors();
+        audioLoaded = true;
+        micActive = true;
+
+        const micBtn = document.getElementById('mic-btn');
+        if (micBtn) micBtn.classList.add('active');
+        ui.audioName.innerText = 'Microphone active';
+        const audioContainer = document.getElementById('audio-input-container');
+        if (audioContainer) audioContainer.title = 'Live microphone input';
+        const meterEl = document.getElementById('audio-meter');
+        if (meterEl) meterEl.style.display = '';
+        updateButtonStates();
+    }).catch(err => {
+        console.warn('Microphone access denied:', err);
+    });
+}
+
+function stopMicrophone() {
+    if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+    }
+    if (micSource) { try { micSource.disconnect(); } catch(e){} micSource = null; }
+    if (audioAnalyser) { try { audioAnalyser.disconnect(); } catch(e){} }
+    if (audioGainNode) { try { audioGainNode.disconnect(); } catch(e){} }
+    micActive = false;
+    audioLoaded = false;
+
+    const micBtn = document.getElementById('mic-btn');
+    if (micBtn) micBtn.classList.remove('active');
+    ui.audioName.innerText = 'mp3, wav, ogg';
+    const meterEl = document.getElementById('audio-meter');
+    if (meterEl) meterEl.style.display = 'none';
+    updateButtonStates();
 }
