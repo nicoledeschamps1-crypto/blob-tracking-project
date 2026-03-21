@@ -1474,6 +1474,9 @@ function setup() {
 
     updateButtonStates();
     currentParam = navOrder[0];
+
+    // Initialize WebGL2 shader pipeline (Phase 0)
+    initShaderFX();
 }
 
 // Update zoom UI elements
@@ -2085,6 +2088,9 @@ function draw() {
 
     // Update zoom UI each frame (for smooth transitions)
     if (zoomSmooth && (Math.abs(vidZoom - zoomTargetLevel) > 0.002)) updateZoomUI();
+
+    // GPU shader effects pipeline (Phase 0 — passthrough proof of concept)
+    processShaderFX();
 }
 
 // ── CORE UI LISTENERS ─────────────────────
