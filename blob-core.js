@@ -368,6 +368,8 @@ let splitMirrorFlip = false;     // swap left/right sides
 let splitDualFx = false;         // different effect per side
 let splitLeftEffect = '';        // effect name for left side
 let splitRightEffect = '';       // effect name for right side
+let splitShape = 'rect';         // zoom side clip shape: rect|rounded|circle|pill
+let _splitDrag = null;           // drag state for split divider
 let _asciiSampler = null;        // offscreen canvas for ASCII viz sampling
 let _splitBuf = null;            // offscreen canvas for dual FX compositing
 let depthBlurEnabled = false;    // depth-of-field vignette blur at edges
@@ -1447,9 +1449,40 @@ function setup() {
         updateZoomUI();
     });
 
+    // Split divider drag
+    canvas.elt.addEventListener('mousedown', (e) => {
+        if (!splitZoomEnabled || e.button !== 0) return;
+        let splitX = Math.round(width * splitPosition / 100);
+        let canvasRect = canvas.elt.getBoundingClientRect();
+        let mx = e.clientX - canvasRect.left;
+        if (Math.abs(mx - splitX) < 8) {
+            e.preventDefault();
+            e.stopPropagation();
+            _splitDrag = { startX: e.clientX, startPos: splitPosition };
+            canvas.elt.style.cursor = 'col-resize';
+        }
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!_splitDrag) return;
+        let canvasRect = canvas.elt.getBoundingClientRect();
+        let newPos = _splitDrag.startPos + (e.clientX - _splitDrag.startX) / canvasRect.width * 100;
+        splitPosition = constrain(newPos, 10, 90);
+        let slider = document.getElementById('slider-split-pos');
+        let input = document.getElementById('val-split-pos');
+        if (slider) slider.value = splitPosition;
+        if (input) input.value = Math.round(splitPosition);
+    });
+    document.addEventListener('mouseup', () => {
+        if (_splitDrag) {
+            _splitDrag = null;
+            canvas.elt.style.cursor = '';
+        }
+    });
+
     // Video pan: middle-click drag or left-drag when zoomed (on canvas only)
     let _vidDrag = null;
     canvas.elt.addEventListener('mousedown', (e) => {
+        if (_splitDrag) return; // split divider drag takes priority
         if (vidZoom <= 1) return;
         let over = document.elementFromPoint(e.clientX, e.clientY);
         if (over && (over.closest('.panel') || over.closest('#timeline-container'))) return;
@@ -1557,6 +1590,14 @@ function draw() {
             if (Math.abs(vidZoom - zoomTargetLevel) < 0.002) vidZoom = zoomTargetLevel;
             if (Math.abs(vidPanX - zoomTargetPanX) < 0.5) vidPanX = zoomTargetPanX;
             if (Math.abs(vidPanY - zoomTargetPanY) < 0.5) vidPanY = zoomTargetPanY;
+        }
+
+        // ── Clamp pan to keep video covering the viewport (no void space)
+        if (vidZoom > 1) {
+            let maxPanX = Math.max(0, (baseW * vidZoom - dispW) / 2);
+            let maxPanY = Math.max(0, (baseH * vidZoom - dispH) / 2);
+            vidPanX = constrain(vidPanX, -maxPanX, maxPanX);
+            vidPanY = constrain(vidPanY, -maxPanY, maxPanY);
         }
 
         // Apply video zoom
@@ -1937,6 +1978,20 @@ function draw() {
     }
 
     // ── Split view: configurable position, mirror, dual FX
+    function applySplitClipShape(ctx, x, y, w, h, shape) {
+        ctx.beginPath();
+        if (shape === 'circle') {
+            let r = Math.min(w, h) / 2;
+            ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
+        } else if (shape === 'rounded') {
+            ctx.roundRect(x, y, w, h, Math.min(w, h) * 0.06);
+        } else if (shape === 'pill') {
+            ctx.roundRect(x, y, w, h, Math.min(w, h) / 2);
+        } else {
+            ctx.rect(x, y, w, h);
+        }
+        ctx.clip();
+    }
     if (splitZoomEnabled && videoLoaded && videoEl) {
         push();
         let splitX = Math.round(width * splitPosition / 100);
@@ -1967,9 +2022,7 @@ function draw() {
             // ── DUAL FX MODE: different effect per side ──
             // Draw zoomed content on zoom side
             drawingContext.save();
-            drawingContext.beginPath();
-            drawingContext.rect(zoomSideX, 0, zoomSideW, height);
-            drawingContext.clip();
+            applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
             image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
             drawingContext.restore();
 
@@ -2000,9 +2053,7 @@ function draw() {
         } else {
             // ── Normal split view (with configurable position/mirror) ──
             drawingContext.save();
-            drawingContext.beginPath();
-            drawingContext.rect(zoomSideX, 0, zoomSideW, height);
-            drawingContext.clip();
+            applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
             image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
 
             // Apply effects to zoom side
@@ -2034,9 +2085,22 @@ function draw() {
             drawingContext.restore();
         }
 
-        // Divider line
-        stroke(255, 120); strokeWeight(1);
+        // Divider line (highlight on hover/drag)
+        let divHover = _splitDrag || (Math.abs(mouseX - splitX) < 8);
+        stroke(255, divHover ? 220 : 120);
+        strokeWeight(divHover ? 3 : 1);
         line(splitX, 0, splitX, height);
+        // Grab handle indicator + cursor
+        if (divHover) {
+            let hY = height / 2;
+            fill(255, 180); noStroke();
+            for (let dy = -12; dy <= 12; dy += 8) {
+                ellipse(splitX, hY + dy, 4, 4);
+            }
+            if (!_splitDrag) cursor('col-resize');
+        } else if (!_splitDrag) {
+            cursor(ARROW);
+        }
 
         // Labels
         noStroke(); fill(255, 150); textSize(10);
@@ -2500,6 +2564,14 @@ function setupCoreUIListeners() {
         btn.addEventListener('click', (e) => {
             splitVizZoom = (e.target.dataset.value === 'on');
             document.querySelectorAll('#split-viz-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Split shape selector
+    document.querySelectorAll('#split-shape-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitShape = e.target.dataset.value;
+            document.querySelectorAll('#split-shape-buttons .selector-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
         });
     });

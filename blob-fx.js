@@ -2148,9 +2148,16 @@ function selectFxEffect(name) {
     // Switch to the correct category if needed
     let cat = FX_CATEGORIES[name];
     if (cat && cat !== currentFxCat) switchFxCategory(cat);
+    // Auto-enable: selecting an effect activates it
+    if (!activeEffects.has(name)) {
+        activeEffects.add(name);
+    }
     showFxParams(name);
     updateFxOnButton();
     updateCardHighlights();
+    updateEffectCardStates();
+    updateDropdownMarkers();
+    updatePostProcessList();
     // Update name label
     let lbl = document.getElementById('fx-effect-name-label');
     let cfg = FX_UI_CONFIG[name];
@@ -2162,11 +2169,18 @@ function cycleFxEffect(dir) {
     let idx = effects.indexOf(currentViewedEffect);
     idx = (idx + dir + effects.length) % effects.length;
     currentViewedEffect = effects[idx];
+    // Auto-enable: cycling to an effect activates it
+    if (!activeEffects.has(currentViewedEffect)) {
+        activeEffects.add(currentViewedEffect);
+    }
     let sel = document.getElementById('fx-effect-select');
     if (sel) sel.value = currentViewedEffect;
     showFxParams(currentViewedEffect);
     updateFxOnButton();
     updateCardHighlights();
+    updateEffectCardStates();
+    updateDropdownMarkers();
+    updatePostProcessList();
     let lbl = document.getElementById('fx-effect-name-label');
     let cfg = FX_UI_CONFIG[currentViewedEffect];
     if (lbl && cfg) lbl.textContent = cfg.label;

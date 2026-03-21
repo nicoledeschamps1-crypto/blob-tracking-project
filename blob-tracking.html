@@ -110,6 +110,8 @@
             --save-btn-color: var(--gray-500);
             --panel-radius: var(--radius-lg);
             --card-radius: var(--radius-md);
+            --surface-subtle: rgba(255,255,255,0.02);
+            --border-subtle: rgba(255,255,255,0.04);
 
             /* Timeline sizing */
             --tl-height: 280px;
@@ -343,15 +345,16 @@
             background: var(--btn-bg);
             border: 1px solid var(--btn-border);
             color: var(--btn-text);
-            font-size: var(--font-sm);
+            font-size: var(--font-xs);
             font-weight: 700;
-            padding: 8px 6px;
+            padding: 6px;
             min-height: 30px;
             cursor: pointer;
             transition: all 0.15s;
             text-transform: uppercase;
+            letter-spacing: 0.3px;
             font-family: inherit;
-            border-radius: 5px;
+            border-radius: var(--card-radius);
             box-sizing: border-box;
         }
 
@@ -1176,16 +1179,16 @@
         #group-modes .mode-cat {
             margin-bottom: 4px;
             padding: 6px;
-            background: rgba(255,255,255,0.02);
-            border-radius: 6px;
-            border: 1px solid rgba(255,255,255,0.04);
+            background: var(--surface-subtle);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-subtle);
         }
         #group-modes .mode-cat-label {
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: rgba(255,255,255,0.50);
+            color: var(--color-text-muted);
             margin-bottom: 6px;
             margin-top: 0;
         }
@@ -1199,9 +1202,9 @@
             min-width: 38px;
         }
         #group-modes .mode-cat:last-child .selector-btn.active {
-            background: rgba(108, 92, 231, 0.25);
-            color: #c4b8ff;
-            border-color: rgba(108, 92, 231, 0.4);
+            background: var(--color-accent-bg, rgba(108, 92, 231, 0.25));
+            color: var(--color-accent-text, #c4b8ff);
+            border-color: var(--color-accent-border, rgba(108, 92, 231, 0.4));
         }
         #group-modes .mode-cat-off {
             padding: 0;
@@ -2440,43 +2443,45 @@
                 <span class="panel-crosslink" id="link-to-camera" title="Jump to Camera section in right panel">Camera features →</span>
             </div>
 
-            <div class="control-group" id="group-modes">
-                <label>Tracking Mode</label>
-                <div class="mode-cat mode-cat-off">
-                    <div class="selector-row">
-                        <button class="selector-btn" data-value="0">OFF</button>
+            <div class="control-group collapsible" id="group-modes">
+                <label class="collapsible-toggle">Tracking Mode <span class="disc-chevron">&#9662;</span></label>
+                <div class="collapsible-body">
+                    <div class="mode-cat mode-cat-off">
+                        <div class="selector-row">
+                            <button class="selector-btn" data-value="0">OFF</button>
+                        </div>
                     </div>
-                </div>
-                <div class="mode-cat">
-                    <div class="mode-cat-label">Color</div>
-                    <div class="mode-cat-row">
-                        <button class="selector-btn active" data-value="1">BLUE</button>
-                        <button class="selector-btn" data-value="2">RED</button>
-                        <button class="selector-btn" data-value="5">Custom</button>
-                        <button class="selector-btn" data-value="13">Invert</button>
-                        <button class="selector-btn" data-value="10">WARM</button>
-                        <button class="selector-btn" data-value="11">COOL</button>
+                    <div class="mode-cat">
+                        <div class="mode-cat-label">Color</div>
+                        <div class="mode-cat-row">
+                            <button class="selector-btn active" data-value="1">BLUE</button>
+                            <button class="selector-btn" data-value="2">RED</button>
+                            <button class="selector-btn" data-value="5">Custom</button>
+                            <button class="selector-btn" data-value="13">Invert</button>
+                            <button class="selector-btn" data-value="10">WARM</button>
+                            <button class="selector-btn" data-value="11">COOL</button>
+                        </div>
                     </div>
-                </div>
-                <div class="mode-cat">
-                    <div class="mode-cat-label">Analysis</div>
-                    <div class="mode-cat-row">
-                        <button class="selector-btn" data-value="3">Motion</button>
-                        <button class="selector-btn" data-value="6">Bright</button>
-                        <button class="selector-btn" data-value="7">DARK</button>
-                        <button class="selector-btn" data-value="8">EDGE</button>
-                        <button class="selector-btn" data-value="9">Chroma</button>
-                        <button class="selector-btn" data-value="12">Flicker</button>
-                        <button class="selector-btn" data-value="4">SKIN</button>
+                    <div class="mode-cat">
+                        <div class="mode-cat-label">Analysis</div>
+                        <div class="mode-cat-row">
+                            <button class="selector-btn" data-value="3">Motion</button>
+                            <button class="selector-btn" data-value="6">Bright</button>
+                            <button class="selector-btn" data-value="7">DARK</button>
+                            <button class="selector-btn" data-value="8">EDGE</button>
+                            <button class="selector-btn" data-value="9">Chroma</button>
+                            <button class="selector-btn" data-value="12">Flicker</button>
+                            <button class="selector-btn" data-value="4">SKIN</button>
+                        </div>
                     </div>
-                </div>
-                <div class="mode-cat">
-                    <div class="mode-cat-label">AI</div>
-                    <div class="mode-cat-row">
-                        <button class="selector-btn" data-value="14">MASK</button>
-                        <button class="selector-btn" data-value="15">EYES</button>
-                        <button class="selector-btn" data-value="16">LIPS</button>
-                        <button class="selector-btn" data-value="17">FACE</button>
+                    <div class="mode-cat">
+                        <div class="mode-cat-label">AI</div>
+                        <div class="mode-cat-row">
+                            <button class="selector-btn" data-value="14">MASK</button>
+                            <button class="selector-btn" data-value="15">EYES</button>
+                            <button class="selector-btn" data-value="16">LIPS</button>
+                            <button class="selector-btn" data-value="17">FACE</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2924,6 +2929,13 @@
                             <button class="selector-btn" data-value="on">ON</button>
                             <button class="selector-btn active" data-value="off">OFF</button>
                         </div>
+                        <label>Feed Shape</label>
+                        <div class="selector-row" id="split-shape-buttons">
+                            <button class="selector-btn active" data-value="rect">RECT</button>
+                            <button class="selector-btn" data-value="rounded">ROUND</button>
+                            <button class="selector-btn" data-value="circle">CIRCLE</button>
+                            <button class="selector-btn" data-value="pill">PILL</button>
+                        </div>
                     </div>
                     <label>Depth Blur</label>
                     <div class="selector-row" id="zoom-depth-buttons">
@@ -3130,8 +3142,8 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260321d"></script>
-<script src="blob-fx.js?v=20260321d"></script>
+<script src="blob-core.js?v=20260321e"></script>
+<script src="blob-fx.js?v=20260321e"></script>
 <script src="blob-shader-fx.js?v=20260321e"></script>
 <script src="blob-audio.js?v=20260321d"></script>
 <script src="blob-timeline.js?v=20260321d"></script>

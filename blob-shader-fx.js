@@ -1480,5 +1480,15 @@ function processShaderFX() {
     if (!shaderFX.ready || !shaderFX.enabled) return;
     syncShaderFromCPU();
     if (shaderFX.activeEffects.size === 0) return;
-    shaderFX.process(p5Canvas);
+    // Clip GPU shader output to video bounds
+    if (typeof drawingContext !== 'undefined' && typeof videoX !== 'undefined' && videoW > 0) {
+        drawingContext.save();
+        drawingContext.beginPath();
+        drawingContext.rect(videoX, videoY, videoW, videoH);
+        drawingContext.clip();
+        shaderFX.process(p5Canvas);
+        drawingContext.restore();
+    } else {
+        shaderFX.process(p5Canvas);
+    }
 }
