@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // blob-shader-fx.js — WebGL2 GPU Shader Effects Pipeline
-// Phase 2: 20 effects, per-effect opacity, blend modes
+// Phase 2.5: 30 effects, per-effect opacity, blend modes
 // ═══════════════════════════════════════════════════════════════
 
 'use strict';
@@ -546,6 +546,371 @@ void main() {
 
 
 // ═══════════════════════════════════════════════════════════════
+// Phase 2.5 — 10 Additional Effects + Blend Modes
+// ═══════════════════════════════════════════════════════════════
+
+// ── 21. Gradient Map ─────────────────────────────────────────
+const FRAG_GRADMAP = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec3 u_color1;
+uniform vec3 u_color2;
+uniform vec3 u_color3;
+uniform float u_midpoint;
+uniform float u_intensity;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 mapped;
+    if (lum <= u_midpoint) {
+        float t = u_midpoint > 0.0 ? lum / u_midpoint : 0.0;
+        mapped = mix(u_color1, u_color3, t);
+    } else {
+        float t = u_midpoint < 1.0 ? (lum - u_midpoint) / (1.0 - u_midpoint) : 1.0;
+        mapped = mix(u_color3, u_color2, t);
+    }
+    vec3 result = mix(orig.rgb, mapped, u_intensity);
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 22. Thermal ──────────────────────────────────────────────
+const FRAG_THERMAL = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_intensity;
+uniform float u_palette;
+uniform float u_opacity;
+out vec4 fragColor;
+vec3 thermalLookup(float lum, float pal) {
+    const vec3 d[11] = vec3[11](
+        vec3(0,0,.502),vec3(0,0,1),vec3(0,.502,1),vec3(0,1,1),vec3(0,1,.502),
+        vec3(0,1,0),vec3(.502,1,0),vec3(1,1,0),vec3(1,.502,0),vec3(1,0,0),vec3(1,1,1));
+    const vec3 ir[9] = vec3[9](
+        vec3(0,0,0),vec3(0,0,.392),vec3(.314,0,.471),vec3(.627,0,.314),
+        vec3(.784,.196,0),vec3(1,.392,0),vec3(1,.784,.196),vec3(1,1,.588),vec3(1,1,1));
+    const vec3 rb[8] = vec3[8](
+        vec3(0,0,.502),vec3(0,0,1),vec3(0,1,1),vec3(0,1,0),
+        vec3(1,1,0),vec3(1,.502,0),vec3(1,0,0),vec3(1,0,.502));
+    const vec3 ar[7] = vec3[7](
+        vec3(0,.078,.235),vec3(0,.235,.471),vec3(.157,.471,.706),
+        vec3(.392,.706,.863),vec3(.706,.863,.941),vec3(.863,.941,1),vec3(1,1,1));
+    const vec3 ni[7] = vec3[7](
+        vec3(0,0,0),vec3(0,.078,0),vec3(0,.196,.039),
+        vec3(0,.353,.078),vec3(.039,.549,.118),vec3(.118,.784,.196),vec3(.706,1,.706));
+    if (pal < 0.5) {
+        float p = lum * 10.0; int lo = int(floor(p));
+        return mix(d[min(lo,10)], d[min(lo+1,10)], fract(p));
+    } else if (pal < 1.5) {
+        float p = lum * 8.0; int lo = int(floor(p));
+        return mix(ir[min(lo,8)], ir[min(lo+1,8)], fract(p));
+    } else if (pal < 2.5) {
+        float p = lum * 7.0; int lo = int(floor(p));
+        return mix(rb[min(lo,7)], rb[min(lo+1,7)], fract(p));
+    } else if (pal < 3.5) {
+        float p = lum * 6.0; int lo = int(floor(p));
+        return mix(ar[min(lo,6)], ar[min(lo+1,6)], fract(p));
+    } else {
+        float p = lum * 6.0; int lo = int(floor(p));
+        return mix(ni[min(lo,6)], ni[min(lo+1,6)], fract(p));
+    }
+}
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 thermal = thermalLookup(lum, u_palette);
+    vec3 result = mix(orig.rgb, thermal, u_intensity);
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 23. RGB Shift ────────────────────────────────────────────
+const FRAG_RGBSHIFT = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform vec2 u_rOffset;
+uniform vec2 u_bOffset;
+uniform float u_intensity;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 texel = 1.0 / u_resolution;
+    vec2 rOff = u_rOffset * texel * u_intensity;
+    vec2 bOff = u_bOffset * texel * u_intensity;
+    float r = texture(u_texture, v_texCoord + rOff).r;
+    float b = texture(u_texture, v_texCoord + bOff).b;
+    vec3 result = vec3(r, orig.g, b);
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 24. Wave ─────────────────────────────────────────────────
+const FRAG_WAVE = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_frequency;
+uniform float u_speed;
+uniform float u_mode;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 uv = v_texCoord;
+    float t = u_time * u_speed * 0.05;
+    float amp = u_amplitude * 0.5 / u_resolution.x;
+    if (u_mode < 0.5) {
+        float off = sin(uv.y * u_frequency * 0.05 * u_resolution.y + t) * amp;
+        uv.x = clamp(uv.x + off, 0.0, 1.0);
+    } else if (u_mode < 1.5) {
+        float off = sin(uv.x * u_frequency * 0.05 * u_resolution.x + t) * amp;
+        uv.y = clamp(uv.y + off, 0.0, 1.0);
+    } else {
+        vec2 delta = uv - 0.5;
+        float dist = length(delta * u_resolution);
+        float wave = sin(dist * u_frequency * 0.05 + t) * amp;
+        vec2 dir = normalize(delta + 0.0001);
+        uv = clamp(uv + dir * wave, 0.0, 1.0);
+    }
+    vec3 result = texture(u_texture, uv).rgb;
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 25. Dither (Bayer) ───────────────────────────────────────
+const FRAG_DITHER = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_strength;
+uniform float u_pixelation;
+uniform float u_colorCount;
+uniform float u_opacity;
+out vec4 fragColor;
+float bayer8(vec2 pos) {
+    const float m[64] = float[64](
+        0.0,32.0,8.0,40.0,2.0,34.0,10.0,42.0,
+        48.0,16.0,56.0,24.0,50.0,18.0,58.0,26.0,
+        12.0,44.0,4.0,36.0,14.0,46.0,6.0,38.0,
+        60.0,28.0,52.0,20.0,62.0,30.0,54.0,22.0,
+        3.0,35.0,11.0,43.0,1.0,33.0,9.0,41.0,
+        51.0,19.0,59.0,27.0,49.0,17.0,57.0,25.0,
+        15.0,47.0,7.0,39.0,13.0,45.0,5.0,37.0,
+        63.0,31.0,55.0,23.0,61.0,29.0,53.0,21.0);
+    int x = int(mod(pos.x, 8.0));
+    int y = int(mod(pos.y, 8.0));
+    return m[y * 8 + x] / 64.0;
+}
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 px = floor(v_texCoord * u_resolution / u_pixelation) * u_pixelation;
+    vec4 sampled = texture(u_texture, (px + 0.5) / u_resolution);
+    float bayerVal = bayer8(px) - 0.5;
+    float levels = max(1.0, u_colorCount - 1.0);
+    vec3 dithered = floor(sampled.rgb * levels + bayerVal * u_strength + 0.5) / levels;
+    fragColor = vec4(mix(orig.rgb, clamp(dithered, 0.0, 1.0), u_opacity), 1.0);
+}`;
+
+// ── 26. Swirl ────────────────────────────────────────────────
+const FRAG_SWIRL = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_angle;
+uniform float u_radius;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 center = vec2(0.5);
+    vec2 delta = v_texCoord - center;
+    vec2 aspect = vec2(1.0, u_resolution.y / u_resolution.x);
+    float dist = length(delta * aspect) * 2.0;
+    float radius = u_radius;
+    vec2 uv = v_texCoord;
+    if (dist < radius) {
+        float pct = (radius - dist) / radius;
+        float theta = pct * pct * u_angle;
+        float s = sin(theta), c = cos(theta);
+        delta = vec2(delta.x * c - delta.y * s, delta.x * s + delta.y * c);
+        uv = clamp(center + delta, 0.0, 1.0);
+    }
+    vec3 result = texture(u_texture, uv).rgb;
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 27. Ripple ───────────────────────────────────────────────
+const FRAG_RIPPLE = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_frequency;
+uniform float u_speed;
+uniform float u_damping;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 center = vec2(0.5);
+    vec2 delta = v_texCoord - center;
+    float dist = length(delta * u_resolution);
+    float maxR = length(u_resolution) * 0.5;
+    float dampFactor = u_damping > 0.0 ? exp(-dist / maxR * u_damping * 3.0) : 1.0;
+    float wave = sin(dist * u_frequency * 0.05 - u_time * u_speed * 0.1) * u_amplitude * 0.3 / u_resolution.x * dampFactor;
+    vec2 dir = normalize(delta + 0.0001);
+    vec2 uv = clamp(v_texCoord + dir * wave, 0.0, 1.0);
+    vec3 result = texture(u_texture, uv).rgb;
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 28. NTSC ─────────────────────────────────────────────────
+const FRAG_NTSC = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_chromaBleed;
+uniform float u_instability;
+uniform float u_noise;
+uniform float u_rolling;
+uniform float u_opacity;
+out vec4 fragColor;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    vec2 texel = 1.0 / u_resolution;
+    vec3 result = orig.rgb;
+    if (u_chromaBleed > 0.0) {
+        float bleed = u_chromaBleed * 8.0 * texel.x;
+        result.r = result.r * 0.5 + texture(u_texture, vec2(v_texCoord.x + bleed, v_texCoord.y)).r * 0.5;
+        result.b = result.b * 0.5 + texture(u_texture, vec2(v_texCoord.x - bleed, v_texCoord.y)).b * 0.5;
+    }
+    if (u_instability > 0.0) {
+        float jitter = (hash(vec2(floor(v_texCoord.y * u_resolution.y * 0.5), floor(u_time * 30.0))) - 0.5) * u_instability * 0.118;
+        result.r += jitter;
+        result.g -= jitter * 0.5;
+    }
+    if (u_noise > 0.0) {
+        float n = hash(v_texCoord * u_resolution + u_time * 1000.0);
+        if (n > 1.0 - u_noise * 0.4) {
+            float noiseVal = (hash(v_texCoord * u_resolution + u_time * 999.0) - 0.5) * u_noise * 0.314;
+            result += vec3(noiseVal);
+        }
+    }
+    if (u_rolling > 0.5) {
+        float barPos = fract(u_time * 0.5);
+        float barWidth = 0.08;
+        float dist = abs(v_texCoord.y - barPos);
+        if (dist < barWidth) result += vec3(0.118 * (1.0 - dist / barWidth));
+    }
+    fragColor = vec4(mix(orig.rgb, clamp(result, 0.0, 1.0), u_opacity), 1.0);
+}`;
+
+// ── 29. Color Balance ────────────────────────────────────────
+const FRAG_COLORBAL = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform vec3 u_shadow;
+uniform vec3 u_mid;
+uniform vec3 u_hi;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
+    float sw = max(0.0, 1.0 - lum * 3.0);
+    float mw = max(0.0, 1.0 - abs(lum - 0.5) * 4.0);
+    float hw = max(0.0, lum * 3.0 - 2.0);
+    vec3 shift = u_shadow * sw + u_mid * mw + u_hi * hw;
+    vec3 result = clamp(orig.rgb + shift, 0.0, 1.0);
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── 30. RGB Gain ─────────────────────────────────────────────
+const FRAG_RGBGAIN = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_rGain;
+uniform float u_gGain;
+uniform float u_bGain;
+uniform float u_gamma;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    float invG = u_gamma > 0.0 ? 1.0 / u_gamma : 1.0;
+    vec3 result = pow(clamp(orig.rgb * vec3(u_rGain, u_gGain, u_bGain), 0.0, 1.0), vec3(invG));
+    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── Blend Pass Shader ────────────────────────────────────────
+const FRAG_BLEND = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform sampler2D u_original;
+uniform float u_blendMode;
+uniform float u_opacity;
+out vec4 fragColor;
+void main() {
+    vec3 base = texture(u_original, v_texCoord).rgb;
+    vec3 blend = texture(u_texture, v_texCoord).rgb;
+    vec3 result;
+    if (u_blendMode < 0.5) {
+        result = blend;
+    } else if (u_blendMode < 1.5) {
+        result = base * blend;
+    } else if (u_blendMode < 2.5) {
+        result = 1.0 - (1.0 - base) * (1.0 - blend);
+    } else if (u_blendMode < 3.5) {
+        result = vec3(
+            base.r < 0.5 ? 2.0*base.r*blend.r : 1.0-2.0*(1.0-base.r)*(1.0-blend.r),
+            base.g < 0.5 ? 2.0*base.g*blend.g : 1.0-2.0*(1.0-base.g)*(1.0-blend.g),
+            base.b < 0.5 ? 2.0*base.b*blend.b : 1.0-2.0*(1.0-base.b)*(1.0-blend.b));
+    } else if (u_blendMode < 4.5) {
+        result = vec3(
+            blend.r < 0.5 ? base.r-(1.0-2.0*blend.r)*base.r*(1.0-base.r) : base.r+(2.0*blend.r-1.0)*(sqrt(base.r)-base.r),
+            blend.g < 0.5 ? base.g-(1.0-2.0*blend.g)*base.g*(1.0-base.g) : base.g+(2.0*blend.g-1.0)*(sqrt(base.g)-base.g),
+            blend.b < 0.5 ? base.b-(1.0-2.0*blend.b)*base.b*(1.0-base.b) : base.b+(2.0*blend.b-1.0)*(sqrt(base.b)-base.b));
+    } else if (u_blendMode < 5.5) {
+        result = vec3(
+            blend.r < 0.5 ? 2.0*base.r*blend.r : 1.0-2.0*(1.0-base.r)*(1.0-blend.r),
+            blend.g < 0.5 ? 2.0*base.g*blend.g : 1.0-2.0*(1.0-base.g)*(1.0-blend.g),
+            blend.b < 0.5 ? 2.0*base.b*blend.b : 1.0-2.0*(1.0-base.b)*(1.0-blend.b));
+    } else if (u_blendMode < 6.5) {
+        result = abs(base - blend);
+    } else {
+        result = base + blend - 2.0 * base * blend;
+    }
+    fragColor = vec4(mix(base, result, u_opacity), 1.0);
+}`;
+
+// Blend mode constants
+const BLEND_NORMAL = 0;
+const BLEND_MULTIPLY = 1;
+const BLEND_SCREEN = 2;
+const BLEND_OVERLAY = 3;
+const BLEND_SOFT_LIGHT = 4;
+const BLEND_HARD_LIGHT = 5;
+const BLEND_DIFFERENCE = 6;
+const BLEND_EXCLUSION = 7;
+
+
+// ═══════════════════════════════════════════════════════════════
 // ShaderFX Pipeline Class
 // ═══════════════════════════════════════════════════════════════
 
@@ -562,11 +927,13 @@ class ShaderFXPipeline {
         this.effectChain = [];
         this.activeEffects = new Set();
         this.effectOpacity = new Map();   // per-effect opacity (0–1)
+        this.effectBlendMode = new Map(); // per-effect blend mode (0=normal)
         this.width = 0;
         this.height = 0;
         this.enabled = false;
         this.ready = false;
         this._pingPongIdx = 0;
+        this._blendProgram = null;       // blend pass program entry
     }
 
     init(width, height) {
@@ -725,6 +1092,30 @@ class ShaderFXPipeline {
         this.effectOpacity.set(name, Math.max(0, Math.min(1, opacity)));
     }
 
+    setEffectBlendMode(name, mode) {
+        this.effectBlendMode.set(name, mode);
+    }
+
+    _renderPass(entry, inputTexture, targetFBO, opacity) {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, targetFBO);
+        gl.viewport(0, 0, this.width, this.height);
+        gl.useProgram(entry.program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, inputTexture);
+        if (entry.uniforms['u_texture'])
+            gl.uniform1i(entry.uniforms['u_texture'].location, 0);
+        if (entry.uniforms['u_resolution'])
+            gl.uniform2f(entry.uniforms['u_resolution'].location, this.width, this.height);
+        if (entry.uniforms['u_time'])
+            gl.uniform1f(entry.uniforms['u_time'].location, performance.now() / 1000.0);
+        if (entry.uniforms['u_opacity'])
+            gl.uniform1f(entry.uniforms['u_opacity'].location, opacity);
+        gl.bindVertexArray(this.quadVAO);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindVertexArray(null);
+    }
+
     process(sourceCanvas) {
         if (!this.ready || !this.enabled) return;
         const gl = this.gl;
@@ -744,34 +1135,53 @@ class ShaderFXPipeline {
             const effectName = chain[i];
             const entry = this.programs.get(effectName);
             const isLast = (i === chain.length - 1);
+            const blendMode = this.effectBlendMode.get(effectName) || 0;
+            const opacity = this.effectOpacity.get(effectName) ?? 1.0;
 
-            if (isLast) {
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            if (blendMode === 0) {
+                // Normal blend: effect handles opacity internally
+                const targetFBO = isLast ? null : this.framebuffers[this._pingPongIdx];
+                this._renderPass(entry, inputTexture, targetFBO, opacity);
+                if (!isLast) {
+                    inputTexture = this.fbTextures[this._pingPongIdx];
+                    this._pingPongIdx = 1 - this._pingPongIdx;
+                }
             } else {
-                gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffers[this._pingPongIdx]);
-            }
-            gl.viewport(0, 0, this.width, this.height);
-            gl.useProgram(entry.program);
+                // Non-normal blend: render effect at full strength, then blend pass
+                const preEffectTexture = inputTexture;
 
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, inputTexture);
-            if (entry.uniforms['u_texture'])
-                gl.uniform1i(entry.uniforms['u_texture'].location, 0);
-            if (entry.uniforms['u_resolution'])
-                gl.uniform2f(entry.uniforms['u_resolution'].location, this.width, this.height);
-            if (entry.uniforms['u_time'])
-                gl.uniform1f(entry.uniforms['u_time'].location, performance.now() / 1000.0);
-            if (entry.uniforms['u_opacity'])
-                gl.uniform1f(entry.uniforms['u_opacity'].location,
-                             this.effectOpacity.get(effectName) ?? 1.0);
+                // Render effect to pingpong buffer (full opacity)
+                this._renderPass(entry, inputTexture, this.framebuffers[this._pingPongIdx], 1.0);
+                const effectTexture = this.fbTextures[this._pingPongIdx];
+                const blendIdx = 1 - this._pingPongIdx;
 
-            gl.bindVertexArray(this.quadVAO);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-            gl.bindVertexArray(null);
+                // Blend pass: combine pre-effect + effect output
+                const blendEntry = this._blendProgram;
+                const blendTarget = isLast ? null : this.framebuffers[blendIdx];
+                gl.bindFramebuffer(gl.FRAMEBUFFER, blendTarget);
+                gl.viewport(0, 0, this.width, this.height);
+                gl.useProgram(blendEntry.program);
 
-            if (!isLast) {
-                inputTexture = this.fbTextures[this._pingPongIdx];
-                this._pingPongIdx = 1 - this._pingPongIdx;
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, effectTexture);
+                gl.uniform1i(blendEntry.uniforms['u_texture'].location, 0);
+
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, preEffectTexture);
+                gl.uniform1i(blendEntry.uniforms['u_original'].location, 1);
+
+                gl.uniform1f(blendEntry.uniforms['u_blendMode'].location, blendMode);
+                gl.uniform1f(blendEntry.uniforms['u_opacity'].location, opacity);
+
+                gl.bindVertexArray(this.quadVAO);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                gl.bindVertexArray(null);
+
+                if (!isLast) {
+                    inputTexture = this.fbTextures[blendIdx];
+                    // pingPongIdx stays same (we used both buffers, result in blendIdx)
+                    this._pingPongIdx = 1 - blendIdx;
+                }
             }
         }
 
@@ -825,12 +1235,14 @@ class ShaderFXPipeline {
 const SHADER_CHAIN_ORDER = [
     // Color tier
     'sepia', 'tint', 'bricon', 'exposure', 'colortemp', 'levels', 'duotone', 'threshold',
+    'gradmap', 'thermal', 'rgbgain', 'colorbal',
     // Distortion tier
-    'chroma', 'blursharp', 'emboss',
+    'chroma', 'rgbshift', 'blursharp', 'emboss',
+    'wave', 'swirl', 'ripple',
     // Pattern tier
-    'bloom', 'pixel',
+    'bloom', 'pixel', 'dither',
     // Overlay tier
-    'glitch', 'noise', 'grain', 'crt',
+    'glitch', 'noise', 'grain', 'crt', 'ntsc',
     // Hybrid → shader
     'halftone',
     // Draw → shader
@@ -950,6 +1362,63 @@ function registerCoreShaderEffects() {
         { name:'pixel', frag:FRAG_PIXELATE, sync:()=>{
             shaderFX.setUniform('pixel','u_size',Math.max(2,pixelSize));
         }},
+        // Phase 2.5 — 10 new effects
+        { name:'gradmap', frag:FRAG_GRADMAP, sync:()=>{
+            shaderFX.setUniform('gradmap','u_color1',_hexToGL(gradColor1));
+            shaderFX.setUniform('gradmap','u_color2',_hexToGL(gradColor2));
+            shaderFX.setUniform('gradmap','u_color3',_hexToGL(gradColor3));
+            shaderFX.setUniform('gradmap','u_midpoint',gradMidpoint/100);
+            shaderFX.setUniform('gradmap','u_intensity',gradIntensity/100);
+        }},
+        { name:'thermal', frag:FRAG_THERMAL, sync:()=>{
+            shaderFX.setUniform('thermal','u_intensity',thermalIntensity/100);
+            let palIdx = {default:0,iron:1,rainbow:2,arctic:3,night:4}[thermalPalette]||0;
+            shaderFX.setUniform('thermal','u_palette',palIdx);
+        }},
+        { name:'rgbshift', frag:FRAG_RGBSHIFT, sync:()=>{
+            shaderFX.setUniform('rgbshift','u_rOffset',[rgbShiftRX,rgbShiftRY]);
+            shaderFX.setUniform('rgbshift','u_bOffset',[rgbShiftBX,rgbShiftBY]);
+            shaderFX.setUniform('rgbshift','u_intensity',rgbShiftIntensity/100);
+        }},
+        { name:'wave', frag:FRAG_WAVE, sync:()=>{
+            shaderFX.setUniform('wave','u_amplitude',waveAmp);
+            shaderFX.setUniform('wave','u_frequency',waveFreq);
+            shaderFX.setUniform('wave','u_speed',waveSpeed);
+            let modeIdx = {horizontal:0,vertical:1,circular:2}[waveMode]||0;
+            shaderFX.setUniform('wave','u_mode',modeIdx);
+        }},
+        { name:'dither', frag:FRAG_DITHER, sync:()=>{
+            shaderFX.setUniform('dither','u_strength',ditherStrength/100);
+            shaderFX.setUniform('dither','u_pixelation',Math.max(1,ditherPixelation));
+            shaderFX.setUniform('dither','u_colorCount',Math.max(2,ditherColorCount));
+        }},
+        { name:'swirl', frag:FRAG_SWIRL, sync:()=>{
+            shaderFX.setUniform('swirl','u_angle',swirlAngle*Math.PI/180);
+            shaderFX.setUniform('swirl','u_radius',swirlRadius/100);
+        }},
+        { name:'ripple', frag:FRAG_RIPPLE, sync:()=>{
+            shaderFX.setUniform('ripple','u_amplitude',rippleAmp);
+            shaderFX.setUniform('ripple','u_frequency',rippleFreq);
+            shaderFX.setUniform('ripple','u_speed',rippleSpeed);
+            shaderFX.setUniform('ripple','u_damping',rippleDamping/100);
+        }},
+        { name:'ntsc', frag:FRAG_NTSC, sync:()=>{
+            shaderFX.setUniform('ntsc','u_chromaBleed',ntscChromaBleed/100);
+            shaderFX.setUniform('ntsc','u_instability',ntscInstability/100);
+            shaderFX.setUniform('ntsc','u_noise',ntscNoise/100);
+            shaderFX.setUniform('ntsc','u_rolling',ntscRolling?1:0);
+        }},
+        { name:'colorbal', frag:FRAG_COLORBAL, sync:()=>{
+            shaderFX.setUniform('colorbal','u_shadow',[colorbalShadowR*0.5/255,colorbalShadowG*0.5/255,colorbalShadowB*0.5/255]);
+            shaderFX.setUniform('colorbal','u_mid',[colorbalMidR*0.5/255,colorbalMidG*0.5/255,colorbalMidB*0.5/255]);
+            shaderFX.setUniform('colorbal','u_hi',[colorbalHiR*0.5/255,colorbalHiG*0.5/255,colorbalHiB*0.5/255]);
+        }},
+        { name:'rgbgain', frag:FRAG_RGBGAIN, sync:()=>{
+            shaderFX.setUniform('rgbgain','u_rGain',rgbGainR/100);
+            shaderFX.setUniform('rgbgain','u_gGain',rgbGainG/100);
+            shaderFX.setUniform('rgbgain','u_bGain',rgbGainB/100);
+            shaderFX.setUniform('rgbgain','u_gamma',rgbGainGamma);
+        }},
     ];
 
     let count = 0;
@@ -959,7 +1428,13 @@ function registerCoreShaderEffects() {
             count++;
         }
     }
-    console.log('[ShaderFX] Registered ' + count + '/20 core effects');
+
+    // Register blend pass shader
+    if (shaderFX.registerEffect('_blend', VERT_PASSTHROUGH, FRAG_BLEND)) {
+        shaderFX._blendProgram = shaderFX.programs.get('_blend');
+    }
+
+    console.log('[ShaderFX] Registered ' + count + '/30 core effects + blend pass');
     return count;
 }
 
@@ -994,7 +1469,7 @@ function initShaderFX() {
     if (ok) {
         registerCoreShaderEffects();
         shaderFX.setEffectChain(SHADER_CHAIN_ORDER);
-        console.log('[ShaderFX] Phase 2 ready — 20 GPU effects + per-effect opacity');
+        console.log('[ShaderFX] Phase 2.5 ready — 30 GPU effects + blend modes');
     }
     return ok;
 }
