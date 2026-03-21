@@ -15,34 +15,115 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <style>
         :root {
-            --bg-color: #0b0b0b;
-            --panel-bg: rgba(18, 18, 18, 0.92);
-            --text-main: #e5e5e5;
-            --text-muted: #888;
-            --accent: #d4d4d4;
+            /* ═══ DESIGN SYSTEM TOKENS ═══ */
+
+            /* Layer 1: Primitives — raw values, never used directly in rules */
+            --gray-950: #0b0b0b;
+            --gray-900: #111;
+            --gray-850: #1a1a1a;
+            --gray-800: #242424;
+            --gray-700: #2a2a2a;
+            --gray-600: #333;
+            --gray-500: #4a4a4a;
+            --gray-400: #999;
+            --gray-300: #aaa;
+            --gray-200: #cfcfcf;
+            --gray-150: #d4d4d4;
+            --gray-100: #e5e5e5;
+            --purple-600: rgba(108, 92, 231, 0.35);
+            --purple-500: #6C5CE7;
+            --purple-400: #7C6DF7;
+            --purple-300: #c4b8ff;
+            --teal-500: #00CEC9;
+            --teal-400: #00E0D9;
+            --red-500: #e84040;
+            --red-400: #ff4444;
+            --green-500: #00B894;
+            --yellow-500: #FDCB6E;
+            --orange-500: #E17055;
+
+            /* Layer 2: Semantic — meaning-based, used in component tokens & rules */
+            --color-bg: var(--gray-950);
+            --color-panel: rgba(18, 18, 18, 0.92);
+            --color-surface: var(--gray-850);
+            --color-elevated: var(--gray-800);
+            --color-highlight: var(--gray-700);
+            --color-border: var(--gray-600);
+            --color-text: var(--gray-100);
+            --color-text-muted: var(--gray-400);
+            --color-text-accent: var(--gray-150);
+            --color-accent: var(--purple-500);
+            --color-accent-hover: var(--purple-400);
+            --color-accent-light: var(--purple-300);
+            --color-danger: var(--red-400);
+            --color-success: var(--green-500);
+            --color-teal: var(--teal-500);
+            --color-teal-hover: var(--teal-400);
+            --color-orange: var(--orange-500);
+            --color-yellow: var(--yellow-500);
+
+            /* Layer 3: Component tokens */
+            --btn-bg: rgba(255,255,255,0.07);
+            --btn-bg-hover: rgba(255,255,255,0.12);
+            --btn-bg-active: rgba(255,255,255,0.16);
+            --btn-border: rgba(255,255,255,0.18);
+            --btn-border-hover: rgba(255,255,255,0.35);
+            --btn-border-active: rgba(255,255,255,0.40);
+            --btn-text: var(--gray-300);
+            --btn-text-active: #fff;
+            --slider-track-color: var(--color-highlight);
+            --slider-thumb-color: var(--gray-200);
+
+            /* Spacing system (4px grid) */
+            --sp-1: 4px;
+            --sp-2: 8px;
+            --sp-3: 12px;
+            --sp-4: 16px;
+            --sp-5: 24px;
+            --sp-6: 32px;
+
+            /* Typography scale */
+            --font-xs: 9px;
+            --font-sm: 10px;
+            --font-md: 11px;
+            --font-lg: 13px;
+            --font-xl: 14px;
+
+            /* Radii */
+            --radius-sm: 3px;
+            --radius-md: 6px;
+            --radius-lg: 12px;
+            --radius-pill: 9999px;
+
+            /* ═══ LEGACY ALIASES (backward compat — remove as rules migrate) ═══ */
+            --bg-color: var(--color-bg);
+            --panel-bg: var(--color-panel);
+            --text-main: var(--color-text);
+            --text-muted: var(--color-text-muted);
+            --accent: var(--color-text-accent);
             --active-bg: rgba(255, 255, 255, 0.05);
-            --slider-track: #2a2a2a;
-            --slider-thumb: #cfcfcf;
+            --slider-track: var(--color-highlight);
+            --slider-thumb: var(--slider-thumb-color);
             --btn-hover: rgba(255, 255, 255, 0.1);
-            --btn-active-bg: #e5e5e5;
-            --btn-active-text: #0b0b0b;
-            --save-btn-color: #4a4a4a;
-            --panel-radius: 12px;
-            --card-radius: 6px;
+            --btn-active-bg: var(--color-text);
+            --btn-active-text: var(--color-bg);
+            --save-btn-color: var(--gray-500);
+            --panel-radius: var(--radius-lg);
+            --card-radius: var(--radius-md);
 
             /* Timeline sizing */
             --tl-height: 280px;
-            --tl-padding-v: 12px;
+            --tl-padding-v: var(--sp-3);
             --tl-padding-h: 14px;
             --tl-row-gap: 5px;
             --tl-btn-svg: 14px;
-            --tl-band-font: 10px;
+            --tl-band-font: var(--font-sm);
             --tl-band-padding: 3px 8px;
-            --tl-time-font: 11px;
+            --tl-time-font: var(--font-md);
             --tl-ruler-height: 22px;
             --tl-seg-height: 28px;
-            --tl-lane-pitch: 32px;
-            --tl-seg-font: 10px;
+            --tl-lane-pitch: var(--sp-6);
+            --tl-seg-font: var(--font-sm);
             --tl-zoom-width: 80px;
         }
 
@@ -67,7 +148,7 @@
         /* Panel Base (shared by left + right) */
         .panel {
             position: absolute;
-            top: 24px;
+            top: 56px;
             width: 280px;
             padding: 20px;
             background: var(--panel-bg);
@@ -173,11 +254,10 @@
             border: none;
             color: var(--accent);
             font-family: 'Commit Mono', 'Roboto Mono', monospace;
-            font-size: 10px;
+            font-size: var(--font-sm);
             text-align: right;
             width: 40px;
             padding: 0;
-            outline: none;
             cursor: text;
             -moz-appearance: textfield;
         }
@@ -203,7 +283,7 @@
         .slider-wrapper {
             position: relative;
             width: 100%;
-            height: 20px;
+            height: 24px;
             display: flex;
             align-items: center;
         }
@@ -218,20 +298,20 @@
 
         input[type="range"]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 3px;
+            height: 6px;
             background: var(--slider-track);
             border: none;
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 10px;
-            width: 10px;
+            height: 14px;
+            width: 14px;
             background: var(--slider-thumb);
             border: none;
             border-radius: 50%;
-            margin-top: -3.5px;
+            margin-top: -4px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.4);
             transition: transform 0.1s;
         }
@@ -243,10 +323,10 @@
 
         input[type="range"]:active::-webkit-slider-thumb {
             background: #fff;
-            transform: scale(1.15);
+            transform: scale(1.25);
         }
 
-        input[type="range"]:focus { outline: none; }
+        /* Focus handled by global :focus-visible rule */
 
         /* Selector Buttons Row */
         .selector-row {
@@ -260,29 +340,74 @@
 
         .selector-btn {
             flex: 1;
-            background: rgba(255,255,255,0.07);
-            border: 1px solid rgba(255,255,255,0.18);
-            color: #aaa;
-            font-size: 10px;
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            color: var(--btn-text);
+            font-size: var(--font-sm);
             font-weight: 700;
             padding: 8px 6px;
+            min-height: 30px;
             cursor: pointer;
             transition: all 0.15s;
             text-transform: uppercase;
             font-family: inherit;
             border-radius: 5px;
+            box-sizing: border-box;
         }
 
         .selector-btn:hover {
-            color: #fff;
-            background: rgba(255,255,255,0.12);
-            border-color: rgba(255,255,255,0.35);
+            color: var(--btn-text-active);
+            background: var(--btn-bg-hover);
+            border-color: var(--btn-border-hover);
         }
 
         .selector-btn.active {
-            background: rgba(255,255,255,0.16);
-            color: #fff;
-            border-color: rgba(255,255,255,0.40);
+            background: var(--btn-bg-active);
+            color: var(--btn-text-active);
+            border-color: var(--btn-border-active);
+        }
+
+        /* ═══ BUTTON SYSTEM ═══ */
+
+        /* Disabled state — applies to any button */
+        .selector-btn:disabled,
+        .selector-btn.disabled,
+        .action-btn:disabled,
+        .action-btn.disabled,
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Focus visible — global keyboard focus ring */
+        *:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+        }
+        /* Remove outline on mouse click but keep for keyboard */
+        *:focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        /* Button hierarchy: Primary (accent fill) */
+        .btn-primary {
+            background: var(--color-accent) !important;
+            color: #fff !important;
+            border-color: var(--color-accent) !important;
+            font-weight: 700;
+        }
+        .btn-primary:hover {
+            background: var(--color-accent-hover) !important;
+            border-color: var(--color-accent-hover) !important;
+        }
+
+        /* Button hierarchy: Danger (red) */
+        .btn-danger.active,
+        .btn-danger.recording {
+            background: rgba(255, 68, 68, 0.15) !important;
+            border-color: var(--color-danger) !important;
+            color: var(--color-danger) !important;
         }
 
         /* Panel Tabs */
@@ -636,10 +761,288 @@
             color: var(--text-muted);
         }
 
-        /* (FX categories now use tabs + dropdown, old accordion CSS removed) */
+        /* ═══ FX EFFECT CARDS ═══ */
+        .fx-card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--sp-1);
+            margin-bottom: var(--sp-2);
+        }
+        .fx-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 5px;
+            padding: 6px 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--btn-text);
+            font-family: inherit;
+            position: relative;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fx-card:hover {
+            background: var(--btn-bg-hover);
+            border-color: var(--btn-border-hover);
+            color: var(--btn-text-active);
+        }
+        .fx-card.viewing {
+            border-color: var(--cat-color, var(--color-accent));
+            color: var(--btn-text-active);
+            background: rgba(255,255,255,0.1);
+        }
+        .fx-card.active-effect {
+            box-shadow: inset 0 -2px 0 var(--cat-color, var(--color-accent));
+        }
+        .fx-card .fx-fav {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            font-size: 10px;
+            line-height: 12px;
+            color: rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+        .fx-card .fx-fav:hover { color: var(--color-yellow); }
+        .fx-card .fx-fav.starred { color: var(--color-yellow); }
+        /* Favorites row */
+        .fx-favorites-row {
+            display: flex;
+            gap: var(--sp-1);
+            margin-bottom: var(--sp-2);
+            flex-wrap: wrap;
+        }
+        .fx-favorites-row:empty { display: none; }
+        .fx-favorites-row .fx-card {
+            flex: 0 0 auto;
+            padding: 4px 8px;
+            min-height: 24px;
+            font-size: 8px;
+            border-color: rgba(253, 203, 110, 0.3);
+        }
+
+        /* ═══ FX VIEW SWITCHER (Effects | Presets) ═══ */
+        .fx-view-switcher {
+            display: flex;
+            gap: 2px;
+            margin-bottom: var(--sp-2);
+            background: rgba(255,255,255,0.04);
+            border-radius: 6px;
+            padding: 2px;
+        }
+        .fx-view-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-radius: 5px;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .fx-view-btn:hover { color: var(--color-text); }
+        .fx-view-btn.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--color-text);
+        }
+
+        /* ═══ FX PRESETS ═══ */
+        .fx-preset-cat-tabs {
+            display: flex;
+            gap: 2px;
+            margin-bottom: var(--sp-2);
+            flex-wrap: wrap;
+        }
+        .fx-preset-cat-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 12px;
+            color: var(--btn-text);
+            font-family: inherit;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .fx-preset-cat-btn:hover {
+            background: var(--btn-bg-hover);
+            border-color: var(--btn-border-hover);
+            color: var(--btn-text-active);
+        }
+        .fx-preset-cat-btn.active {
+            background: rgba(255,255,255,0.12);
+            border-color: var(--preset-cat-color, var(--color-accent));
+            color: var(--btn-text-active);
+        }
+        .fx-preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--sp-1);
+            margin-bottom: var(--sp-2);
+        }
+        .fx-preset-grid:empty { display: none; }
+        .fx-preset-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 6px;
+            padding: 8px 8px 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+        }
+        .fx-preset-card:hover {
+            background: var(--btn-bg-hover);
+            border-color: var(--btn-border-hover);
+        }
+        .fx-preset-card.active-preset {
+            border-color: var(--preset-cat-color, var(--color-accent));
+            box-shadow: inset 0 0 0 1px var(--preset-cat-color, var(--color-accent)), 0 0 8px rgba(108,92,231,0.2);
+        }
+        .fx-preset-card-name {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--color-text);
+            margin-bottom: 2px;
+        }
+        .fx-preset-card-desc {
+            font-size: 8px;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+        .fx-preset-card-effects {
+            display: flex;
+            gap: 3px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .fx-preset-card-effects span {
+            font-size: 7px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.06);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+        .fx-preset-card .fx-preset-delete {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 14px;
+            height: 14px;
+            font-size: 10px;
+            line-height: 14px;
+            text-align: center;
+            color: rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: color 0.15s;
+            display: none;
+        }
+        .fx-preset-card.custom-preset .fx-preset-delete { display: block; }
+        .fx-preset-card .fx-preset-delete:hover { color: #E17055; }
+        .fx-preset-active {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            margin-bottom: var(--sp-2);
+            background: rgba(108,92,231,0.1);
+            border: 1px solid rgba(108,92,231,0.3);
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--color-text);
+        }
+        .fx-preset-active-clear {
+            margin-left: auto;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 8px;
+            font-weight: 600;
+            padding: 2px 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .fx-preset-active-clear:hover {
+            border-color: #E17055;
+            color: #E17055;
+        }
+        .fx-preset-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: var(--sp-2) 0;
+        }
+        .fx-preset-custom-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--sp-2);
+        }
+        .fx-preset-custom-header span {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+        .fx-preset-save-btn {
+            background: rgba(108,92,231,0.15);
+            border: 1px solid rgba(108,92,231,0.3);
+            border-radius: 4px;
+            color: #6C5CE7;
+            font-family: inherit;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .fx-preset-save-btn:hover {
+            background: rgba(108,92,231,0.25);
+            border-color: #6C5CE7;
+        }
+
+        /* (FX categories now use tabs + cards, old accordion CSS removed) */
 
         /* Collapsible sections (right panel) */
-        .collapsible.collapsed .collapsible-body { display: none; }
+        .collapsible-body {
+            overflow: hidden;
+            max-height: 800px;
+            transition: max-height 0.2s ease-out, opacity 0.15s ease-out;
+            opacity: 1;
+        }
+        .collapsible.collapsed .collapsible-body {
+            max-height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
         .collapsible-toggle { cursor: pointer; user-select: none; }
         .disc-chevron { float: right; font-size: 8px; transition: transform 0.2s; color: var(--text-muted); }
         .collapsible.collapsed .disc-chevron { transform: rotate(-90deg); }
@@ -657,13 +1060,14 @@
 
         .action-btn {
             background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.12);
+            border: 1px solid var(--btn-border);
             border-radius: var(--card-radius);
-            color: var(--text-main);
+            color: var(--color-text);
             padding: 9px 8px;
+            min-height: 36px;
             flex: 1;
             font-family: inherit;
-            font-size: 10px;
+            font-size: var(--font-sm);
             font-weight: 700;
             text-transform: uppercase;
             cursor: pointer;
@@ -672,11 +1076,12 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
+            box-sizing: border-box;
         }
 
         .action-btn:hover {
             background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.25);
+            border-color: var(--btn-border-hover);
         }
 
         .action-btn svg {
@@ -1444,19 +1849,22 @@
             color: #ccc;
         }
         .fx-on-btn {
-            width: 32px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 3px;
+            border-radius: 5px;
             background: none;
             color: var(--text-muted);
-            font-size: 8px;
-            font-weight: 700;
+            font-size: 16px;
             cursor: pointer;
             font-family: inherit;
             transition: all 0.15s;
             padding: 0;
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
         }
         .fx-on-btn:hover {
             border-color: rgba(255,255,255,0.3);
@@ -1467,6 +1875,115 @@
             border-color: var(--cat-color, #6C5CE7);
             color: #fff;
         }
+        .fx-on-btn.active .eye-closed { display: none; }
+        .fx-on-btn .eye-open { display: none; }
+        .fx-on-btn.active .eye-open { display: inline; }
+        .fx-on-btn:not(.active) .eye-closed { display: inline; }
+        .fx-on-btn:not(.active) .eye-open { display: none; }
+
+        /* Post Process list */
+        .fx-postprocess {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 8px;
+        }
+        .fx-postprocess-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .fx-postprocess-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: rgba(255,255,255,0.50);
+        }
+        .fx-postprocess-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .fx-pp-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-left: 3px solid var(--pp-cat-color, rgba(255,255,255,0.15));
+            border-radius: 5px;
+            margin-bottom: 4px;
+            background: rgba(255,255,255,0.02);
+            transition: background 0.15s;
+        }
+        .fx-pp-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .fx-pp-item .fx-pp-drag {
+            color: rgba(255,255,255,0.25);
+            font-size: 10px;
+            cursor: grab;
+            user-select: none;
+        }
+        .fx-pp-item .fx-pp-settings {
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s;
+        }
+        .fx-pp-item .fx-pp-settings:hover { color: #fff; }
+        .fx-pp-item .fx-pp-name {
+            flex: 1;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+        .fx-pp-item .fx-pp-eye {
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-size: 15px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .fx-pp-item .fx-pp-eye:hover { color: #fff; }
+        .fx-pp-item .fx-pp-eye.visible { color: #fff; }
+        .fx-pp-item .fx-pp-remove {
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: none;
+            color: rgba(255,255,255,0.25);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s;
+        }
+        .fx-pp-item .fx-pp-remove:hover { color: #ff6b6b; }
         .fx-drag-handle {
             width: 24px;
             height: 24px;
@@ -1511,13 +2028,13 @@
             min-width: 0;
         }
         .fx-inline-slider input[type="range"]::-webkit-slider-runnable-track {
-            height: 5px;
+            height: 6px;
             border-radius: 3px;
         }
         .fx-inline-slider input[type="range"]::-webkit-slider-thumb {
             height: 14px;
             width: 14px;
-            margin-top: -4.5px;
+            margin-top: -4px;
         }
         .fx-inline-slider .value-input {
             width: 34px;
@@ -1662,6 +2179,115 @@
             border-color: rgba(255,255,255,0.35);
         }
 
+        /* ═══ TOP BAR ═══ */
+        #top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 32px;
+            background: var(--color-panel);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 var(--sp-4);
+            gap: var(--sp-2);
+            font-family: inherit;
+        }
+        #top-bar .tb-zone {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-2);
+        }
+        #top-bar .tb-zone-right {
+            margin-left: auto;
+            gap: var(--sp-4);
+        }
+        #top-bar .tb-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            color: var(--color-text);
+            padding: 4px 8px;
+            min-height: 24px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--sp-1);
+            font-family: inherit;
+            font-size: var(--font-xs);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        #top-bar .tb-btn:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: var(--btn-border);
+        }
+        #top-bar .tb-btn svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+        }
+        #top-bar .tb-btn.recording {
+            color: var(--color-danger);
+            animation: pulse-record 1.2s ease-in-out infinite;
+        }
+        #top-bar .tb-btn.recording svg { fill: var(--color-danger); }
+        #top-bar .tb-divider {
+            width: 1px;
+            height: 16px;
+            background: rgba(255,255,255,0.08);
+        }
+        #top-bar .tb-status {
+            font-size: var(--font-xs);
+            font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-family: 'Commit Mono', 'Roboto Mono', monospace;
+        }
+        #top-bar .tb-status.active { color: var(--color-text); }
+        #top-bar .tb-rec-dot {
+            display: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-danger);
+            animation: pulse-rec-dot 1s ease-in-out infinite;
+        }
+        #top-bar .tb-rec-dot.visible { display: inline-block; }
+        @keyframes pulse-rec-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        #top-bar .tb-fps { font-variant-numeric: tabular-nums; }
+        #top-bar .tb-fps.good { color: var(--color-success); }
+        #top-bar .tb-fps.warn { color: var(--color-yellow); }
+        #top-bar .tb-fps.bad { color: var(--color-danger); }
+
+        /* Cross-link styles */
+        .panel-crosslink {
+            font-size: var(--font-xs);
+            color: var(--color-accent);
+            cursor: pointer;
+            transition: color 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-top: var(--sp-1);
+        }
+        .panel-crosslink:hover { color: var(--color-accent-light); text-decoration: underline; }
+        @keyframes pulse-highlight {
+            0% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.4); }
+            50% { box-shadow: 0 0 12px 4px rgba(108, 92, 231, 0.3); }
+            100% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0); }
+        }
+        .highlight-pulse { animation: pulse-highlight 0.5s ease-out; }
+
         /* ═══ EMPTY STATE HINT ═══ */
         #tl-empty-hint {
             position: absolute;
@@ -1693,9 +2319,55 @@
             font-family: inherit;
             font-size: 9px;
         }
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 1200px) {
+            .panel { width: 240px; padding: var(--sp-4); }
+        }
+        @media (max-width: 900px) {
+            .panel { width: 200px; padding: var(--sp-3); }
+            #timeline-container { left: 220px; right: 220px; }
+        }
+        @media (max-width: 700px) {
+            .panel { width: 180px; padding: var(--sp-2); font-size: 9px; }
+            #timeline-container { left: 200px; right: 200px; }
+            #top-bar { padding: 0 var(--sp-2); gap: var(--sp-1); }
+        }
     </style>
 </head>
 <body>
+
+    <!-- ═══ TOP BAR ═══ -->
+    <div id="top-bar">
+        <div class="tb-zone">
+            <button class="tb-btn" id="tb-play" title="Play/Pause (Space)" aria-label="Play or Pause">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="tb-btn" id="tb-restart" title="Restart (Home)" aria-label="Restart">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            </button>
+            <button class="tb-btn" id="tb-record" title="Record (Shift+R)" aria-label="Toggle Recording">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>
+            </button>
+            <button class="tb-btn" id="tb-save" title="Save Recording" aria-label="Save Recording">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </button>
+            <button class="tb-btn" id="tb-photo" title="Screenshot (P)" aria-label="Take Screenshot">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
+            </button>
+        </div>
+        <div class="tb-divider"></div>
+        <div class="tb-zone">
+            <span class="tb-rec-dot" id="tb-rec-dot"></span>
+            <span class="tb-status" id="tb-rec-time"></span>
+        </div>
+        <div class="tb-zone tb-zone-right" aria-live="polite">
+            <span class="tb-status tb-fps" id="tb-fps">--</span>
+            <div class="tb-divider"></div>
+            <span class="tb-status" id="tb-source">NO SOURCE</span>
+            <div class="tb-divider"></div>
+            <span class="tb-status" id="tb-mode">OFF</span>
+        </div>
+    </div>
 
     <div id="debug-panel"></div>
 
@@ -1705,7 +2377,7 @@
             <div class="title-row">
                 <h1>Hues of Dispositions</h1>
                 <div style="display:flex;align-items:center;gap:6px">
-                    <button class="help-btn" id="help-btn" title="Help (?)">?</button>
+                    <button class="help-btn" id="help-btn" title="Help (?)" aria-label="Help and keyboard shortcuts">?</button>
                     <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls">
                         <svg viewBox="0 0 24 24">
                             <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
@@ -1739,12 +2411,34 @@
                     <div id="file-name">mp4 or mov</div>
                     <input type="file" id="videoUpload" accept="video/mp4,video/quicktime">
                 </div>
-                <button id="webcam-btn" title="Use Webcam">
+                <button id="webcam-btn" title="Use Webcam" aria-label="Toggle webcam">
                     <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                     CAM
                 </button>
             </div>
 
+            <!-- Zoom — compact viewport controls -->
+            <div class="control-group" id="zoom-options-panel">
+                <label>Zoom <span id="zoom-level" style="color:#00CEC9;margin-left:6px;font-weight:bold">1.00x</span></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-vid-zoom" min="0.25" max="8" value="1" step="0.05">
+                </div>
+                <div class="selector-row" id="zoom-preset-buttons">
+                    <button class="selector-btn" data-value="0.5">0.5x</button>
+                    <button class="selector-btn active" data-value="1">1x</button>
+                    <button class="selector-btn" data-value="2">2x</button>
+                    <button class="selector-btn" data-value="4">4x</button>
+                </div>
+                <label>Smooth</label>
+                <div class="selector-row" id="zoom-smooth-buttons">
+                    <button class="selector-btn active" data-value="on">ON</button>
+                    <button class="selector-btn" data-value="off">OFF</button>
+                </div>
+                <div style="font-size:9px;color:var(--text-muted);margin-top:2px">
+                    [ / ] zoom &nbsp; \ reset &nbsp; dbl-click reset
+                </div>
+                <span class="panel-crosslink" id="link-to-camera" title="Jump to Camera section in right panel">Camera features →</span>
+            </div>
 
             <div class="control-group" id="group-modes">
                 <label>Tracking Mode</label>
@@ -1829,6 +2523,24 @@
                     <button class="selector-btn" data-value="9">PLT</button>
                     <button class="selector-btn" data-value="7">NONE</button>
                     <button class="selector-btn viz-zoom-standalone" data-value="10">ZOOM</button>
+                    <button class="selector-btn viz-zoom-standalone" data-value="11">THERMO</button>
+                    <button class="selector-btn viz-zoom-standalone" data-value="12">ASCII</button>
+                </div>
+            </div>
+
+            <!-- Zoom Viz options (shown when ZOOM viz active) -->
+            <div class="control-group" id="viz-zoom-options" style="display:none">
+                <label>Zoom Viz <span id="viz-zoom-val" style="color:#00CEC9;margin-left:6px">3.0x</span></label>
+                <div class="slider-wrapper">
+                    <input type="range" id="slider-viz-zoom" min="-8" max="8" value="3" step="0.5">
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:-2px">
+                    <span>WIDE</span><span>1:1</span><span>MACRO</span>
+                </div>
+                <label>Color Box</label>
+                <div class="selector-row" id="viz-zoom-box-buttons">
+                    <button class="selector-btn" data-value="on">ON</button>
+                    <button class="selector-btn active" data-value="off">OFF</button>
                 </div>
             </div>
 
@@ -1870,12 +2582,23 @@
                 </div>
             </div>
 
+            <!-- ── Zoom Controls ── -->
             <div class="control-group">
                 <label>Lines</label>
                 <div class="selector-row" id="line-buttons">
                     <button class="selector-btn active" data-value="off">OFF</button>
                     <button class="selector-btn" data-value="on">ON</button>
                 </div>
+            </div>
+
+            <div class="control-group">
+                <label>Box Color</label>
+                <div class="fx-color-picker">
+                    <input type="color" class="fx-color-input" id="trackbox-color-picker" value="#969696">
+                    <input type="text" class="fx-hex-input" id="trackbox-color-hex" value="#969696" maxlength="7">
+                </div>
+                <label>Box Weight <input type="number" class="value-input" id="val-box-weight" value="1.2" step="0.2"></label>
+                <div class="slider-wrapper"><input type="range" id="slider-box-weight" min="0.2" max="6" value="1.2" step="0.2"></div>
             </div>
 
             <div class="control-group" id="line-options-group" style="display:none">
@@ -1943,6 +2666,7 @@
                 <svg viewBox="0 0 24 24"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
                 Photo
             </button>
+
 
             </div><!-- /tab-content track -->
 
@@ -2087,9 +2811,38 @@
                     <span>Effects</span>
                     <label class="fx-toggle-switch"><input type="checkbox" id="master-fx-toggle" checked><span class="toggle-slider"></span></label>
                 </div>
-                <div id="fx-cat-tabs"></div>
-                <div id="fx-selector-row"></div>
-                <div id="fx-params-container"></div>
+                <div id="fx-view-switcher" class="fx-view-switcher">
+                    <button class="fx-view-btn active" data-view="effects">Effects</button>
+                    <button class="fx-view-btn" data-view="presets">Presets</button>
+                </div>
+                <div id="fx-effects-view">
+                    <div id="fx-favorites-row" class="fx-favorites-row"></div>
+                    <div id="fx-cat-tabs"></div>
+                    <div id="fx-card-grid" class="fx-card-grid"></div>
+                    <div id="fx-selector-row"></div>
+                    <div id="fx-params-container"></div>
+                </div>
+                <div id="fx-presets-view" style="display:none">
+                    <div id="fx-preset-active" class="fx-preset-active" style="display:none"></div>
+                    <div id="fx-preset-cat-tabs" class="fx-preset-cat-tabs"></div>
+                    <div id="fx-preset-grid" class="fx-preset-grid"></div>
+                    <div class="fx-preset-divider"></div>
+                    <div class="fx-preset-custom-header">
+                        <span>My Presets</span>
+                        <button id="fx-preset-save-btn" class="fx-preset-save-btn" title="Save current effects as preset">+ Save</button>
+                    </div>
+                    <div id="fx-preset-custom-grid" class="fx-preset-grid"></div>
+                </div>
+                <div id="fx-postprocess" class="fx-postprocess" style="display:none">
+                    <div class="fx-postprocess-header">
+                        <span class="fx-postprocess-title">Post Process</span>
+                        <div class="fx-postprocess-actions">
+                            <button class="fx-action-btn" id="fx-pp-randomize" title="Randomize all">&#x1F3B2;</button>
+                            <button class="fx-action-btn" id="fx-pp-add" title="Add current effect">+</button>
+                        </div>
+                    </div>
+                    <div id="fx-pp-list"></div>
+                </div>
             </div>
 
             <!-- REMOVED: old static FX categories/cards/params — now JS-generated by buildFxPanel() -->
@@ -2107,6 +2860,81 @@
                 <label>Background Dim <input type="number" class="value-input" id="val-bgdim" value="0"></label>
                 <div class="slider-wrapper">
                     <input type="range" id="slider-bgdim" min="0" max="100" value="0" step="1">
+                </div>
+            </div>
+
+            <!-- Camera — viewport behavior features -->
+            <div class="control-group collapsible collapsed" id="camera-group">
+                <label class="collapsible-toggle">Camera <span class="disc-chevron">&#9662;</span></label>
+                <div class="collapsible-body">
+                    <span class="panel-crosslink" id="link-to-zoom" title="Jump to Zoom controls in left panel">← Zoom controls</span>
+                    <label>Auto-Follow</label>
+                    <div class="selector-row" id="zoom-autofollow-buttons">
+                        <button class="selector-btn" data-value="on">ON</button>
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                    </div>
+                    <label>Ken Burns</label>
+                    <div class="selector-row" id="zoom-kenburns-buttons">
+                        <button class="selector-btn" data-value="on">ON</button>
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                    </div>
+                    <div id="kenburns-speed-group" style="display:none">
+                        <label>Speed <input type="number" class="value-input" id="val-kb-speed" value="0.3" step="0.1"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-kb-speed" min="0.05" max="1.5" value="0.3" step="0.05"></div>
+                        <label>Min Zoom <input type="number" class="value-input" id="val-kb-min" value="1.0" step="0.1"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-kb-min" min="1.0" max="4.0" value="1.0" step="0.1"></div>
+                        <label>Max Zoom <input type="number" class="value-input" id="val-kb-max" value="2.5" step="0.1"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-kb-max" min="1.5" max="5.0" value="2.5" step="0.1"></div>
+                        <label>Pan Amount <input type="number" class="value-input" id="val-kb-pan" value="0.15" step="0.05"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-kb-pan" min="0" max="0.5" value="0.15" step="0.01"></div>
+                    </div>
+                    <label>Split View</label>
+                    <div class="selector-row" id="zoom-split-buttons">
+                        <button class="selector-btn" data-value="on">ON</button>
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                    </div>
+                    <div id="split-zoom-group" style="display:none">
+                        <label>Position <input type="number" class="value-input" id="val-split-pos" value="50" step="5"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-split-pos" min="10" max="90" value="50" step="1"></div>
+                        <label>Split Zoom <input type="number" class="value-input" id="val-split-zoom" value="3" step="0.5"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-split-zoom" min="1.5" max="8" value="3" step="0.5"></div>
+                        <label>Flip Sides</label>
+                        <div class="selector-row" id="split-mirror-buttons">
+                            <button class="selector-btn" data-value="on">ON</button>
+                            <button class="selector-btn active" data-value="off">OFF</button>
+                        </div>
+                        <label>Split FX</label>
+                        <div class="selector-row" id="split-fx-buttons">
+                            <button class="selector-btn active" data-value="on">ON</button>
+                            <button class="selector-btn" data-value="off">OFF</button>
+                        </div>
+                        <label>Dual FX</label>
+                        <div class="selector-row" id="split-dualfx-buttons">
+                            <button class="selector-btn" data-value="on">ON</button>
+                            <button class="selector-btn active" data-value="off">OFF</button>
+                        </div>
+                        <div id="split-dualfx-group" style="display:none">
+                            <label>Left Effect</label>
+                            <select class="value-input" id="split-left-fx" style="width:100%;margin:2px 0 6px;padding:3px 4px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px"><option value="">None</option></select>
+                            <label>Right Effect</label>
+                            <select class="value-input" id="split-right-fx" style="width:100%;margin:2px 0 6px;padding:3px 4px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px"><option value="">None</option></select>
+                        </div>
+                        <label>Split Zoom Viz</label>
+                        <div class="selector-row" id="split-viz-buttons">
+                            <button class="selector-btn" data-value="on">ON</button>
+                            <button class="selector-btn active" data-value="off">OFF</button>
+                        </div>
+                    </div>
+                    <label>Depth Blur</label>
+                    <div class="selector-row" id="zoom-depth-buttons">
+                        <button class="selector-btn" data-value="on">ON</button>
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                    </div>
+                    <label>PiP Map</label>
+                    <div class="selector-row" id="zoom-pip-buttons">
+                        <button class="selector-btn" data-value="on">ON</button>
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                    </div>
                 </div>
             </div>
 
@@ -2302,12 +3130,12 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js"></script>
-<script src="blob-fx.js"></script>
-<script src="blob-audio.js"></script>
-<script src="blob-timeline.js"></script>
-<script src="blob-mask.js"></script>
-<script src="blob-tracking.js"></script>
+<script src="blob-core.js?v=20260321c"></script>
+<script src="blob-fx.js?v=20260321c"></script>
+<script src="blob-audio.js?v=20260321c"></script>
+<script src="blob-timeline.js?v=20260321c"></script>
+<script src="blob-mask.js?v=20260321c"></script>
+<script src="blob-tracking.js?v=20260321c"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">
@@ -2374,7 +3202,10 @@ async function initFaceLandmarker() {
                 delegate: "GPU"
             },
             runningMode: "VIDEO",
-            numFaces: 2,
+            numFaces: 3,
+            minFaceDetectionConfidence: 0.4,
+            minFacePresenceConfidence: 0.4,
+            minTrackingConfidence: 0.4,
             outputFaceBlendshapes: false,
             outputFacialTransformationMatrixes: false
         });

@@ -15,7 +15,7 @@ function trackPoints() {
 
         const w = videoEl.width, h = videoEl.height;
 
-        // Throttled detection — cache landmarks between frames
+        // Detect every frame for smooth tracking
         faceDetectFrame++;
         if (faceDetectFrame >= FACE_DETECT_INTERVAL || !faceLandmarkCache) {
             faceDetectFrame = 0;
@@ -23,7 +23,32 @@ function trackPoints() {
                 const ts = performance.now();
                 const result = window.mpFaceLandmarker.detectForVideo(videoEl.elt, ts);
                 if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
-                    faceLandmarkCache = result.faceLandmarks;
+                    let rawLandmarks = result.faceLandmarks;
+
+                    // EMA smoothing: blend new detections with previous positions
+                    if (smoothedLandmarks && smoothedLandmarks.length === rawLandmarks.length) {
+                        for (let fi = 0; fi < rawLandmarks.length; fi++) {
+                            let raw = rawLandmarks[fi];
+                            let sm = smoothedLandmarks[fi];
+                            if (sm.length === raw.length) {
+                                for (let li = 0; li < raw.length; li++) {
+                                    sm[li] = {
+                                        x: sm[li].x * LANDMARK_SMOOTH + raw[li].x * (1 - LANDMARK_SMOOTH),
+                                        y: sm[li].y * LANDMARK_SMOOTH + raw[li].y * (1 - LANDMARK_SMOOTH),
+                                        z: sm[li].z * LANDMARK_SMOOTH + raw[li].z * (1 - LANDMARK_SMOOTH)
+                                    };
+                                }
+                            } else {
+                                smoothedLandmarks[fi] = raw.map(l => ({x: l.x, y: l.y, z: l.z}));
+                            }
+                        }
+                    } else {
+                        // First detection or face count changed — initialize smoothed
+                        smoothedLandmarks = rawLandmarks.map(face =>
+                            face.map(l => ({x: l.x, y: l.y, z: l.z}))
+                        );
+                    }
+                    faceLandmarkCache = smoothedLandmarks;
                 }
             } catch (e) {
                 // Detection failed — use cache
@@ -88,6 +113,7 @@ function trackPoints() {
         for (let i = 0; i < numPoints; i++) {
             let c = candidates[i];
             let screenX = map(c.x, 0, w, videoX, videoX + videoW);
+            if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
             let screenY = map(c.y, 0, h, videoY, videoY + videoH);
             trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
         }
@@ -138,6 +164,7 @@ function trackPoints() {
         for (let i = 0; i < numPoints; i++) {
             let c = candidates[i];
             let screenX = map(c.x, 0, w, videoX, videoX + videoW);
+            if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
             let screenY = map(c.y, 0, h, videoY, videoY + videoH);
             trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
         }
@@ -283,12 +310,14 @@ function trackPoints() {
     for (let i = 0; i < numPoints; i++) {
         let c = candidates[i];
         let screenX = map(c.x, 0, w, videoX, videoX + videoW);
+        if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
         let screenY = map(c.y, 0, h, videoY, videoY + videoH);
         trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
     }
 }
 
 function drawLines() {
+    if (trackedPoints.length < 2) return;
     let opacity = map(paramValues[2], 0, 100, 0, 255);
     let curvatureLevel = lineStraight ? 0 : paramValues[3];
     // Parse line color and apply opacity

@@ -39,9 +39,16 @@ function handleAudioFile(event) {
 
     // Track when audio ends
     audioElement.addEventListener('ended', () => {
+        // Webcam is a live stream — always loop audio back
+        if (usingWebcam) {
+            audioElement.currentTime = 0;
+            audioElement.play().catch(() => {});
+            audioPlaying = true;
+            return;
+        }
         audioPlaying = false;
         if (loopMode === 'once' && videoEl) {
-            videoEl.pause();
+            videoEl.elt.pause();
             videoPlaying = false;
             let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
             ui.btnPlay.innerHTML = playIcon;

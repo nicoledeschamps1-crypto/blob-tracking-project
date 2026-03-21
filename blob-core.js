@@ -25,6 +25,8 @@ let showLines = false;
 let lineColor = '#ffffff';
 let lineWeight = 1;
 let lineStraight = false;
+let trackBoxColor = '#969696'; // default gray tracking box color
+let trackBoxWeight = 1.2;      // box stroke weight
 let currentMode = 1;
 let _userMode = 1;        // user's UI-selected mode (survives timeline overrides)
 let _userCustomHue = 195; // user's UI-selected custom hue
@@ -53,6 +55,7 @@ let bgDim = 0;
 let productInfo = { brand: '', name: '', material: '', price: '', size: '' };
 let activeVizModes = new Set([1]);
 let activeEffects = new Set();
+let currentPreset = null; // currently applied preset name (null = none)
 let fxLayerAll = false;
 let asciiCellSize = 10;
 let asciiColorMode = 'mono';
@@ -193,6 +196,144 @@ let rgbShiftIntensity = 70;
 // Master FX toggle
 let masterFxEnabled = true;
 
+// ── NEW EFFECTS v2 ──
+// Threshold
+let thresholdLevel = 128;
+let thresholdInvert = false;
+
+// Exposure
+let exposureEV = 0;
+
+// Color Temperature
+let colortempValue = 0;
+
+// RGB Gain
+let rgbGainR = 100;
+let rgbGainG = 100;
+let rgbGainB = 100;
+let rgbGainGamma = 1.0;
+
+// Levels
+let levelsInBlack = 0;
+let levelsInWhite = 255;
+let levelsGamma = 1.0;
+let levelsOutBlack = 0;
+let levelsOutWhite = 255;
+
+// Color Balance
+let colorbalShadowR = 0;
+let colorbalShadowG = 0;
+let colorbalShadowB = 0;
+let colorbalMidR = 0;
+let colorbalMidG = 0;
+let colorbalMidB = 0;
+let colorbalHiR = 0;
+let colorbalHiG = 0;
+let colorbalHiB = 0;
+
+// Color Matrix
+let colmatrixPreset = 'none';
+let colmatrixIntensity = 80;
+
+// Blur/Sharp
+let blursharpAmount = 0;
+
+// Modulate
+let modulateFreq = 10;
+let modulateAmp = 20;
+let modulateSpeed = 1;
+let modulateDir = 'horizontal';
+
+// Ripple
+let rippleFreq = 5;
+let rippleAmp = 15;
+let rippleSpeed = 2;
+let rippleDamping = 0;
+
+// Swirl
+let swirlAngle = 90;
+let swirlRadius = 70;
+
+// Reed Glass
+let reedWidth = 10;
+let reedDistortion = 20;
+let reedChromatic = false;
+
+// Polar to Rect
+let polar2rectRotation = 0;
+
+// Rect to Polar
+let rect2polarRotation = 0;
+
+// Radial Blur
+let radblurIntensity = 30;
+
+// Zoom Blur
+let zoomblurIntensity = 30;
+
+// Circular Blur
+let circblurIntensity = 30;
+
+// Elastic Grid
+let elgridSize = 12;
+let elgridWarp = 30;
+let elgridSpeed = 1;
+let elgridAnimated = true;
+
+// Print Stamp
+let printstampDotSize = 6;
+let printstampContrast = 60;
+let printstampGrain = 40;
+
+// Y2K Blue
+let y2kBlueShift = 70;
+let y2kGlow = 40;
+let y2kGrain = 30;
+
+// NTSC
+let ntscChromaBleed = 50;
+let ntscInstability = 30;
+let ntscNoise = 20;
+let ntscRolling = false;
+
+// Stripe
+let stripeDensity = 10;
+let stripeAngle = 0;
+let stripeThickness = 2;
+let stripeOpacity = 50;
+let stripeMode = 'linear';
+
+// Paper Scan
+let paperscanIntensity = 40;
+let paperscanFiber = 3;
+let paperscanWarmth = 30;
+
+// Xerox
+let xeroxContrast = 60;
+let xeroxNoise = 40;
+let xeroxDarkness = 50;
+
+// Grunge
+let grungeTint = '#cc6677';
+let grungePosterize = 3;
+let grungeGrain = 50;
+
+// ── IMPROVEMENT PARAMS for existing effects ──
+let sepiaWarmth = 0;
+let thermalPalette = 'default';
+let gradColor3 = '#888888';
+let gradMidpoint = 50;
+let chromaMode = 'linear';
+let waveMode = 'horizontal';
+let embossColor = false;
+let bloomAnamorphic = false;
+let noiseAlgo = 'random';
+let vigColor = '#000000';
+let crtPhosphor = 'none';
+let ledShape = 'square';
+let scanVertical = false;
+let pixelMode = 'square';
+
 let videoX, videoY, videoW, videoH;
 let currentVideoUrl = null;
 
@@ -200,6 +341,40 @@ let currentVideoUrl = null;
 let vidZoom = 1;
 let vidPanX = 0;
 let vidPanY = 0;
+
+// Zoom features
+let zoomSmooth = true;           // smooth animated transitions
+let zoomTargetLevel = 1;         // target zoom for smooth lerp
+let zoomTargetPanX = 0;
+let zoomTargetPanY = 0;
+let autoFollow = false;          // auto-follow tracked region
+let autoFollowSpeed = 0.08;      // follow lerp speed
+let kenBurnsEnabled = false;     // Ken Burns cinematic auto-zoom
+let kenBurnsSpeed = 0.3;         // KB animation speed
+let kenBurnsTime = 0;            // KB phase accumulator
+let kenBurnsMinZoom = 1.0;      // KB minimum zoom
+let kenBurnsMaxZoom = 2.5;      // KB maximum zoom
+let kenBurnsPanAmt = 0.15;      // KB pan amount (fraction)
+let preKBZoom = 1;              // saved zoom before KB
+let preKBPanX = 0;              // saved panX before KB
+let preKBPanY = 0;              // saved panY before KB
+let kenBurnsReturning = false;  // smooth return to pre-KB state
+let splitZoomEnabled = false;    // split view (normal + zoomed)
+let splitZoomLevel = 3;          // zoom level for the zoomed half
+let splitFxEnabled = true;       // apply effects to split view half
+let splitVizZoom = false;        // show zoom viz blobs on split half
+let splitPosition = 50;          // split divider position 0-100%
+let splitMirrorFlip = false;     // swap left/right sides
+let splitDualFx = false;         // different effect per side
+let splitLeftEffect = '';        // effect name for left side
+let splitRightEffect = '';       // effect name for right side
+let _asciiSampler = null;        // offscreen canvas for ASCII viz sampling
+let _splitBuf = null;            // offscreen canvas for dual FX compositing
+let depthBlurEnabled = false;    // depth-of-field vignette blur at edges
+let depthBlurStrength = 40;      // blur vignette width in pixels
+let pipEnabled = false;          // picture-in-picture overview map
+let vizZoomLevel = 3;            // zoom viz magnification (-8 to 8, negative = zoom out)
+let vizZoomBox = false;          // show colored box on zoom viz blobs
 
 // MASK tracking state (MediaPipe AI re-segmentation per frame)
 let maskSelecting = false;
@@ -251,7 +426,11 @@ const MODE_NAMES = {
 // Face landmark tracking state (MediaPipe Face Landmarker)
 let faceLandmarkCache = null;   // cached landmark results
 let faceDetectFrame = 0;        // frame counter for throttled detection
-const FACE_DETECT_INTERVAL = 2; // re-detect every N frames
+const FACE_DETECT_INTERVAL = 1; // detect every frame for smooth tracking
+
+// Landmark smoothing (EMA — exponential moving average)
+let smoothedLandmarks = null;   // smoothed landmark positions per face
+const LANDMARK_SMOOTH = 0.35;   // 0 = no smoothing, 1 = frozen (0.35 = responsive + stable)
 
 // Landmark index groups for face feature modes
 const FACE_EYES_INDICES = [
@@ -262,7 +441,11 @@ const FACE_EYES_INDICES = [
     // Left iris
     468, 469, 470, 471, 472,
     // Right iris
-    473, 474, 475, 476, 477
+    473, 474, 475, 476, 477,
+    // Left eyebrow
+    70, 63, 105, 66, 107, 55, 65, 52, 53, 46,
+    // Right eyebrow
+    300, 293, 334, 296, 336, 285, 295, 282, 283, 276
 ];
 
 const FACE_LIPS_INDICES = [
@@ -271,7 +454,9 @@ const FACE_LIPS_INDICES = [
     308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
     // Inner lip
     78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308,
-    78, 95, 88, 178, 87, 14, 317, 402, 318, 324
+    78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
+    // Chin / jaw near lips
+    152, 148, 176, 149, 150, 136, 172, 58, 132, 377, 400, 378, 379, 365, 397, 288, 361
 ];
 let modeDragState = null;
 const BLOB_SEG_COLOR = '#00CEC9';
@@ -279,50 +464,87 @@ let editingBlobSeg = null; // when a blob segment is selected, sliders edit its 
 
 const FX_CATEGORIES = {
     sepia:'color', tint:'color', palette:'color', bricon:'color', thermal:'color', gradmap:'color', duotone:'color',
+    threshold:'color', exposure:'color', colortemp:'color', rgbgain:'color', levels:'color', colorbal:'color', colmatrix:'color',
     chroma:'distortion', rgbshift:'distortion', curve:'distortion', wave:'distortion', jitter:'distortion', mblur:'distortion', emboss:'distortion',
+    blursharp:'distortion', modulate:'distortion', ripple:'distortion', swirl:'distortion', reedglass:'distortion', polar2rect:'distortion', rect2polar:'distortion', radblur:'distortion', zoomblur:'distortion', circblur:'distortion', elgrid:'distortion',
     bloom:'pattern', dither:'pattern', atkinson:'pattern', halftone:'pattern', pxsort:'pattern', pixel:'pattern', led:'pattern',
-    ascii:'overlay', glitch:'overlay', noise:'overlay', grain:'overlay', dots:'overlay', grid:'overlay', scanlines:'overlay', vignette:'overlay', crt:'overlay'
+    printstamp:'pattern', y2kblue:'pattern',
+    ascii:'overlay', glitch:'overlay', noise:'overlay', grain:'overlay', dots:'overlay', grid:'overlay', scanlines:'overlay', vignette:'overlay', crt:'overlay',
+    ntsc:'overlay', stripe:'overlay', paperscan:'overlay', xerox:'overlay', grunge:'overlay'
 };
 const FX_CAT_COLORS = { color:'#6C5CE7', distortion:'#00B894', pattern:'#FDCB6E', overlay:'#E17055' };
 const FX_PARAM_MAP = {
-    sepia: [{v:'sepiaIntensity',g:()=>sepiaIntensity,s:v=>sepiaIntensity=v}],
+    sepia: [{v:'sepiaIntensity',g:()=>sepiaIntensity,s:v=>sepiaIntensity=v},{v:'sepiaWarmth',g:()=>sepiaWarmth,s:v=>sepiaWarmth=v}],
     tint: [{v:'tintPreset',g:()=>tintPreset,s:v=>tintPreset=v},{v:'tintIntensity',g:()=>tintIntensity,s:v=>tintIntensity=v},{v:'tintCustomColor',g:()=>tintCustomColor,s:v=>tintCustomColor=v}],
     palette: [{v:'palettePreset',g:()=>palettePreset,s:v=>palettePreset=v},{v:'paletteIntensity',g:()=>paletteIntensity,s:v=>paletteIntensity=v}],
     bricon: [{v:'briValue',g:()=>briValue,s:v=>briValue=v},{v:'conValue',g:()=>conValue,s:v=>conValue=v},{v:'satValue',g:()=>satValue,s:v=>satValue=v}],
-    chroma: [{v:'chromaOffset',g:()=>chromaOffset,s:v=>chromaOffset=v}],
+    chroma: [{v:'chromaOffset',g:()=>chromaOffset,s:v=>chromaOffset=v},{v:'chromaMode',g:()=>chromaMode,s:v=>chromaMode=v}],
     curve: [{v:'curveIntensity',g:()=>curveIntensity,s:v=>curveIntensity=v},{v:'curveDirection',g:()=>curveDirection,s:v=>curveDirection=v}],
-    wave: [{v:'waveAmp',g:()=>waveAmp,s:v=>waveAmp=v},{v:'waveFreq',g:()=>waveFreq,s:v=>waveFreq=v},{v:'waveSpeed',g:()=>waveSpeed,s:v=>waveSpeed=v}],
+    wave: [{v:'waveAmp',g:()=>waveAmp,s:v=>waveAmp=v},{v:'waveFreq',g:()=>waveFreq,s:v=>waveFreq=v},{v:'waveSpeed',g:()=>waveSpeed,s:v=>waveSpeed=v},{v:'waveMode',g:()=>waveMode,s:v=>waveMode=v}],
     jitter: [{v:'jitterIntensity',g:()=>jitterIntensity,s:v=>jitterIntensity=v},{v:'jitterBlockSize',g:()=>jitterBlockSize,s:v=>jitterBlockSize=v},{v:'jitterMode',g:()=>jitterMode,s:v=>jitterMode=v}],
     mblur: [{v:'mblurIntensity',g:()=>mblurIntensity,s:v=>mblurIntensity=v},{v:'mblurAngle',g:()=>mblurAngle,s:v=>mblurAngle=v}],
-    bloom: [{v:'bloomIntensity',g:()=>bloomIntensity,s:v=>bloomIntensity=v},{v:'bloomRadius',g:()=>bloomRadius,s:v=>bloomRadius=v},{v:'bloomThreshold',g:()=>bloomThreshold,s:v=>bloomThreshold=v},{v:'bloomSpread',g:()=>bloomSpread,s:v=>bloomSpread=v},{v:'bloomBlendMode',g:()=>bloomBlendMode,s:v=>bloomBlendMode=v},{v:'bloomExposure',g:()=>bloomExposure,s:v=>bloomExposure=v}],
+    bloom: [{v:'bloomIntensity',g:()=>bloomIntensity,s:v=>bloomIntensity=v},{v:'bloomRadius',g:()=>bloomRadius,s:v=>bloomRadius=v},{v:'bloomThreshold',g:()=>bloomThreshold,s:v=>bloomThreshold=v},{v:'bloomSpread',g:()=>bloomSpread,s:v=>bloomSpread=v},{v:'bloomBlendMode',g:()=>bloomBlendMode,s:v=>bloomBlendMode=v},{v:'bloomExposure',g:()=>bloomExposure,s:v=>bloomExposure=v},{v:'bloomAnamorphic',g:()=>bloomAnamorphic,s:v=>bloomAnamorphic=v}],
     dither: [{v:'ditherColorMode',g:()=>ditherColorMode,s:v=>ditherColorMode=v},{v:'ditherAlgorithm',g:()=>ditherAlgorithm,s:v=>ditherAlgorithm=v},{v:'ditherPalette',g:()=>ditherPalette,s:v=>ditherPalette=v},{v:'ditherColorCount',g:()=>ditherColorCount,s:v=>ditherColorCount=v},{v:'ditherPixelation',g:()=>ditherPixelation,s:v=>ditherPixelation=v},{v:'ditherStrength',g:()=>ditherStrength,s:v=>ditherStrength=v}],
     atkinson: [{v:'atkinsonColorMode',g:()=>atkinsonColorMode,s:v=>atkinsonColorMode=v},{v:'atkinsonThreshold',g:()=>atkinsonThreshold,s:v=>atkinsonThreshold=v},{v:'atkinsonSpread',g:()=>atkinsonSpread,s:v=>atkinsonSpread=v},{v:'atkinsonStrength',g:()=>atkinsonStrength,s:v=>atkinsonStrength=v}],
     halftone: [{v:'halfSpacing',g:()=>halfSpacing,s:v=>halfSpacing=v},{v:'halfColorMode',g:()=>halfColorMode,s:v=>halfColorMode=v},{v:'halfAngle',g:()=>halfAngle,s:v=>halfAngle=v},{v:'halfContrast',g:()=>halfContrast,s:v=>halfContrast=v},{v:'halfSpread',g:()=>halfSpread,s:v=>halfSpread=v},{v:'halfShape',g:()=>halfShape,s:v=>halfShape=v},{v:'halfInkColor',g:()=>halfInkColor,s:v=>halfInkColor=v},{v:'halfPaperColor',g:()=>halfPaperColor,s:v=>halfPaperColor=v},{v:'halfInverted',g:()=>halfInverted,s:v=>halfInverted=v}],
     pxsort: [{v:'pxsortLo',g:()=>pxsortLo,s:v=>pxsortLo=v},{v:'pxsortHi',g:()=>pxsortHi,s:v=>pxsortHi=v},{v:'pxsortDir',g:()=>pxsortDir,s:v=>pxsortDir=v}],
-    pixel: [{v:'pixelSize',g:()=>pixelSize,s:v=>pixelSize=v}],
+    pixel: [{v:'pixelSize',g:()=>pixelSize,s:v=>pixelSize=v},{v:'pixelMode',g:()=>pixelMode,s:v=>pixelMode=v}],
     ascii: [{v:'asciiCellSize',g:()=>asciiCellSize,s:v=>asciiCellSize=v},{v:'asciiColorMode',g:()=>asciiColorMode,s:v=>asciiColorMode=v},{v:'asciiCharSet',g:()=>asciiCharSet,s:v=>asciiCharSet=v},{v:'asciiInvert',g:()=>asciiInvert,s:v=>asciiInvert=v}],
     glitch: [{v:'glitchIntensity',g:()=>glitchIntensity,s:v=>glitchIntensity=v},{v:'glitchFreq',g:()=>glitchFreq,s:v=>glitchFreq=v},{v:'glitchMode',g:()=>glitchMode,s:v=>glitchMode=v},{v:'glitchChannelShift',g:()=>glitchChannelShift,s:v=>glitchChannelShift=v},{v:'glitchBlockSize',g:()=>glitchBlockSize,s:v=>glitchBlockSize=v},{v:'glitchSeed',g:()=>glitchSeed,s:v=>glitchSeed=v},{v:'glitchSpeed',g:()=>glitchSpeed,s:v=>glitchSpeed=v}],
-    noise: [{v:'noiseIntensity',g:()=>noiseIntensity,s:v=>noiseIntensity=v},{v:'noiseScale',g:()=>noiseScale,s:v=>noiseScale=v},{v:'noiseColorMode',g:()=>noiseColorMode,s:v=>noiseColorMode=v}],
+    noise: [{v:'noiseIntensity',g:()=>noiseIntensity,s:v=>noiseIntensity=v},{v:'noiseScale',g:()=>noiseScale,s:v=>noiseScale=v},{v:'noiseColorMode',g:()=>noiseColorMode,s:v=>noiseColorMode=v},{v:'noiseAlgo',g:()=>noiseAlgo,s:v=>noiseAlgo=v}],
     grain: [{v:'grainIntensity',g:()=>grainIntensity,s:v=>grainIntensity=v},{v:'grainSize',g:()=>grainSize,s:v=>grainSize=v},{v:'grainColorMode',g:()=>grainColorMode,s:v=>grainColorMode=v}],
     dots: [{v:'dotsAngle',g:()=>dotsAngle,s:v=>dotsAngle=v},{v:'dotsScale',g:()=>dotsScale,s:v=>dotsScale=v}],
     grid: [{v:'gridScale',g:()=>gridScale,s:v=>gridScale=v},{v:'gridWidth',g:()=>gridWidth,s:v=>gridWidth=v},{v:'gridOpacity',g:()=>gridOpacity,s:v=>gridOpacity=v}],
-    scanlines: [{v:'scanIntensity',g:()=>scanIntensity,s:v=>scanIntensity=v},{v:'scanCount',g:()=>scanCount,s:v=>scanCount=v}],
-    vignette: [{v:'vigIntensity',g:()=>vigIntensity,s:v=>vigIntensity=v},{v:'vigRadius',g:()=>vigRadius,s:v=>vigRadius=v}],
+    scanlines: [{v:'scanIntensity',g:()=>scanIntensity,s:v=>scanIntensity=v},{v:'scanCount',g:()=>scanCount,s:v=>scanCount=v},{v:'scanVertical',g:()=>scanVertical,s:v=>scanVertical=v}],
+    vignette: [{v:'vigIntensity',g:()=>vigIntensity,s:v=>vigIntensity=v},{v:'vigRadius',g:()=>vigRadius,s:v=>vigRadius=v},{v:'vigColor',g:()=>vigColor,s:v=>vigColor=v}],
     // New effects
-    thermal: [{v:'thermalIntensity',g:()=>thermalIntensity,s:v=>thermalIntensity=v}],
-    gradmap: [{v:'gradColor1',g:()=>gradColor1,s:v=>gradColor1=v},{v:'gradColor2',g:()=>gradColor2,s:v=>gradColor2=v},{v:'gradIntensity',g:()=>gradIntensity,s:v=>gradIntensity=v}],
+    thermal: [{v:'thermalIntensity',g:()=>thermalIntensity,s:v=>thermalIntensity=v},{v:'thermalPalette',g:()=>thermalPalette,s:v=>thermalPalette=v}],
+    gradmap: [{v:'gradColor1',g:()=>gradColor1,s:v=>gradColor1=v},{v:'gradColor2',g:()=>gradColor2,s:v=>gradColor2=v},{v:'gradColor3',g:()=>gradColor3,s:v=>gradColor3=v},{v:'gradMidpoint',g:()=>gradMidpoint,s:v=>gradMidpoint=v},{v:'gradIntensity',g:()=>gradIntensity,s:v=>gradIntensity=v}],
     duotone: [{v:'duoShadow',g:()=>duoShadow,s:v=>duoShadow=v},{v:'duoHighlight',g:()=>duoHighlight,s:v=>duoHighlight=v},{v:'duoIntensity',g:()=>duoIntensity,s:v=>duoIntensity=v}],
     rgbshift: [{v:'rgbShiftRX',g:()=>rgbShiftRX,s:v=>rgbShiftRX=v},{v:'rgbShiftRY',g:()=>rgbShiftRY,s:v=>rgbShiftRY=v},{v:'rgbShiftBX',g:()=>rgbShiftBX,s:v=>rgbShiftBX=v},{v:'rgbShiftBY',g:()=>rgbShiftBY,s:v=>rgbShiftBY=v},{v:'rgbShiftIntensity',g:()=>rgbShiftIntensity,s:v=>rgbShiftIntensity=v}],
-    emboss: [{v:'embossAngle',g:()=>embossAngle,s:v=>embossAngle=v},{v:'embossStrength',g:()=>embossStrength,s:v=>embossStrength=v}],
-    led: [{v:'ledCellSize',g:()=>ledCellSize,s:v=>ledCellSize=v},{v:'ledGap',g:()=>ledGap,s:v=>ledGap=v},{v:'ledGlow',g:()=>ledGlow,s:v=>ledGlow=v},{v:'ledBrightness',g:()=>ledBrightness,s:v=>ledBrightness=v}],
-    crt: [{v:'crtScanWeight',g:()=>crtScanWeight,s:v=>crtScanWeight=v},{v:'crtCurvature',g:()=>crtCurvature,s:v=>crtCurvature=v},{v:'crtGlow',g:()=>crtGlow,s:v=>crtGlow=v},{v:'crtChroma',g:()=>crtChroma,s:v=>crtChroma=v},{v:'crtStatic',g:()=>crtStatic,s:v=>crtStatic=v}]
+    emboss: [{v:'embossAngle',g:()=>embossAngle,s:v=>embossAngle=v},{v:'embossStrength',g:()=>embossStrength,s:v=>embossStrength=v},{v:'embossColor',g:()=>embossColor,s:v=>embossColor=v}],
+    led: [{v:'ledCellSize',g:()=>ledCellSize,s:v=>ledCellSize=v},{v:'ledGap',g:()=>ledGap,s:v=>ledGap=v},{v:'ledGlow',g:()=>ledGlow,s:v=>ledGlow=v},{v:'ledBrightness',g:()=>ledBrightness,s:v=>ledBrightness=v},{v:'ledShape',g:()=>ledShape,s:v=>ledShape=v}],
+    crt: [{v:'crtScanWeight',g:()=>crtScanWeight,s:v=>crtScanWeight=v},{v:'crtCurvature',g:()=>crtCurvature,s:v=>crtCurvature=v},{v:'crtGlow',g:()=>crtGlow,s:v=>crtGlow=v},{v:'crtChroma',g:()=>crtChroma,s:v=>crtChroma=v},{v:'crtStatic',g:()=>crtStatic,s:v=>crtStatic=v},{v:'crtPhosphor',g:()=>crtPhosphor,s:v=>crtPhosphor=v}],
+    // New effects v2
+    threshold: [{v:'thresholdLevel',g:()=>thresholdLevel,s:v=>thresholdLevel=v},{v:'thresholdInvert',g:()=>thresholdInvert,s:v=>thresholdInvert=v}],
+    exposure: [{v:'exposureEV',g:()=>exposureEV,s:v=>exposureEV=v}],
+    colortemp: [{v:'colortempValue',g:()=>colortempValue,s:v=>colortempValue=v}],
+    rgbgain: [{v:'rgbGainR',g:()=>rgbGainR,s:v=>rgbGainR=v},{v:'rgbGainG',g:()=>rgbGainG,s:v=>rgbGainG=v},{v:'rgbGainB',g:()=>rgbGainB,s:v=>rgbGainB=v},{v:'rgbGainGamma',g:()=>rgbGainGamma,s:v=>rgbGainGamma=v}],
+    levels: [{v:'levelsInBlack',g:()=>levelsInBlack,s:v=>levelsInBlack=v},{v:'levelsInWhite',g:()=>levelsInWhite,s:v=>levelsInWhite=v},{v:'levelsGamma',g:()=>levelsGamma,s:v=>levelsGamma=v},{v:'levelsOutBlack',g:()=>levelsOutBlack,s:v=>levelsOutBlack=v},{v:'levelsOutWhite',g:()=>levelsOutWhite,s:v=>levelsOutWhite=v}],
+    colorbal: [{v:'colorbalShadowR',g:()=>colorbalShadowR,s:v=>colorbalShadowR=v},{v:'colorbalShadowG',g:()=>colorbalShadowG,s:v=>colorbalShadowG=v},{v:'colorbalShadowB',g:()=>colorbalShadowB,s:v=>colorbalShadowB=v},{v:'colorbalMidR',g:()=>colorbalMidR,s:v=>colorbalMidR=v},{v:'colorbalMidG',g:()=>colorbalMidG,s:v=>colorbalMidG=v},{v:'colorbalMidB',g:()=>colorbalMidB,s:v=>colorbalMidB=v},{v:'colorbalHiR',g:()=>colorbalHiR,s:v=>colorbalHiR=v},{v:'colorbalHiG',g:()=>colorbalHiG,s:v=>colorbalHiG=v},{v:'colorbalHiB',g:()=>colorbalHiB,s:v=>colorbalHiB=v}],
+    colmatrix: [{v:'colmatrixPreset',g:()=>colmatrixPreset,s:v=>colmatrixPreset=v},{v:'colmatrixIntensity',g:()=>colmatrixIntensity,s:v=>colmatrixIntensity=v}],
+    blursharp: [{v:'blursharpAmount',g:()=>blursharpAmount,s:v=>blursharpAmount=v}],
+    modulate: [{v:'modulateFreq',g:()=>modulateFreq,s:v=>modulateFreq=v},{v:'modulateAmp',g:()=>modulateAmp,s:v=>modulateAmp=v},{v:'modulateSpeed',g:()=>modulateSpeed,s:v=>modulateSpeed=v},{v:'modulateDir',g:()=>modulateDir,s:v=>modulateDir=v}],
+    ripple: [{v:'rippleFreq',g:()=>rippleFreq,s:v=>rippleFreq=v},{v:'rippleAmp',g:()=>rippleAmp,s:v=>rippleAmp=v},{v:'rippleSpeed',g:()=>rippleSpeed,s:v=>rippleSpeed=v},{v:'rippleDamping',g:()=>rippleDamping,s:v=>rippleDamping=v}],
+    swirl: [{v:'swirlAngle',g:()=>swirlAngle,s:v=>swirlAngle=v},{v:'swirlRadius',g:()=>swirlRadius,s:v=>swirlRadius=v}],
+    reedglass: [{v:'reedWidth',g:()=>reedWidth,s:v=>reedWidth=v},{v:'reedDistortion',g:()=>reedDistortion,s:v=>reedDistortion=v},{v:'reedChromatic',g:()=>reedChromatic,s:v=>reedChromatic=v}],
+    polar2rect: [{v:'polar2rectRotation',g:()=>polar2rectRotation,s:v=>polar2rectRotation=v}],
+    rect2polar: [{v:'rect2polarRotation',g:()=>rect2polarRotation,s:v=>rect2polarRotation=v}],
+    radblur: [{v:'radblurIntensity',g:()=>radblurIntensity,s:v=>radblurIntensity=v}],
+    zoomblur: [{v:'zoomblurIntensity',g:()=>zoomblurIntensity,s:v=>zoomblurIntensity=v}],
+    circblur: [{v:'circblurIntensity',g:()=>circblurIntensity,s:v=>circblurIntensity=v}],
+    elgrid: [{v:'elgridSize',g:()=>elgridSize,s:v=>elgridSize=v},{v:'elgridWarp',g:()=>elgridWarp,s:v=>elgridWarp=v},{v:'elgridSpeed',g:()=>elgridSpeed,s:v=>elgridSpeed=v},{v:'elgridAnimated',g:()=>elgridAnimated,s:v=>elgridAnimated=v}],
+    printstamp: [{v:'printstampDotSize',g:()=>printstampDotSize,s:v=>printstampDotSize=v},{v:'printstampContrast',g:()=>printstampContrast,s:v=>printstampContrast=v},{v:'printstampGrain',g:()=>printstampGrain,s:v=>printstampGrain=v}],
+    y2kblue: [{v:'y2kBlueShift',g:()=>y2kBlueShift,s:v=>y2kBlueShift=v},{v:'y2kGlow',g:()=>y2kGlow,s:v=>y2kGlow=v},{v:'y2kGrain',g:()=>y2kGrain,s:v=>y2kGrain=v}],
+    ntsc: [{v:'ntscChromaBleed',g:()=>ntscChromaBleed,s:v=>ntscChromaBleed=v},{v:'ntscInstability',g:()=>ntscInstability,s:v=>ntscInstability=v},{v:'ntscNoise',g:()=>ntscNoise,s:v=>ntscNoise=v},{v:'ntscRolling',g:()=>ntscRolling,s:v=>ntscRolling=v}],
+    stripe: [{v:'stripeDensity',g:()=>stripeDensity,s:v=>stripeDensity=v},{v:'stripeAngle',g:()=>stripeAngle,s:v=>stripeAngle=v},{v:'stripeThickness',g:()=>stripeThickness,s:v=>stripeThickness=v},{v:'stripeOpacity',g:()=>stripeOpacity,s:v=>stripeOpacity=v},{v:'stripeMode',g:()=>stripeMode,s:v=>stripeMode=v}],
+    paperscan: [{v:'paperscanIntensity',g:()=>paperscanIntensity,s:v=>paperscanIntensity=v},{v:'paperscanFiber',g:()=>paperscanFiber,s:v=>paperscanFiber=v},{v:'paperscanWarmth',g:()=>paperscanWarmth,s:v=>paperscanWarmth=v}],
+    xerox: [{v:'xeroxContrast',g:()=>xeroxContrast,s:v=>xeroxContrast=v},{v:'xeroxNoise',g:()=>xeroxNoise,s:v=>xeroxNoise=v},{v:'xeroxDarkness',g:()=>xeroxDarkness,s:v=>xeroxDarkness=v}],
+    grunge: [{v:'grungeTint',g:()=>grungeTint,s:v=>grungeTint=v},{v:'grungePosterize',g:()=>grungePosterize,s:v=>grungePosterize=v},{v:'grungeGrain',g:()=>grungeGrain,s:v=>grungeGrain=v}]
 };
 const EFFECT_FN_MAP = {
     sepia:()=>applySepia(), tint:()=>applyTint(), palette:()=>applyPalette(), bricon:()=>applyBriCon(),
     thermal:()=>applyThermal(), gradmap:()=>applyGradientMap(), duotone:()=>applyDuotone(),
     chroma:()=>applyChromatic(), rgbshift:()=>applyRGBShift(), curve:()=>applyCurve(), wave:()=>applyWave(), jitter:()=>applyJitter(), mblur:()=>applyMblur(), emboss:()=>applyEmboss(),
     bloom:()=>applyBloom(), dither:()=>applyDithering(), atkinson:()=>applyAtkinson(), halftone:()=>applyHalftone(), pxsort:()=>applyPixelSort(), pixel:()=>applyPixelate(), led:()=>applyLED(),
-    ascii:()=>applyASCII(), glitch:()=>applyGlitch(), noise:()=>applyNoise(), grain:()=>applyGrain(), dots:()=>applyDots(), grid:()=>applyGrid(), scanlines:()=>applyScanlines(), vignette:()=>applyVignette(), crt:()=>applyCRT()
+    ascii:()=>applyASCII(), glitch:()=>applyGlitch(), noise:()=>applyNoise(), grain:()=>applyGrain(), dots:()=>applyDots(), grid:()=>applyGrid(), scanlines:()=>applyScanlines(), vignette:()=>applyVignette(), crt:()=>applyCRT(),
+    threshold:()=>applyThreshold(), exposure:()=>applyExposure(), colortemp:()=>applyColorTemp(),
+    rgbgain:()=>applyRGBGain(), levels:()=>applyLevels(), colorbal:()=>applyColorBalance(), colmatrix:()=>applyColorMatrix(),
+    blursharp:()=>applyBlurSharp(), modulate:()=>applyModulate(), ripple:()=>applyRipple(), swirl:()=>applySwirl(),
+    reedglass:()=>applyReedGlass(), polar2rect:()=>applyPolar2Rect(), rect2polar:()=>applyRect2Polar(),
+    radblur:()=>applyRadialBlur(), zoomblur:()=>applyZoomBlur(), circblur:()=>applyCircBlur(), elgrid:()=>applyElasticGrid(),
+    printstamp:()=>applyPrintStamp(), y2kblue:()=>applyY2KBlue(),
+    ntsc:()=>applyNTSC(), stripe:()=>applyStripe(), paperscan:()=>applyPaperScan(), xerox:()=>applyXerox(), grunge:()=>applyGrunge()
 };
 
 // ── SHARED PALETTES (used by Palette, Dither, Gradient effects) ──
@@ -343,38 +565,306 @@ const PALETTES = {
     bw: [[0,0,0],[255,255,255]]
 };
 
+const DUO_PRESETS = {
+    midnight: ['#0a0a2e','#4fc3f7'],
+    sunset: ['#2d1b69','#ff6b35'],
+    forest: ['#1a3a1a','#7ecf7e'],
+    ocean: ['#0a2647','#17c3b2'],
+    neon: ['#0d0221','#ff2e63'],
+    vintage: ['#3e2723','#d4a574']
+};
+
 // ── FX DEFAULTS (for reset functionality) ──
 const FX_DEFAULTS = {
-    sepia: {sepiaIntensity:70},
+    sepia: {sepiaIntensity:70,sepiaWarmth:0},
     tint: {tintPreset:'green',tintIntensity:70,tintCustomColor:'#00ff00'},
     palette: {palettePreset:'noir',paletteIntensity:80},
     bricon: {briValue:0,conValue:100,satValue:100},
-    chroma: {chromaOffset:5},
+    chroma: {chromaOffset:5,chromaMode:'linear'},
     curve: {curveIntensity:30,curveDirection:'barrel'},
-    wave: {waveAmp:20,waveFreq:5,waveSpeed:2},
+    wave: {waveAmp:20,waveFreq:5,waveSpeed:2,waveMode:'horizontal'},
     jitter: {jitterIntensity:20,jitterBlockSize:2,jitterMode:'random'},
     mblur: {mblurIntensity:30,mblurAngle:0},
-    bloom: {bloomIntensity:40,bloomRadius:50,bloomThreshold:50,bloomSpread:50,bloomBlendMode:'additive',bloomExposure:100},
+    bloom: {bloomIntensity:40,bloomRadius:50,bloomThreshold:50,bloomSpread:50,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
     dither: {ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:1,ditherStrength:100},
     atkinson: {atkinsonColorMode:'bw',atkinsonThreshold:128,atkinsonSpread:100,atkinsonStrength:100},
     halftone: {halfSpacing:6,halfColorMode:'bw',halfAngle:0,halfContrast:50,halfSpread:0,halfShape:'circle',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false},
     pxsort: {pxsortLo:30,pxsortHi:220,pxsortDir:'horizontal'},
-    pixel: {pixelSize:8},
+    pixel: {pixelSize:8,pixelMode:'square'},
     ascii: {asciiCellSize:10,asciiColorMode:'mono',asciiCharSet:'classic',asciiInvert:false},
     glitch: {glitchIntensity:30,glitchFreq:20,glitchMode:'shift',glitchChannelShift:50,glitchBlockSize:50,glitchSeed:0,glitchSpeed:50},
-    noise: {noiseIntensity:25,noiseScale:1,noiseColorMode:'mono'},
+    noise: {noiseIntensity:25,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
     grain: {grainIntensity:35,grainSize:15,grainColorMode:'mono'},
     dots: {dotsAngle:45,dotsScale:6},
     grid: {gridScale:20,gridWidth:1,gridOpacity:30},
-    scanlines: {scanIntensity:50,scanCount:300},
-    vignette: {vigIntensity:50,vigRadius:70},
-    thermal: {thermalIntensity:80},
-    gradmap: {gradColor1:'#000033',gradColor2:'#ff6600',gradIntensity:80},
+    scanlines: {scanIntensity:50,scanCount:300,scanVertical:false},
+    vignette: {vigIntensity:50,vigRadius:70,vigColor:'#000000'},
+    thermal: {thermalIntensity:80,thermalPalette:'default'},
+    gradmap: {gradColor1:'#000033',gradColor2:'#ff6600',gradColor3:'#888888',gradMidpoint:50,gradIntensity:80},
     duotone: {duoShadow:'#1a1a2e',duoHighlight:'#e94560',duoIntensity:80},
     rgbshift: {rgbShiftRX:5,rgbShiftRY:0,rgbShiftBX:-5,rgbShiftBY:0,rgbShiftIntensity:70},
-    emboss: {embossAngle:135,embossStrength:50},
-    led: {ledCellSize:8,ledGap:2,ledGlow:30,ledBrightness:100},
-    crt: {crtScanWeight:2,crtCurvature:30,crtGlow:50,crtChroma:3,crtStatic:20}
+    emboss: {embossAngle:135,embossStrength:50,embossColor:false},
+    led: {ledCellSize:8,ledGap:2,ledGlow:30,ledBrightness:100,ledShape:'square'},
+    crt: {crtScanWeight:2,crtCurvature:30,crtGlow:50,crtChroma:3,crtStatic:20,crtPhosphor:'none'},
+    threshold: {thresholdLevel:128,thresholdInvert:false},
+    exposure: {exposureEV:0},
+    colortemp: {colortempValue:0},
+    rgbgain: {rgbGainR:100,rgbGainG:100,rgbGainB:100,rgbGainGamma:1.0},
+    levels: {levelsInBlack:0,levelsInWhite:255,levelsGamma:1.0,levelsOutBlack:0,levelsOutWhite:255},
+    colorbal: {colorbalShadowR:0,colorbalShadowG:0,colorbalShadowB:0,colorbalMidR:0,colorbalMidG:0,colorbalMidB:0,colorbalHiR:0,colorbalHiG:0,colorbalHiB:0},
+    colmatrix: {colmatrixPreset:'none',colmatrixIntensity:80},
+    blursharp: {blursharpAmount:0},
+    modulate: {modulateFreq:10,modulateAmp:20,modulateSpeed:1,modulateDir:'horizontal'},
+    ripple: {rippleFreq:5,rippleAmp:15,rippleSpeed:2,rippleDamping:0},
+    swirl: {swirlAngle:90,swirlRadius:70},
+    reedglass: {reedWidth:10,reedDistortion:20,reedChromatic:false},
+    polar2rect: {polar2rectRotation:0},
+    rect2polar: {rect2polarRotation:0},
+    radblur: {radblurIntensity:30},
+    zoomblur: {zoomblurIntensity:30},
+    circblur: {circblurIntensity:30},
+    elgrid: {elgridSize:12,elgridWarp:30,elgridSpeed:1,elgridAnimated:true},
+    printstamp: {printstampDotSize:6,printstampContrast:60,printstampGrain:40},
+    y2kblue: {y2kBlueShift:70,y2kGlow:40,y2kGrain:30},
+    ntsc: {ntscChromaBleed:50,ntscInstability:30,ntscNoise:20,ntscRolling:false},
+    stripe: {stripeDensity:10,stripeAngle:0,stripeThickness:2,stripeOpacity:50,stripeMode:'linear'},
+    paperscan: {paperscanIntensity:40,paperscanFiber:3,paperscanWarmth:30},
+    xerox: {xeroxContrast:60,xeroxNoise:40,xeroxDarkness:50},
+    grunge: {grungeTint:'#cc6677',grungePosterize:3,grungeGrain:50}
+};
+
+// ── FX_PRESETS — Built-in preset definitions (inspired by effect.app) ──
+// Each preset: name, category, description, effects (which effects + parameter values)
+const FX_PRESET_CATEGORIES = ['all','film','retro','digital','creative','glitch'];
+const FX_PRESET_CAT_LABELS = {all:'All',film:'Film',retro:'Retro',digital:'Digital',creative:'Creative',glitch:'Glitch'};
+const FX_PRESET_CAT_COLORS = {all:'#888888',film:'#6C5CE7',retro:'#E17055',digital:'#00B894',creative:'#FDCB6E',glitch:'#FD79A8'};
+const FX_PRESETS = {
+    cyanotype: {
+        name:'Cyanotype', category:'film',
+        desc:'Classic blue sun-print look',
+        effects:{
+            duotone:{duoShadow:'#001133',duoHighlight:'#5588cc',duoIntensity:95},
+            grain:{grainIntensity:25,grainSize:12,grainColorMode:'mono'},
+            vignette:{vigIntensity:45,vigRadius:60,vigColor:'#000022'}
+        }
+    },
+    vintage_poster: {
+        name:'Vintage Poster', category:'film',
+        desc:'Warm retro poster aesthetic',
+        effects:{
+            sepia:{sepiaIntensity:55,sepiaWarmth:20},
+            exposure:{exposureEV:0.3},
+            grain:{grainIntensity:30,grainSize:18,grainColorMode:'mono'},
+            vignette:{vigIntensity:55,vigRadius:55,vigColor:'#1a0a00'}
+        }
+    },
+    vintage_print: {
+        name:'Vintage Print', category:'film',
+        desc:'Aged printed paper texture',
+        effects:{
+            sepia:{sepiaIntensity:40,sepiaWarmth:15},
+            paperscan:{paperscanIntensity:50,paperscanFiber:4,paperscanWarmth:40},
+            grain:{grainIntensity:35,grainSize:20,grainColorMode:'mono'}
+        }
+    },
+    soft_editorial: {
+        name:'Soft Editorial', category:'film',
+        desc:'Clean fashion editorial look',
+        effects:{
+            blursharp:{blursharpAmount:-15},
+            exposure:{exposureEV:0.4},
+            colortemp:{colortempValue:10},
+            vignette:{vigIntensity:25,vigRadius:80,vigColor:'#000000'}
+        }
+    },
+    noir: {
+        name:'Noir', category:'film',
+        desc:'High-contrast black and white',
+        effects:{
+            levels:{levelsInBlack:30,levelsInWhite:220,levelsGamma:0.9,levelsOutBlack:0,levelsOutWhite:255},
+            duotone:{duoShadow:'#000000',duoHighlight:'#ffffff',duoIntensity:100},
+            vignette:{vigIntensity:60,vigRadius:50,vigColor:'#000000'},
+            grain:{grainIntensity:20,grainSize:10,grainColorMode:'mono'}
+        }
+    },
+    vhs: {
+        name:'VHS', category:'retro',
+        desc:'Worn VHS tape distortion',
+        effects:{
+            ntsc:{ntscChromaBleed:65,ntscInstability:45,ntscNoise:35,ntscRolling:false},
+            noise:{noiseIntensity:15,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'},
+            scanlines:{scanIntensity:30,scanCount:250,scanVertical:false}
+        }
+    },
+    crt_retro: {
+        name:'CRT Retro', category:'retro',
+        desc:'Old CRT monitor effect',
+        effects:{
+            crt:{crtScanWeight:3,crtCurvature:40,crtGlow:60,crtChroma:4,crtStatic:30,crtPhosphor:'slot'},
+            noise:{noiseIntensity:10,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+        }
+    },
+    y2k_blue: {
+        name:'Y2K Blue', category:'retro',
+        desc:'Early 2000s blue digital glow',
+        effects:{
+            y2kblue:{y2kBlueShift:85,y2kGlow:55,y2kGrain:25}
+        }
+    },
+    ntsc_broadcast: {
+        name:'NTSC Broadcast', category:'retro',
+        desc:'Analog TV broadcast signal',
+        effects:{
+            ntsc:{ntscChromaBleed:40,ntscInstability:20,ntscNoise:15,ntscRolling:false},
+            stripe:{stripeDensity:15,stripeAngle:0,stripeThickness:1,stripeOpacity:20,stripeMode:'linear'},
+            noise:{noiseIntensity:8,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+        }
+    },
+    mod_dither: {
+        name:'Modulation Dither', category:'digital',
+        desc:'Wavy dithered pixel pattern',
+        effects:{
+            modulate:{modulateFreq:8,modulateAmp:15,modulateSpeed:1,modulateDir:'horizontal'},
+            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:2,ditherStrength:100}
+        }
+    },
+    digital_gobelin: {
+        name:'Digital Gobelin', category:'digital',
+        desc:'Woven tapestry pixel art',
+        effects:{
+            pixel:{pixelSize:6,pixelMode:'square'},
+            halftone:{halfSpacing:4,halfColorMode:'color',halfAngle:15,halfContrast:60,halfSpread:0,halfShape:'circle',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false}
+        }
+    },
+    led_matrix: {
+        name:'LED Matrix', category:'digital',
+        desc:'LED screen display grid',
+        effects:{
+            led:{ledCellSize:6,ledGap:2,ledGlow:50,ledBrightness:110,ledShape:'circle'},
+            bloom:{bloomIntensity:30,bloomRadius:40,bloomThreshold:40,bloomSpread:60,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false}
+        }
+    },
+    msx_ascii: {
+        name:'MSX ASCII', category:'digital',
+        desc:'Green phosphor ASCII terminal',
+        effects:{
+            ascii:{asciiCellSize:8,asciiColorMode:'mono',asciiCharSet:'classic',asciiInvert:false},
+            crt:{crtScanWeight:2,crtCurvature:20,crtGlow:40,crtChroma:0,crtStatic:15,crtPhosphor:'slot'},
+            noise:{noiseIntensity:8,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+        }
+    },
+    psychedelic: {
+        name:'Psychedelic', category:'creative',
+        desc:'Colorful warped visuals',
+        effects:{
+            chroma:{chromaOffset:12,chromaMode:'radial'},
+            wave:{waveAmp:15,waveFreq:3,waveSpeed:2,waveMode:'horizontal'},
+            bloom:{bloomIntensity:50,bloomRadius:60,bloomThreshold:35,bloomSpread:70,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false}
+        }
+    },
+    dreamy: {
+        name:'Dreamy', category:'creative',
+        desc:'Soft ethereal glow',
+        effects:{
+            bloom:{bloomIntensity:55,bloomRadius:70,bloomThreshold:30,bloomSpread:80,bloomBlendMode:'screen',bloomExposure:110,bloomAnamorphic:false},
+            blursharp:{blursharpAmount:-20},
+            vignette:{vigIntensity:35,vigRadius:75,vigColor:'#0a0015'}
+        }
+    },
+    night_vision: {
+        name:'Night Vision', category:'creative',
+        desc:'Military night-vision green',
+        effects:{
+            thermal:{thermalIntensity:90,thermalPalette:'night'},
+            noise:{noiseIntensity:30,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
+            scanlines:{scanIntensity:25,scanCount:400,scanVertical:false},
+            vignette:{vigIntensity:65,vigRadius:45,vigColor:'#000000'}
+        }
+    },
+    orb: {
+        name:'ORB', category:'creative',
+        desc:'Radial bloom orb effect',
+        effects:{
+            radblur:{radblurIntensity:45},
+            bloom:{bloomIntensity:60,bloomRadius:80,bloomThreshold:25,bloomSpread:90,bloomBlendMode:'additive',bloomExposure:120,bloomAnamorphic:false},
+            duotone:{duoShadow:'#0a1a0a',duoHighlight:'#44ff88',duoIntensity:70}
+        }
+    },
+    glitch_art: {
+        name:'Glitch Art', category:'glitch',
+        desc:'Digital corruption aesthetic',
+        effects:{
+            glitch:{glitchIntensity:50,glitchFreq:30,glitchMode:'shift',glitchChannelShift:70,glitchBlockSize:40,glitchSeed:0,glitchSpeed:60},
+            rgbshift:{rgbShiftRX:8,rgbShiftRY:2,rgbShiftBX:-6,rgbShiftBY:-2,rgbShiftIntensity:80},
+            noise:{noiseIntensity:15,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'}
+        }
+    },
+    type_distress: {
+        name:'Type Distress', category:'glitch',
+        desc:'Damaged printed type texture',
+        effects:{
+            threshold:{thresholdLevel:120,thresholdInvert:false},
+            noise:{noiseIntensity:35,noiseScale:2,noiseColorMode:'mono',noiseAlgo:'random'},
+            emboss:{embossAngle:135,embossStrength:30,embossColor:false}
+        }
+    },
+    xerox_copy: {
+        name:'Xerox Copy', category:'glitch',
+        desc:'Photocopier degradation',
+        effects:{
+            xerox:{xeroxContrast:70,xeroxNoise:50,xeroxDarkness:55},
+            paperscan:{paperscanIntensity:30,paperscanFiber:2,paperscanWarmth:10}
+        }
+    },
+    emboss_dirt: {
+        name:'Emboss Dirt', category:'glitch',
+        desc:'Textured emboss with grit',
+        effects:{
+            emboss:{embossAngle:135,embossStrength:60,embossColor:true},
+            grunge:{grungeTint:'#886644',grungePosterize:4,grungeGrain:60},
+            noise:{noiseIntensity:12,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+        }
+    },
+    static_grain: {
+        name:'Static Grain', category:'glitch',
+        desc:'Heavy film grain static',
+        effects:{
+            noise:{noiseIntensity:40,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
+            grain:{grainIntensity:50,grainSize:25,grainColorMode:'mono'}
+        }
+    },
+    soft_bleed: {
+        name:'Soft Bleed Cracks', category:'creative',
+        desc:'Ink bleeding on cracked paper',
+        effects:{
+            blursharp:{blursharpAmount:-25},
+            paperscan:{paperscanIntensity:60,paperscanFiber:5,paperscanWarmth:20},
+            grunge:{grungeTint:'#997766',grungePosterize:5,grungeGrain:40}
+        }
+    },
+    rgb_hatch: {
+        name:'RGB Hatch', category:'digital',
+        desc:'RGB channel crosshatch pattern',
+        effects:{
+            rgbshift:{rgbShiftRX:4,rgbShiftRY:0,rgbShiftBX:-4,rgbShiftBY:0,rgbShiftIntensity:60},
+            halftone:{halfSpacing:5,halfColorMode:'color',halfAngle:45,halfContrast:70,halfSpread:10,halfShape:'line',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false}
+        }
+    },
+    print_stamp: {
+        name:'Print Stamp', category:'film',
+        desc:'Rubber stamp print texture',
+        effects:{
+            printstamp:{printstampDotSize:5,printstampContrast:70,printstampGrain:50}
+        }
+    },
+    grunge_poster: {
+        name:'Grunge', category:'glitch',
+        desc:'Dirty textured grunge look',
+        effects:{
+            grunge:{grungeTint:'#cc6677',grungePosterize:3,grungeGrain:60},
+            vignette:{vigIntensity:40,vigRadius:55,vigColor:'#1a0a0a'}
+        }
+    }
 };
 
 // ── FX_UI_CONFIG — UI control definitions for JS-generated FX panel ──
@@ -382,7 +872,8 @@ const FX_DEFAULTS = {
 // Control types: slider, selector, color, shape, swatch, toggle
 const FX_UI_CONFIG = {
     sepia: { label:'Sepia', controls:[
-        {type:'slider',sid:'slider-sepia-intensity',vid:'val-sepia-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>sepiaIntensity=v}
+        {type:'slider',sid:'slider-sepia-intensity',vid:'val-sepia-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>sepiaIntensity=v},
+        {type:'slider',sid:'slider-sepia-warmth',vid:'val-sepia-warmth',label:'Warmth',min:-50,max:50,step:1,setter:v=>sepiaWarmth=v}
     ]},
     tint: { label:'Tint', hasRandomize:true, controls:[
         {type:'selector',cid:'tint-preset-buttons',label:'Preset',setter:v=>tintPreset=v,
@@ -401,20 +892,27 @@ const FX_UI_CONFIG = {
         {type:'slider',sid:'slider-sat',vid:'val-sat',label:'Saturation',min:0,max:200,step:1,setter:v=>satValue=v}
     ]},
     thermal: { label:'Thermal', hasRandomize:true, controls:[
-        {type:'slider',sid:'slider-thermal-intensity',vid:'val-thermal-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>thermalIntensity=v}
+        {type:'slider',sid:'slider-thermal-intensity',vid:'val-thermal-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>thermalIntensity=v},
+        {type:'selector',cid:'thermal-palette-buttons',label:'Palette',setter:v=>thermalPalette=v,
+         opts:[{v:'default',l:'DEFAULT'},{v:'iron',l:'IRON'},{v:'rainbow',l:'RAINBOW'},{v:'arctic',l:'ARCTIC'},{v:'night',l:'NIGHT'}]}
     ]},
     gradmap: { label:'Grad Map', hasRandomize:true, controls:[
         {type:'color',cid:'grad-color1',hid:'grad-color1-hex',label:'Shadow',setter:v=>gradColor1=v},
+        {type:'color',cid:'grad-color3',hid:'grad-color3-hex',label:'Midtone',setter:v=>gradColor3=v},
         {type:'color',cid:'grad-color2',hid:'grad-color2-hex',label:'Highlight',setter:v=>gradColor2=v},
+        {type:'slider',sid:'slider-grad-midpoint',vid:'val-grad-midpoint',label:'Midpoint',min:10,max:90,step:1,setter:v=>gradMidpoint=v},
         {type:'slider',sid:'slider-grad-intensity',vid:'val-grad-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>gradIntensity=v}
     ]},
     duotone: { label:'Duotone', hasRandomize:true, controls:[
         {type:'color',cid:'duo-shadow',hid:'duo-shadow-hex',label:'Shadow',setter:v=>duoShadow=v},
         {type:'color',cid:'duo-highlight',hid:'duo-highlight-hex',label:'Highlight',setter:v=>duoHighlight=v},
-        {type:'slider',sid:'slider-duo-intensity',vid:'val-duo-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>duoIntensity=v}
+        {type:'slider',sid:'slider-duo-intensity',vid:'val-duo-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>duoIntensity=v},
+        {type:'selector',cid:'duo-preset-buttons',label:'Preset',setter:v=>{let presets={midnight:['#0a0a2e','#4fc3f7'],sunset:['#2d1b69','#ff6b35'],forest:['#1a3a1a','#7ecf7e'],ocean:['#0a2647','#17c3b2'],neon:['#0d0221','#ff2e63'],vintage:['#3e2723','#d4a574']};if(presets[v]){duoShadow=presets[v][0];duoHighlight=presets[v][1];}},opts:[{v:'midnight',l:'MIDNT'},{v:'sunset',l:'SUNST'},{v:'forest',l:'FORST'},{v:'ocean',l:'OCEAN'},{v:'neon',l:'NEON'},{v:'vintage',l:'VNTGE'}]}
     ]},
     chroma: { label:'Chromatic', controls:[
-        {type:'slider',sid:'slider-chroma-offset',vid:'val-chroma-offset',label:'Offset',min:1,max:25,step:1,setter:v=>chromaOffset=v}
+        {type:'slider',sid:'slider-chroma-offset',vid:'val-chroma-offset',label:'Offset',min:1,max:25,step:1,setter:v=>chromaOffset=v},
+        {type:'selector',cid:'chroma-mode-buttons',label:'Mode',setter:v=>chromaMode=v,
+         opts:[{v:'linear',l:'LINEAR'},{v:'radial',l:'RADIAL'}]}
     ]},
     rgbshift: { label:'RGB Shift', hasRandomize:true, controls:[
         {type:'slider',sid:'slider-rgbshift-rx',vid:'val-rgbshift-rx',label:'Red X',min:-25,max:25,step:1,setter:v=>rgbShiftRX=v},
@@ -431,7 +929,9 @@ const FX_UI_CONFIG = {
     wave: { label:'Wave', controls:[
         {type:'slider',sid:'slider-wave-amp',vid:'val-wave-amp',label:'Amplitude',min:1,max:100,step:1,setter:v=>waveAmp=v},
         {type:'slider',sid:'slider-wave-freq',vid:'val-wave-freq',label:'Frequency',min:1,max:20,step:1,setter:v=>waveFreq=v},
-        {type:'slider',sid:'slider-wave-speed',vid:'val-wave-speed',label:'Speed',min:0,max:5,step:0.1,setter:v=>waveSpeed=v}
+        {type:'slider',sid:'slider-wave-speed',vid:'val-wave-speed',label:'Speed',min:0,max:5,step:0.1,setter:v=>waveSpeed=v},
+        {type:'selector',cid:'wave-mode-buttons',label:'Mode',setter:v=>waveMode=v,
+         opts:[{v:'horizontal',l:'HORIZ'},{v:'vertical',l:'VERT'},{v:'circular',l:'CIRC'}]}
     ]},
     jitter: { label:'Jitter', controls:[
         {type:'slider',sid:'slider-jitter-intensity',vid:'val-jitter-intensity',label:'Intensity',min:1,max:100,step:1,setter:v=>jitterIntensity=v},
@@ -445,7 +945,8 @@ const FX_UI_CONFIG = {
     ]},
     emboss: { label:'Emboss', hasRandomize:true, controls:[
         {type:'slider',sid:'slider-emboss-angle',vid:'val-emboss-angle',label:'Angle',min:0,max:360,step:1,setter:v=>embossAngle=v},
-        {type:'slider',sid:'slider-emboss-strength',vid:'val-emboss-strength',label:'Strength',min:5,max:100,step:1,setter:v=>embossStrength=v}
+        {type:'slider',sid:'slider-emboss-strength',vid:'val-emboss-strength',label:'Strength',min:5,max:100,step:1,setter:v=>embossStrength=v},
+        {type:'toggle',tid:'emboss-color-toggle',label:'Preserve Color',setter:v=>embossColor=v}
     ]},
     bloom: { label:'Bloom', hasRandomize:true, controls:[
         {type:'slider',sid:'slider-bloom-intensity',vid:'val-bloom-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>bloomIntensity=v},
@@ -454,7 +955,8 @@ const FX_UI_CONFIG = {
         {type:'slider',sid:'slider-bloom-spread',vid:'val-bloom-spread',label:'Spread',min:10,max:100,step:1,setter:v=>bloomSpread=v},
         {type:'slider',sid:'slider-bloom-exposure',vid:'val-bloom-exposure',label:'Exposure',min:50,max:200,step:1,setter:v=>bloomExposure=v},
         {type:'selector',cid:'bloom-blend-buttons',label:'Blend',setter:v=>bloomBlendMode=v,
-         opts:[{v:'additive',l:'ADD'},{v:'screen',l:'SCREEN'},{v:'soft',l:'SOFT'}]}
+         opts:[{v:'additive',l:'ADD'},{v:'screen',l:'SCREEN'},{v:'soft',l:'SOFT'}]},
+        {type:'toggle',tid:'bloom-anamorphic-toggle',label:'Anamorphic',setter:v=>bloomAnamorphic=v}
     ]},
     dither: { label:'Dither', hasRandomize:true, controls:[
         {type:'selector',cid:'dither-algo-buttons',label:'Algorithm',setter:v=>ditherAlgorithm=v,
@@ -509,13 +1011,17 @@ const FX_UI_CONFIG = {
          opts:[{v:'horizontal',l:'HORIZ'},{v:'vertical',l:'VERT'}]}
     ]},
     pixel: { label:'Pixelate', controls:[
-        {type:'slider',sid:'slider-pixel-size',vid:'val-pixel-size',label:'Size',min:2,max:50,step:1,setter:v=>pixelSize=v}
+        {type:'slider',sid:'slider-pixel-size',vid:'val-pixel-size',label:'Size',min:2,max:50,step:1,setter:v=>pixelSize=v},
+        {type:'selector',cid:'pixel-mode-buttons',label:'Mode',setter:v=>pixelMode=v,
+         opts:[{v:'square',l:'SQUARE'},{v:'hex',l:'HEX'}]}
     ]},
     led: { label:'LED Screen', hasRandomize:true, controls:[
         {type:'slider',sid:'slider-led-cellsize',vid:'val-led-cellsize',label:'Cell Size',min:4,max:20,step:1,setter:v=>ledCellSize=v},
         {type:'slider',sid:'slider-led-gap',vid:'val-led-gap',label:'Gap',min:1,max:5,step:1,setter:v=>ledGap=v},
         {type:'slider',sid:'slider-led-glow',vid:'val-led-glow',label:'Glow',min:0,max:100,step:1,setter:v=>ledGlow=v},
-        {type:'slider',sid:'slider-led-brightness',vid:'val-led-brightness',label:'Brightness',min:50,max:150,step:1,setter:v=>ledBrightness=v}
+        {type:'slider',sid:'slider-led-brightness',vid:'val-led-brightness',label:'Brightness',min:50,max:150,step:1,setter:v=>ledBrightness=v},
+        {type:'selector',cid:'led-shape-buttons',label:'Shape',setter:v=>ledShape=v,
+         opts:[{v:'square',l:'SQUARE'},{v:'circle',l:'CIRCLE'}]}
     ]},
     ascii: { label:'ASCII', controls:[
         {type:'slider',sid:'slider-ascii-cell',vid:'val-ascii-cell',label:'Cell Size',min:4,max:24,step:1,setter:v=>asciiCellSize=v},
@@ -540,7 +1046,9 @@ const FX_UI_CONFIG = {
         {type:'slider',sid:'slider-noise-intensity',vid:'val-noise-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>noiseIntensity=v},
         {type:'slider',sid:'slider-noise-scale',vid:'val-noise-scale',label:'Scale',min:1,max:10,step:1,setter:v=>noiseScale=v},
         {type:'selector',cid:'noise-color-buttons',label:'Color',setter:v=>noiseColorMode=v,
-         opts:[{v:'mono',l:'MONO'},{v:'color',l:'COLOR'}]}
+         opts:[{v:'mono',l:'MONO'},{v:'color',l:'COLOR'}]},
+        {type:'selector',cid:'noise-algo-buttons',label:'Algorithm',setter:v=>noiseAlgo=v,
+         opts:[{v:'random',l:'RANDOM'},{v:'simplex',l:'SIMPLEX'}]}
     ]},
     grain: { label:'Grain', controls:[
         {type:'slider',sid:'slider-grain-intensity',vid:'val-grain-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>grainIntensity=v},
@@ -559,18 +1067,146 @@ const FX_UI_CONFIG = {
     ]},
     scanlines: { label:'Scanlines', controls:[
         {type:'slider',sid:'slider-scan-intensity',vid:'val-scan-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>scanIntensity=v},
-        {type:'slider',sid:'slider-scan-count',vid:'val-scan-count',label:'Count',min:50,max:800,step:10,setter:v=>scanCount=v}
+        {type:'slider',sid:'slider-scan-count',vid:'val-scan-count',label:'Count',min:50,max:800,step:10,setter:v=>scanCount=v},
+        {type:'toggle',tid:'scan-vertical-toggle',label:'Vertical',setter:v=>scanVertical=v}
     ]},
     vignette: { label:'Vignette', controls:[
         {type:'slider',sid:'slider-vig-intensity',vid:'val-vig-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>vigIntensity=v},
-        {type:'slider',sid:'slider-vig-radius',vid:'val-vig-radius',label:'Radius',min:20,max:100,step:1,setter:v=>vigRadius=v}
+        {type:'slider',sid:'slider-vig-radius',vid:'val-vig-radius',label:'Radius',min:20,max:100,step:1,setter:v=>vigRadius=v},
+        {type:'color',cid:'vig-color',hid:'vig-color-hex',label:'Color',setter:v=>vigColor=v}
     ]},
     crt: { label:'CRT Screen', hasRandomize:true, controls:[
         {type:'slider',sid:'slider-crt-scanweight',vid:'val-crt-scanweight',label:'Scan Weight',min:1,max:5,step:1,setter:v=>crtScanWeight=v},
         {type:'slider',sid:'slider-crt-curvature',vid:'val-crt-curvature',label:'Curvature',min:0,max:100,step:1,setter:v=>crtCurvature=v},
         {type:'slider',sid:'slider-crt-glow',vid:'val-crt-glow',label:'Phosphor Glow',min:0,max:100,step:1,setter:v=>crtGlow=v},
         {type:'slider',sid:'slider-crt-chroma',vid:'val-crt-chroma',label:'Chroma Fringe',min:0,max:10,step:1,setter:v=>crtChroma=v},
-        {type:'slider',sid:'slider-crt-static',vid:'val-crt-static',label:'Static Noise',min:0,max:100,step:1,setter:v=>crtStatic=v}
+        {type:'slider',sid:'slider-crt-static',vid:'val-crt-static',label:'Static Noise',min:0,max:100,step:1,setter:v=>crtStatic=v},
+        {type:'selector',cid:'crt-phosphor-buttons',label:'Phosphor',setter:v=>crtPhosphor=v,
+         opts:[{v:'none',l:'NONE'},{v:'slot',l:'SLOT'},{v:'aperture',l:'APRT'},{v:'shadow',l:'SHDW'}]}
+    ]},
+    threshold: { label:'Threshold', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-threshold-level',vid:'val-threshold-level',label:'Level',min:0,max:255,step:1,setter:v=>thresholdLevel=v},
+        {type:'toggle',tid:'threshold-invert-toggle',label:'Invert',setter:v=>thresholdInvert=v}
+    ]},
+    exposure: { label:'Exposure', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-exposure-ev',vid:'val-exposure-ev',label:'EV',min:-30,max:30,step:1,setter:v=>exposureEV=v}
+    ]},
+    colortemp: { label:'Color Temp', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-colortemp',vid:'val-colortemp',label:'Temperature',min:-100,max:100,step:1,setter:v=>colortempValue=v}
+    ]},
+    rgbgain: { label:'RGB Gain', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-rgbgain-r',vid:'val-rgbgain-r',label:'Red',min:0,max:200,step:1,setter:v=>rgbGainR=v},
+        {type:'slider',sid:'slider-rgbgain-g',vid:'val-rgbgain-g',label:'Green',min:0,max:200,step:1,setter:v=>rgbGainG=v},
+        {type:'slider',sid:'slider-rgbgain-b',vid:'val-rgbgain-b',label:'Blue',min:0,max:200,step:1,setter:v=>rgbGainB=v},
+        {type:'slider',sid:'slider-rgbgain-gamma',vid:'val-rgbgain-gamma',label:'Gamma',min:2,max:50,step:1,setter:v=>rgbGainGamma=v/10}
+    ]},
+    levels: { label:'Levels', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-levels-inblack',vid:'val-levels-inblack',label:'In Black',min:0,max:255,step:1,setter:v=>levelsInBlack=v},
+        {type:'slider',sid:'slider-levels-inwhite',vid:'val-levels-inwhite',label:'In White',min:0,max:255,step:1,setter:v=>levelsInWhite=v},
+        {type:'slider',sid:'slider-levels-gamma',vid:'val-levels-gamma',label:'Gamma',min:2,max:50,step:1,setter:v=>levelsGamma=v/10},
+        {type:'slider',sid:'slider-levels-outblack',vid:'val-levels-outblack',label:'Out Black',min:0,max:255,step:1,setter:v=>levelsOutBlack=v},
+        {type:'slider',sid:'slider-levels-outwhite',vid:'val-levels-outwhite',label:'Out White',min:0,max:255,step:1,setter:v=>levelsOutWhite=v}
+    ]},
+    colorbal: { label:'Color Bal', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-colorbal-sr',vid:'val-colorbal-sr',label:'Shadow R',min:-100,max:100,step:1,setter:v=>colorbalShadowR=v},
+        {type:'slider',sid:'slider-colorbal-sg',vid:'val-colorbal-sg',label:'Shadow G',min:-100,max:100,step:1,setter:v=>colorbalShadowG=v},
+        {type:'slider',sid:'slider-colorbal-sb',vid:'val-colorbal-sb',label:'Shadow B',min:-100,max:100,step:1,setter:v=>colorbalShadowB=v},
+        {type:'slider',sid:'slider-colorbal-mr',vid:'val-colorbal-mr',label:'Mid R',min:-100,max:100,step:1,setter:v=>colorbalMidR=v},
+        {type:'slider',sid:'slider-colorbal-mg',vid:'val-colorbal-mg',label:'Mid G',min:-100,max:100,step:1,setter:v=>colorbalMidG=v},
+        {type:'slider',sid:'slider-colorbal-mb',vid:'val-colorbal-mb',label:'Mid B',min:-100,max:100,step:1,setter:v=>colorbalMidB=v},
+        {type:'slider',sid:'slider-colorbal-hr',vid:'val-colorbal-hr',label:'Hi R',min:-100,max:100,step:1,setter:v=>colorbalHiR=v},
+        {type:'slider',sid:'slider-colorbal-hg',vid:'val-colorbal-hg',label:'Hi G',min:-100,max:100,step:1,setter:v=>colorbalHiG=v},
+        {type:'slider',sid:'slider-colorbal-hb',vid:'val-colorbal-hb',label:'Hi B',min:-100,max:100,step:1,setter:v=>colorbalHiB=v}
+    ]},
+    colmatrix: { label:'Color Mix', hasRandomize:true, controls:[
+        {type:'selector',cid:'colmatrix-preset-buttons',label:'Preset',setter:v=>colmatrixPreset=v,
+         opts:[{v:'none',l:'NONE'},{v:'sepia-warm',l:'SEPIA+'},{v:'cross',l:'CROSS'},{v:'infrared',l:'INFRA'},{v:'nightvision',l:'NIGHT'}]},
+        {type:'slider',sid:'slider-colmatrix-intensity',vid:'val-colmatrix-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>colmatrixIntensity=v}
+    ]},
+    blursharp: { label:'Blur/Sharp', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-blursharp',vid:'val-blursharp',label:'Amount',min:-100,max:100,step:1,setter:v=>blursharpAmount=v}
+    ]},
+    modulate: { label:'Modulate', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-modulate-freq',vid:'val-modulate-freq',label:'Frequency',min:1,max:50,step:1,setter:v=>modulateFreq=v},
+        {type:'slider',sid:'slider-modulate-amp',vid:'val-modulate-amp',label:'Amplitude',min:1,max:100,step:1,setter:v=>modulateAmp=v},
+        {type:'slider',sid:'slider-modulate-speed',vid:'val-modulate-speed',label:'Speed',min:0,max:50,step:1,setter:v=>modulateSpeed=v/10},
+        {type:'selector',cid:'modulate-dir-buttons',label:'Direction',setter:v=>modulateDir=v,
+         opts:[{v:'horizontal',l:'HORIZ'},{v:'vertical',l:'VERT'},{v:'both',l:'BOTH'}]}
+    ]},
+    ripple: { label:'Ripple', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-ripple-freq',vid:'val-ripple-freq',label:'Frequency',min:1,max:20,step:1,setter:v=>rippleFreq=v},
+        {type:'slider',sid:'slider-ripple-amp',vid:'val-ripple-amp',label:'Amplitude',min:1,max:50,step:1,setter:v=>rippleAmp=v},
+        {type:'slider',sid:'slider-ripple-speed',vid:'val-ripple-speed',label:'Speed',min:0,max:50,step:1,setter:v=>rippleSpeed=v/10},
+        {type:'slider',sid:'slider-ripple-damping',vid:'val-ripple-damping',label:'Damping',min:0,max:100,step:1,setter:v=>rippleDamping=v}
+    ]},
+    swirl: { label:'Swirl', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-swirl-angle',vid:'val-swirl-angle',label:'Angle',min:-360,max:360,step:1,setter:v=>swirlAngle=v},
+        {type:'slider',sid:'slider-swirl-radius',vid:'val-swirl-radius',label:'Radius',min:10,max:100,step:1,setter:v=>swirlRadius=v}
+    ]},
+    reedglass: { label:'Reed Glass', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-reed-width',vid:'val-reed-width',label:'Rib Width',min:2,max:40,step:1,setter:v=>reedWidth=v},
+        {type:'slider',sid:'slider-reed-distortion',vid:'val-reed-distortion',label:'Distortion',min:1,max:50,step:1,setter:v=>reedDistortion=v},
+        {type:'toggle',tid:'reed-chromatic-toggle',label:'Chromatic',setter:v=>reedChromatic=v}
+    ]},
+    polar2rect: { label:'Polar\u2192Rect', controls:[
+        {type:'slider',sid:'slider-polar2rect-rot',vid:'val-polar2rect-rot',label:'Rotation',min:0,max:360,step:1,setter:v=>polar2rectRotation=v}
+    ]},
+    rect2polar: { label:'Rect\u2192Polar', controls:[
+        {type:'slider',sid:'slider-rect2polar-rot',vid:'val-rect2polar-rot',label:'Rotation',min:0,max:360,step:1,setter:v=>rect2polarRotation=v}
+    ]},
+    radblur: { label:'Radial Blur', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-radblur-intensity',vid:'val-radblur-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>radblurIntensity=v}
+    ]},
+    zoomblur: { label:'Zoom Blur', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-zoomblur-intensity',vid:'val-zoomblur-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>zoomblurIntensity=v}
+    ]},
+    circblur: { label:'Circ Blur', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-circblur-intensity',vid:'val-circblur-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>circblurIntensity=v}
+    ]},
+    elgrid: { label:'Elastic Grid', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-elgrid-size',vid:'val-elgrid-size',label:'Grid Size',min:4,max:32,step:1,setter:v=>elgridSize=v},
+        {type:'slider',sid:'slider-elgrid-warp',vid:'val-elgrid-warp',label:'Warp',min:1,max:100,step:1,setter:v=>elgridWarp=v},
+        {type:'slider',sid:'slider-elgrid-speed',vid:'val-elgrid-speed',label:'Speed',min:0,max:50,step:1,setter:v=>elgridSpeed=v/10},
+        {type:'toggle',tid:'elgrid-animated-toggle',label:'Animate',setter:v=>elgridAnimated=v}
+    ]},
+    printstamp: { label:'Print Stamp', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-printstamp-dotsize',vid:'val-printstamp-dotsize',label:'Dot Size',min:2,max:12,step:1,setter:v=>printstampDotSize=v},
+        {type:'slider',sid:'slider-printstamp-contrast',vid:'val-printstamp-contrast',label:'Contrast',min:0,max:100,step:1,setter:v=>printstampContrast=v},
+        {type:'slider',sid:'slider-printstamp-grain',vid:'val-printstamp-grain',label:'Paper Grain',min:0,max:100,step:1,setter:v=>printstampGrain=v}
+    ]},
+    y2kblue: { label:'Y2K Blue', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-y2k-blue',vid:'val-y2k-blue',label:'Blue Shift',min:20,max:100,step:1,setter:v=>y2kBlueShift=v},
+        {type:'slider',sid:'slider-y2k-glow',vid:'val-y2k-glow',label:'Glow',min:0,max:100,step:1,setter:v=>y2kGlow=v},
+        {type:'slider',sid:'slider-y2k-grain',vid:'val-y2k-grain',label:'Grain',min:0,max:100,step:1,setter:v=>y2kGrain=v}
+    ]},
+    ntsc: { label:'NTSC', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-ntsc-chroma',vid:'val-ntsc-chroma',label:'Chroma Bleed',min:0,max:100,step:1,setter:v=>ntscChromaBleed=v},
+        {type:'slider',sid:'slider-ntsc-instability',vid:'val-ntsc-instability',label:'Instability',min:0,max:100,step:1,setter:v=>ntscInstability=v},
+        {type:'slider',sid:'slider-ntsc-noise',vid:'val-ntsc-noise',label:'Noise',min:0,max:100,step:1,setter:v=>ntscNoise=v},
+        {type:'toggle',tid:'ntsc-rolling-toggle',label:'Rolling',setter:v=>ntscRolling=v}
+    ]},
+    stripe: { label:'Stripe', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-stripe-density',vid:'val-stripe-density',label:'Density',min:2,max:50,step:1,setter:v=>stripeDensity=v},
+        {type:'slider',sid:'slider-stripe-angle',vid:'val-stripe-angle',label:'Angle',min:0,max:360,step:1,setter:v=>stripeAngle=v},
+        {type:'slider',sid:'slider-stripe-thickness',vid:'val-stripe-thickness',label:'Thickness',min:1,max:10,step:1,setter:v=>stripeThickness=v},
+        {type:'slider',sid:'slider-stripe-opacity',vid:'val-stripe-opacity',label:'Opacity',min:10,max:100,step:1,setter:v=>stripeOpacity=v},
+        {type:'selector',cid:'stripe-mode-buttons',label:'Mode',setter:v=>stripeMode=v,
+         opts:[{v:'linear',l:'LINEAR'},{v:'circular',l:'CIRCLE'}]}
+    ]},
+    paperscan: { label:'Paper Scan', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-paperscan-intensity',vid:'val-paperscan-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>paperscanIntensity=v},
+        {type:'slider',sid:'slider-paperscan-fiber',vid:'val-paperscan-fiber',label:'Fiber Scale',min:1,max:10,step:1,setter:v=>paperscanFiber=v},
+        {type:'slider',sid:'slider-paperscan-warmth',vid:'val-paperscan-warmth',label:'Warmth',min:0,max:100,step:1,setter:v=>paperscanWarmth=v}
+    ]},
+    xerox: { label:'Xerox', hasRandomize:true, controls:[
+        {type:'slider',sid:'slider-xerox-contrast',vid:'val-xerox-contrast',label:'Contrast',min:10,max:100,step:1,setter:v=>xeroxContrast=v},
+        {type:'slider',sid:'slider-xerox-noise',vid:'val-xerox-noise',label:'Noise',min:0,max:100,step:1,setter:v=>xeroxNoise=v},
+        {type:'slider',sid:'slider-xerox-darkness',vid:'val-xerox-darkness',label:'Darkness',min:0,max:100,step:1,setter:v=>xeroxDarkness=v}
+    ]},
+    grunge: { label:'Grunge', hasRandomize:true, controls:[
+        {type:'color',cid:'grunge-tint',hid:'grunge-tint-hex',label:'Tint',setter:v=>grungeTint=v},
+        {type:'slider',sid:'slider-grunge-posterize',vid:'val-grunge-posterize',label:'Posterize',min:2,max:8,step:1,setter:v=>grungePosterize=v},
+        {type:'slider',sid:'slider-grunge-grain',vid:'val-grunge-grain',label:'Grain',min:0,max:100,step:1,setter:v=>grungeGrain=v}
     ]}
 };
 
@@ -606,6 +1242,7 @@ let lastRecordedExt = 'webm';
 let recordingAudioDest = null;
 let recordingCanvas = null;
 let recordingCtx = null;
+let recordingStartTime = 0;
 let recordingVideoTrack = null;
 
 // Audio base values (snapshot of params when sync turns on)
@@ -760,7 +1397,10 @@ function generateSpecialCode() {
 // ── P5 LIFECYCLE ──────────────────────────
 
 function setup() {
+    pixelDensity(1); // 1x density for fast pixel effects (4x fewer pixels on Retina)
     let canvas = createCanvas(windowWidth, windowHeight);
+    pixelDensity(1);
+    resizeCanvas(windowWidth, windowHeight); // force 1x buffer
     p5Canvas = canvas.elt;
     p5Canvas.setAttribute('tabindex', '0');
     canvas.elt.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -774,16 +1414,38 @@ function setup() {
         let over = document.elementFromPoint(e.clientX, e.clientY);
         if (over && (over.closest('.panel') || over.closest('#timeline-container'))) return;
         e.preventDefault();
+        if (kenBurnsEnabled) return; // Ken Burns controls zoom
         let zoomFactor = 1 - e.deltaY * 0.002;
-        let newZoom = Math.max(1, Math.min(8, vidZoom * zoomFactor));
-        // Zoom toward cursor
+        let newZoom = Math.max(0.25, Math.min(8, (zoomSmooth ? zoomTargetLevel : vidZoom) * zoomFactor));
         let cx = e.clientX, cy = e.clientY;
-        vidPanX = cx - (cx - vidPanX) * (newZoom / vidZoom);
-        vidPanY = cy - (cy - vidPanY) * (newZoom / vidZoom);
-        vidZoom = newZoom;
-        // Reset pan when zoomed out to 1x
-        if (vidZoom <= 1.01) { vidZoom = 1; vidPanX = 0; vidPanY = 0; }
+        if (zoomSmooth) {
+            // Smooth mode: set targets, lerp in draw()
+            let curZoom = zoomTargetLevel;
+            zoomTargetPanX = cx - (cx - zoomTargetPanX) * (newZoom / curZoom);
+            zoomTargetPanY = cy - (cy - zoomTargetPanY) * (newZoom / curZoom);
+            zoomTargetLevel = newZoom;
+            if (zoomTargetLevel >= 0.99 && zoomTargetLevel <= 1.01) { zoomTargetLevel = 1; zoomTargetPanX = 0; zoomTargetPanY = 0; }
+            if (zoomTargetLevel < 1) { zoomTargetPanX = 0; zoomTargetPanY = 0; }
+        } else {
+            // Instant mode: direct zoom
+            vidPanX = cx - (cx - vidPanX) * (newZoom / vidZoom);
+            vidPanY = cy - (cy - vidPanY) * (newZoom / vidZoom);
+            vidZoom = newZoom;
+            if (vidZoom >= 0.99 && vidZoom <= 1.01) { vidZoom = 1; vidPanX = 0; vidPanY = 0; }
+            if (vidZoom < 1) { vidPanX = 0; vidPanY = 0; }
+            zoomTargetLevel = vidZoom; zoomTargetPanX = vidPanX; zoomTargetPanY = vidPanY;
+        }
+        updateZoomUI();
     }, { passive: false });
+
+    // Double-click canvas to reset zoom
+    canvas.elt.addEventListener('dblclick', (e) => {
+        let over = document.elementFromPoint(e.clientX, e.clientY);
+        if (over && (over.closest('.panel') || over.closest('#timeline-container'))) return;
+        zoomTargetLevel = 1; zoomTargetPanX = 0; zoomTargetPanY = 0;
+        if (!zoomSmooth) { vidZoom = 1; vidPanX = 0; vidPanY = 0; }
+        updateZoomUI();
+    });
 
     // Video pan: middle-click drag or left-drag when zoomed (on canvas only)
     let _vidDrag = null;
@@ -812,6 +1474,14 @@ function setup() {
 
     updateButtonStates();
     currentParam = navOrder[0];
+}
+
+// Update zoom UI elements
+function updateZoomUI() {
+    let zl = document.getElementById('zoom-level');
+    if (zl) zl.textContent = (zoomSmooth ? zoomTargetLevel : vidZoom).toFixed(2) + 'x';
+    let zs = document.getElementById('slider-vid-zoom');
+    if (zs) zs.value = zoomSmooth ? zoomTargetLevel : vidZoom;
 }
 
 function draw() {
@@ -848,13 +1518,60 @@ function draw() {
             baseH = baseW / videoRatio;
         }
 
+        // ── Ken Burns: animate zoom and pan cinematically
+        if (kenBurnsEnabled && videoPlaying) {
+            kenBurnsTime += deltaTime * 0.001 * kenBurnsSpeed;
+            let kbZoom = map(Math.sin(kenBurnsTime * 0.5), -1, 1, kenBurnsMinZoom, kenBurnsMaxZoom);
+            let kbPanX = Math.sin(kenBurnsTime * 0.3) * baseW * kenBurnsPanAmt;
+            let kbPanY = Math.cos(kenBurnsTime * 0.4) * baseH * kenBurnsPanAmt * 0.67;
+            zoomTargetLevel = kbZoom;
+            zoomTargetPanX = kbPanX;
+            zoomTargetPanY = kbPanY;
+            kenBurnsReturning = false;
+        } else if (kenBurnsReturning) {
+            // Smooth return to original view
+            zoomTargetLevel = preKBZoom;
+            zoomTargetPanX = preKBPanX;
+            zoomTargetPanY = preKBPanY;
+            if (!zoomSmooth) {
+                // No lerp available — snap immediately
+                vidZoom = preKBZoom; vidPanX = preKBPanX; vidPanY = preKBPanY;
+                kenBurnsReturning = false;
+            } else if (Math.abs(vidZoom - preKBZoom) < 0.01 &&
+                Math.abs(vidPanX - preKBPanX) < 1 &&
+                Math.abs(vidPanY - preKBPanY) < 1) {
+                kenBurnsReturning = false;
+            }
+        }
+
+        // ── Smooth zoom lerp
+        if (zoomSmooth) {
+            let lerpSpeed = 0.12;
+            vidZoom += (zoomTargetLevel - vidZoom) * lerpSpeed;
+            vidPanX += (zoomTargetPanX - vidPanX) * lerpSpeed;
+            vidPanY += (zoomTargetPanY - vidPanY) * lerpSpeed;
+            // Snap when close enough
+            if (Math.abs(vidZoom - zoomTargetLevel) < 0.002) vidZoom = zoomTargetLevel;
+            if (Math.abs(vidPanX - zoomTargetPanX) < 0.5) vidPanX = zoomTargetPanX;
+            if (Math.abs(vidPanY - zoomTargetPanY) < 0.5) vidPanY = zoomTargetPanY;
+        }
+
         // Apply video zoom
         videoW = baseW * vidZoom;
         videoH = baseH * vidZoom;
         videoX = (dispW - videoW) / 2 + vidPanX;
         videoY = (dispH - videoH) / 2 + vidPanY;
 
-        image(videoEl, videoX, videoY, videoW, videoH);
+        // Mirror webcam so you see yourself naturally (like a mirror)
+        if (usingWebcam) {
+            push();
+            translate(videoX * 2 + videoW, 0);
+            scale(-1, 1);
+            image(videoEl, videoX, videoY, videoW, videoH);
+            pop();
+        } else {
+            image(videoEl, videoX, videoY, videoW, videoH);
+        }
 
         // MASK AI segmentation overlay — brief flash on selection
         if (currentMode === 14 && maskOverlay) {
@@ -929,15 +1646,32 @@ function draw() {
         }
 
         // VIDEO mode: apply effects to video only (before blobs)
+        let skipGlobalFx = splitZoomEnabled && splitDualFx && splitLeftEffect && splitRightEffect && masterFxEnabled;
+        if (!fxLayerAll && !skipGlobalFx) {
+            try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
+        }
         if (!fxLayerAll) {
-            applyActiveEffects();
-            if (timelineSegments.length > 0) applyTimelineEffects();
+            try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
         }
 
         let timeInterval = map(paramValues[5], 0, 100, 0, 1000);
         if (millis() - lastTrackTime >= timeInterval) {
             trackPoints();
             lastTrackTime = millis();
+        }
+
+        // ── Auto-follow: pan toward centroid of tracked points
+        if (autoFollow && trackedPoints.length > 0 && vidZoom > 1.05 && !kenBurnsEnabled) {
+            let cx = 0, cy = 0;
+            for (let p of trackedPoints) { cx += p.posicao.x; cy += p.posicao.y; }
+            cx /= trackedPoints.length;
+            cy /= trackedPoints.length;
+            // Target pan: center the centroid on screen
+            let targetPanX = (dispW / 2) - (cx - videoX + vidPanX);
+            let targetPanY = (dispH / 2) - (cy - videoY + vidPanY);
+            // Only adjust if centroid is off-center
+            zoomTargetPanX += (targetPanX - zoomTargetPanX) * autoFollowSpeed;
+            zoomTargetPanY += (targetPanY - zoomTargetPanY) * autoFollowSpeed;
         }
 
         // Clip all blob/line drawing to the video frame
@@ -948,6 +1682,7 @@ function draw() {
 
         if (showLines && trackedPoints.length > 1) drawLines();
 
+        let _tbc = color(trackBoxColor); // parse once, reuse per blob
         for (let p of trackedPoints) {
             // Pulse scaling: each blob swells based on pulseIntensity with random delay
             let pScale = 1.0;
@@ -958,39 +1693,131 @@ function draw() {
             let pw = p.width * pScale;
             let ph = p.height * pScale;
 
-            if (activeVizModes.has(10) || (currentMode >= 15 && currentMode <= 17)) {
-                // ZOOM — magnified video crop inside blob
-                // Crop radius scales with blob size for natural zoom feel
+            if (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12) || (currentMode >= 15 && currentMode <= 17)) {
+                // ZOOM / THERMO — video crop inside blob
                 push();
                 let srcX = map(p.posicao.x, videoX, videoX + videoW, 0, videoEl.width);
+                if (usingWebcam) srcX = videoEl.width - srcX; // mirror source for webcam
                 let srcY = map(p.posicao.y, videoY, videoY + videoH, 0, videoEl.height);
                 let isFaceZoom = currentMode >= 15 && currentMode <= 17;
-                // Zoom factor: larger blob size → larger source crop → more magnification
-                // Blob Size (param4) controls how zoomed-in each crop is
-                let zoomFactor = map(paramValues[4], 0, 100, 1.5, 6);
-                let sampleR = max(pw, ph) / zoomFactor;
-                // Minimum source crop so tiny blobs still show detail
-                sampleR = max(sampleR, 8);
+                let absZoom = Math.abs(vizZoomLevel);
+                let sampleR;
+                if (vizZoomLevel >= 0) {
+                    let zoomFactor = map(absZoom, 0, 8, 0.5, 8);
+                    sampleR = max(pw, ph) / max(zoomFactor, 0.1);
+                } else {
+                    let wideFactor = map(absZoom, 0, 8, 1, 12);
+                    sampleR = max(pw, ph) * wideFactor;
+                }
+                sampleR = max(sampleR, 4);
                 let zW = max(pw, 20);
                 let zH = max(ph, 20);
-                // Clamp source region to video bounds
-                let sx = constrain(srcX - sampleR, 0, videoEl.width - sampleR * 0.5);
-                let sy = constrain(srcY - sampleR, 0, videoEl.height - sampleR * 0.5);
+                let sx = constrain(srcX - sampleR, 0, max(0, videoEl.width - sampleR * 0.5));
+                let sy = constrain(srcY - sampleR, 0, max(0, videoEl.height - sampleR * 0.5));
                 let sw = min(sampleR * 2, videoEl.width - sx);
                 let sh = min(sampleR * 2, videoEl.height - sy);
-                image(videoEl, p.posicao.x - zW/2, p.posicao.y - zH/2, zW, zH,
-                      sx, sy, sw, sh);
-                // Subtle border — thin for face, light for general zoom
-                noFill(); strokeWeight(0.8); rectMode(CENTER);
-                if (isFaceZoom) {
-                    stroke(255, 40);
+                sw = max(sw, 1); sh = max(sh, 1);
+                let bx = p.posicao.x - zW/2, by = p.posicao.y - zH/2;
+                image(videoEl, bx, by, zW, zH, sx, sy, sw, sh);
+
+                // THERMO: thermal heatmap on blob box (targeted region only)
+                if (activeVizModes.has(11)) {
+                    let _hm = [[0,0,128],[0,0,255],[0,128,255],[0,255,255],[0,255,128],
+                               [0,255,0],[128,255,0],[255,255,0],[255,128,0],[255,0,0],[255,255,255]];
+                    let _pd = pixelDensity();
+                    let rx = Math.max(0, Math.floor(bx * _pd));
+                    let ry = Math.max(0, Math.floor(by * _pd));
+                    let rw = Math.min(Math.ceil(zW * _pd), drawingContext.canvas.width - rx);
+                    let rh = Math.min(Math.ceil(zH * _pd), drawingContext.canvas.height - ry);
+                    if (rw > 0 && rh > 0) {
+                        let imgData = drawingContext.getImageData(rx, ry, rw, rh);
+                        let d = imgData.data;
+                        for (let i = 0; i < d.length; i += 4) {
+                            let lum = (0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]) / 255;
+                            let pos = lum * (_hm.length - 1);
+                            let lo = Math.floor(pos), hi = Math.min(_hm.length-1, lo+1);
+                            let t = pos - lo;
+                            d[i]   = Math.round(_hm[lo][0]*(1-t) + _hm[hi][0]*t);
+                            d[i+1] = Math.round(_hm[lo][1]*(1-t) + _hm[hi][1]*t);
+                            d[i+2] = Math.round(_hm[lo][2]*(1-t) + _hm[hi][2]*t);
+                        }
+                        drawingContext.putImageData(imgData, rx, ry);
+                    }
+                }
+
+                // ASCII: green terminal-style ASCII art inside blob box
+                if (activeVizModes.has(12)) {
+                    let _chars = ' .,:-~=+*!?#%@$MW';
+                    // Scale up the box so ASCII is actually readable
+                    let asciiScale = 2.8;
+                    let aW = Math.max(zW * asciiScale, 140);
+                    let aH = Math.max(zH * asciiScale, 100);
+                    let ax = p.posicao.x - aW/2, ay = p.posicao.y - aH/2;
+                    // Clamp to canvas
+                    ax = constrain(ax, 0, width - aW);
+                    ay = constrain(ay, 0, height - aH);
+                    let cellSz = 7;
+                    let cols = Math.floor(aW / cellSz);
+                    let rows = Math.floor(aH / (cellSz * 1.6));
+
+                    // Sample video crop into offscreen canvas
+                    if (!_asciiSampler) _asciiSampler = document.createElement('canvas');
+                    _asciiSampler.width = cols;
+                    _asciiSampler.height = rows;
+                    let actx = _asciiSampler.getContext('2d');
+                    actx.drawImage(videoEl.elt || videoEl, sx, sy, sw, sh, 0, 0, cols, rows);
+                    let sData = actx.getImageData(0, 0, cols, rows).data;
+
+                    // Black background
+                    push();
+                    noStroke(); fill(0, 0, 0, 230);
+                    rectMode(CORNER);
+                    rect(ax, ay, aW, aH);
+
+                    // Draw ASCII with green glow
+                    drawingContext.save();
+                    drawingContext.beginPath();
+                    drawingContext.rect(ax, ay, aW, aH);
+                    drawingContext.clip();
+                    let ctx = drawingContext;
+                    ctx.font = (cellSz * 1.3) + 'px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let rowH = cellSz * 1.6;
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            let si = (r * cols + c) * 4;
+                            let lum = (0.299*sData[si] + 0.587*sData[si+1] + 0.114*sData[si+2]) / 255;
+                            let ci = Math.floor(lum * (_chars.length - 1));
+                            if (ci === 0) continue; // skip spaces for perf
+                            let g = Math.round(60 + lum * 195);
+                            ctx.shadowColor = 'rgba(0,' + Math.round(g * 0.8) + ',0,0.5)';
+                            ctx.shadowBlur = lum * 4;
+                            ctx.fillStyle = 'rgb(0,' + g + ',' + Math.round(lum * 30) + ')';
+                            ctx.fillText(_chars[ci], ax + c * cellSz + cellSz/2, ay + r * rowH + rowH/2);
+                        }
+                    }
+                    ctx.shadowBlur = 0;
+                    drawingContext.restore();
+                    pop();
+                }
+
+                // Border
+                noFill(); rectMode(CENTER);
+                if (vizZoomBox) {
+                    stroke(red(_tbc), green(_tbc), blue(_tbc));
+                    strokeWeight(trackBoxWeight);
+                } else if (isFaceZoom) {
+                    stroke(red(_tbc), green(_tbc), blue(_tbc), 40);
+                    strokeWeight(trackBoxWeight * 0.67);
                 } else {
-                    stroke(255, 80);
+                    stroke(red(_tbc), green(_tbc), blue(_tbc), 80);
+                    strokeWeight(trackBoxWeight * 0.67);
                 }
                 rect(p.posicao.x, p.posicao.y, zW, zH);
                 pop();
             } else {
-                stroke(150); noFill(); strokeWeight(1.2); rectMode(CENTER);
+                stroke(red(_tbc), green(_tbc), blue(_tbc)); noFill(); strokeWeight(trackBoxWeight); rectMode(CENTER);
                 rect(p.posicao.x, p.posicao.y, pw, ph);
             }
             drawPointInfo(p);
@@ -999,9 +1826,11 @@ function draw() {
         drawingContext.restore(); // end clip
 
         // ALL mode: apply effects to everything including blobs
+        if (fxLayerAll && !skipGlobalFx) {
+            try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
+        }
         if (fxLayerAll) {
-            applyActiveEffects();
-            if (timelineSegments.length > 0) applyTimelineEffects();
+            try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
         }
 
         // Update timeline playhead
@@ -1020,18 +1849,242 @@ function draw() {
     cursor();
     renderMiniSpectrum();
     if (debugVisible && frameCount % 10 === 0) renderDebug();
+    if (frameCount % 6 === 0) updateTopBar();
 
-    // Copy cropped video region to recording canvas (no black bars)
+    // Copy to recording canvas — composite: native video crop + effects/blobs overlay
     if (isRecording && recordingCanvas && recordingCtx) {
         let pd = pixelDensity();
+        let rw = recordingCanvas.width;
+        let rh = recordingCanvas.height;
+        let srcVidW = videoEl ? (videoEl.videoWidth || videoEl.width) : rw;
+        let srcVidH = videoEl ? (videoEl.videoHeight || videoEl.height) : rh;
+
+        // Calculate visible video region on the p5 canvas
+        let visLeft = Math.max(0, videoX);
+        let visTop = Math.max(0, videoY);
+        let visRight = Math.min(width, videoX + videoW);
+        let visBottom = Math.min(height, videoY + videoH);
+
+        // Normalize to [0,1] within the full video extent
+        let normLeft = (visLeft - videoX) / videoW;
+        let normTop = (visTop - videoY) / videoH;
+        let normRight = (visRight - videoX) / videoW;
+        let normBottom = (visBottom - videoY) / videoH;
+
+        // 1. Sharp base: crop source video at NATIVE resolution
+        //    When zoomed, this crops to exactly what's visible — no blur from upscaling
+        if (videoEl && videoEl.elt) {
+            let cropSx = normLeft * srcVidW;
+            let cropSy = normTop * srcVidH;
+            let cropSw = (normRight - normLeft) * srcVidW;
+            let cropSh = (normBottom - normTop) * srcVidH;
+            recordingCtx.drawImage(videoEl.elt,
+                cropSx, cropSy, cropSw, cropSh,
+                0, 0, rw, rh);
+        }
+
+        // 2. Overlay p5 canvas (effects + blobs) — visible region only
+        let p5Sx = Math.round(visLeft * pd);
+        let p5Sy = Math.round(visTop * pd);
+        let p5Sw = Math.round((visRight - visLeft) * pd);
+        let p5Sh = Math.round((visBottom - visTop) * pd);
         recordingCtx.drawImage(p5Canvas,
-            videoX * pd, videoY * pd, videoW * pd, videoH * pd,
-            0, 0, recordingCanvas.width, recordingCanvas.height);
+            p5Sx, p5Sy, p5Sw, p5Sh,
+            0, 0, rw, rh);
+
         // Signal captureStream(0) that a new frame is ready
         if (recordingVideoTrack && recordingVideoTrack.requestFrame) {
             recordingVideoTrack.requestFrame();
         }
     }
+
+    // ── Depth blur: vignette blur at edges when zoomed
+    if (depthBlurEnabled && videoLoaded && vidZoom > 1.05) {
+        push();
+        drawingContext.save();
+        let ctx = drawingContext;
+        let grad;
+        let s = depthBlurStrength;
+        // Top edge
+        grad = ctx.createLinearGradient(videoX, videoY, videoX, videoY + s);
+        grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(videoX, videoY, videoW, s);
+        // Bottom edge
+        grad = ctx.createLinearGradient(videoX, videoY + videoH - s, videoX, videoY + videoH);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(videoX, videoY + videoH - s, videoW, s);
+        // Left edge
+        grad = ctx.createLinearGradient(videoX, videoY, videoX + s, videoY);
+        grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(videoX, videoY, s, videoH);
+        // Right edge
+        grad = ctx.createLinearGradient(videoX + videoW - s, videoY, videoX + videoW, videoY);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(videoX + videoW - s, videoY, s, videoH);
+        drawingContext.restore();
+        pop();
+    }
+
+    // ── Split view: configurable position, mirror, dual FX
+    if (splitZoomEnabled && videoLoaded && videoEl) {
+        push();
+        let splitX = Math.round(width * splitPosition / 100);
+        let rightW = width - splitX;
+
+        // Calculate zoom crop centered on tracked centroid
+        let zCx = width / 2, zCy = height / 2;
+        if (trackedPoints.length > 0) {
+            zCx = 0; zCy = 0;
+            for (let p of trackedPoints) { zCx += p.posicao.x; zCy += p.posicao.y; }
+            zCx /= trackedPoints.length;
+            zCy /= trackedPoints.length;
+        }
+        let srcVW = videoEl.elt ? (videoEl.elt.videoWidth || videoEl.width) : videoEl.width;
+        let srcVH = videoEl.elt ? (videoEl.elt.videoHeight || videoEl.height) : videoEl.height;
+        let normCx = (zCx - videoX) / videoW;
+        let normCy = (zCy - videoY) / videoH;
+        let cropW = srcVW / splitZoomLevel;
+        let cropH = srcVH / splitZoomLevel;
+        let cropX = constrain(normCx * srcVW - cropW / 2, 0, srcVW - cropW);
+        let cropY = constrain(normCy * srcVH - cropH / 2, 0, srcVH - cropH);
+
+        // Determine sides: mirror flips which side is normal vs zoomed
+        let zoomSideX = splitMirrorFlip ? 0 : splitX;
+        let zoomSideW = splitMirrorFlip ? splitX : rightW;
+
+        if (splitDualFx && splitLeftEffect && splitRightEffect && masterFxEnabled) {
+            // ── DUAL FX MODE: different effect per side ──
+            // Draw zoomed content on zoom side
+            drawingContext.save();
+            drawingContext.beginPath();
+            drawingContext.rect(zoomSideX, 0, zoomSideW, height);
+            drawingContext.clip();
+            image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
+            drawingContext.restore();
+
+            // Canvas now has correct content on both sides
+            // Save full canvas to offscreen buffer
+            let cvs = drawingContext.canvas;
+            if (!_splitBuf || _splitBuf.width !== cvs.width || _splitBuf.height !== cvs.height) {
+                _splitBuf = document.createElement('canvas');
+                _splitBuf.width = cvs.width;
+                _splitBuf.height = cvs.height;
+            }
+            _splitBuf.getContext('2d').drawImage(cvs, 0, 0);
+
+            // Apply left effect to full canvas, save left half
+            try { applySingleEffect(splitLeftEffect); } catch(e) {}
+            let pd = cvs.width / width;
+            let splitPx = Math.round(splitX * pd);
+            let leftData = drawingContext.getImageData(0, 0, splitPx, cvs.height);
+
+            // Restore full canvas from buffer
+            drawingContext.drawImage(_splitBuf, 0, 0);
+
+            // Apply right effect to full canvas
+            try { applySingleEffect(splitRightEffect); } catch(e) {}
+
+            // Restore left half with left effect
+            drawingContext.putImageData(leftData, 0, 0);
+        } else {
+            // ── Normal split view (with configurable position/mirror) ──
+            drawingContext.save();
+            drawingContext.beginPath();
+            drawingContext.rect(zoomSideX, 0, zoomSideW, height);
+            drawingContext.clip();
+            image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
+
+            // Apply effects to zoom side
+            if (splitFxEnabled && masterFxEnabled && activeEffects.size > 0) {
+                try { applyActiveEffects(); } catch(e) {}
+            }
+
+            // Zoom viz blobs on zoom side
+            if (splitVizZoom && trackedPoints.length > 0) {
+                let stbc = color(trackBoxColor);
+                for (let p of trackedPoints) {
+                    let pNormX = (p.posicao.x - videoX) / videoW;
+                    let pNormY = (p.posicao.y - videoY) / videoH;
+                    let spx = zoomSideX + (pNormX - normCx + 0.5 / splitZoomLevel) * zoomSideW * splitZoomLevel;
+                    let spy = (pNormY - normCy + 0.5 / splitZoomLevel) * height * splitZoomLevel;
+                    if (spx < zoomSideX || spx > zoomSideX + zoomSideW || spy < 0 || spy > height) continue;
+                    let pw = p.width * splitZoomLevel * 0.5;
+                    let ph = p.height * splitZoomLevel * 0.5;
+                    let srcPx = constrain(pNormX * srcVW - pw / (splitZoomLevel * 2), 0, srcVW - 1);
+                    let srcPy = constrain(pNormY * srcVH - ph / (splitZoomLevel * 2), 0, srcVH - 1);
+                    let srcPw = Math.min(pw / splitZoomLevel, srcVW - srcPx);
+                    let srcPh = Math.min(ph / splitZoomLevel, srcVH - srcPy);
+                    image(videoEl, spx - pw/2, spy - ph/2, pw, ph, srcPx, srcPy, srcPw, srcPh);
+                    noFill(); stroke(red(stbc), green(stbc), blue(stbc), 80);
+                    strokeWeight(trackBoxWeight * 0.67); rectMode(CENTER);
+                    rect(spx, spy, pw, ph);
+                }
+            }
+            drawingContext.restore();
+        }
+
+        // Divider line
+        stroke(255, 120); strokeWeight(1);
+        line(splitX, 0, splitX, height);
+
+        // Labels
+        noStroke(); fill(255, 150); textSize(10);
+        textAlign(LEFT, TOP);
+        let leftLabel = splitMirrorFlip ? splitZoomLevel.toFixed(1) + 'x' : 'Normal';
+        if (splitDualFx && splitLeftEffect) leftLabel = splitLeftEffect;
+        text(leftLabel, 8, 8);
+        textAlign(RIGHT, TOP);
+        let rightLabel = splitMirrorFlip ? 'Normal' : splitZoomLevel.toFixed(1) + 'x';
+        if (splitDualFx && splitRightEffect) rightLabel = splitRightEffect;
+        else if (!splitDualFx && splitFxEnabled && activeEffects.size > 0) rightLabel += ' + FX';
+        if (!splitDualFx && splitVizZoom) rightLabel += ' + ZOOM';
+        text(rightLabel, width - 8, 8);
+        pop();
+    }
+
+    // ── PiP overview map: shows full video with viewport rectangle
+    if (pipEnabled && videoLoaded && videoEl && vidZoom > 1.05) {
+        push();
+        let pipW = 160, pipH = 160 / (videoEl.width / videoEl.height);
+        let pipX = width - pipW - 12;
+        let pipY = 12;
+        // Background
+        fill(0, 180); noStroke(); rectMode(CORNER);
+        rect(pipX - 2, pipY - 2, pipW + 4, pipH + 4, 4);
+        // Full video thumbnail
+        image(videoEl, pipX, pipY, pipW, pipH);
+        // Viewport rectangle
+        let vpLeft = (Math.max(0, -videoX)) / videoW;
+        let vpTop = (Math.max(0, -videoY)) / videoH;
+        let vpRight = Math.min(1, (width - videoX) / videoW);
+        let vpBottom = Math.min(1, (height - videoY) / videoH);
+        noFill(); stroke(0, 255, 200); strokeWeight(1.5);
+        rect(pipX + vpLeft * pipW, pipY + vpTop * pipH,
+             (vpRight - vpLeft) * pipW, (vpBottom - vpTop) * pipH);
+        // Label
+        noStroke(); fill(255, 150); textSize(8); textAlign(RIGHT, TOP);
+        text(vidZoom.toFixed(1) + 'x', pipX + pipW, pipY + pipH + 3);
+        pop();
+    }
+
+    // ── Zoom level indicator overlay
+    if (videoLoaded && Math.abs(vidZoom - 1) > 0.02) {
+        push();
+        noStroke(); fill(255, 100); textSize(12); textAlign(LEFT, TOP);
+        text(vidZoom.toFixed(2) + 'x', 12, 12);
+        pop();
+    }
+
+    // Update zoom UI each frame (for smooth transitions)
+    if (zoomSmooth && (Math.abs(vidZoom - zoomTargetLevel) > 0.002)) updateZoomUI();
 }
 
 // ── CORE UI LISTENERS ─────────────────────
@@ -1119,7 +2172,7 @@ function setupCoreUIListeners() {
             _userMode = currentMode;
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
-            if (currentMode < 15 || currentMode > 17) faceLandmarkCache = null;
+            if (currentMode < 15 || currentMode > 17) { faceLandmarkCache = null; smoothedLandmarks = null; }
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
             if (currentMode === 14) {
                 enterMaskSelecting();
@@ -1210,7 +2263,31 @@ function setupCoreUIListeners() {
             if (activeVizModes.has(8)) {
                 pig.classList.remove('collapsed');
             }
+            // Show/hide zoom viz options
+            let vzp = document.getElementById('viz-zoom-options');
+            if (vzp) vzp.style.display = (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12)) ? '' : 'none';
             updateButtonStates();
+        });
+    });
+
+    // Zoom viz level slider
+    const vizZoomSlider = document.getElementById('slider-viz-zoom');
+    const vizZoomVal = document.getElementById('viz-zoom-val');
+    if (vizZoomSlider) {
+        vizZoomSlider.addEventListener('input', (e) => {
+            vizZoomLevel = parseFloat(e.target.value);
+            if (vizZoomVal) {
+                let label = vizZoomLevel === 0 ? '1:1' : (vizZoomLevel > 0 ? vizZoomLevel.toFixed(1) + 'x' : vizZoomLevel.toFixed(1) + 'x wide');
+                vizZoomVal.textContent = label;
+            }
+        });
+    }
+    // Zoom viz color box toggle
+    document.querySelectorAll('#viz-zoom-box-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            vizZoomBox = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#viz-zoom-box-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
         });
     });
 
@@ -1219,6 +2296,221 @@ function setupCoreUIListeners() {
             showLines = (e.target.dataset.value === 'on');
             document.getElementById('line-options-group').style.display = showLines ? '' : 'none';
             updateButtonStates();
+        });
+    });
+
+    // Tracking box color picker
+    const trackboxColorPicker = document.getElementById('trackbox-color-picker');
+    const trackboxColorHex = document.getElementById('trackbox-color-hex');
+    trackboxColorPicker.addEventListener('input', (e) => { trackBoxColor = e.target.value; trackboxColorHex.value = e.target.value; });
+    trackboxColorHex.addEventListener('input', (e) => {
+        let v = e.target.value;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) { trackBoxColor = v; trackboxColorPicker.value = v; }
+    });
+    trackboxColorHex.addEventListener('keydown', (e) => e.stopPropagation());
+    // Box stroke weight
+    const boxWeightSlider = document.getElementById('slider-box-weight');
+    const boxWeightInput = document.getElementById('val-box-weight');
+    if (boxWeightSlider) {
+        boxWeightSlider.addEventListener('input', (e) => { trackBoxWeight = parseFloat(e.target.value); boxWeightInput.value = e.target.value; });
+        boxWeightInput.addEventListener('input', (e) => { let v = parseFloat(e.target.value); trackBoxWeight = isNaN(v) ? 1.2 : v; boxWeightSlider.value = trackBoxWeight; });
+        boxWeightInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+
+    // ── Zoom controls
+    const vidZoomSlider = document.getElementById('slider-vid-zoom');
+    if (vidZoomSlider) {
+        vidZoomSlider.addEventListener('input', (e) => {
+            let v = parseFloat(e.target.value);
+            if (zoomSmooth) { zoomTargetLevel = v; } else { vidZoom = v; zoomTargetLevel = v; }
+            if (v < 1) { zoomTargetPanX = 0; zoomTargetPanY = 0; if (!zoomSmooth) { vidPanX = 0; vidPanY = 0; } }
+            updateZoomUI();
+        });
+    }
+    // Zoom presets
+    document.querySelectorAll('#zoom-preset-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            let v = parseFloat(e.target.dataset.value);
+            zoomTargetLevel = v; zoomTargetPanX = 0; zoomTargetPanY = 0;
+            if (!zoomSmooth) { vidZoom = v; vidPanX = 0; vidPanY = 0; }
+            document.querySelectorAll('#zoom-preset-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            updateZoomUI();
+        });
+    });
+    // Smooth zoom toggle
+    document.querySelectorAll('#zoom-smooth-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            zoomSmooth = (e.target.dataset.value === 'on');
+            if (!zoomSmooth) { zoomTargetLevel = vidZoom; zoomTargetPanX = vidPanX; zoomTargetPanY = vidPanY; }
+            document.querySelectorAll('#zoom-smooth-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Auto-follow toggle
+    document.querySelectorAll('#zoom-autofollow-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            autoFollow = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#zoom-autofollow-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Ken Burns toggle
+    document.querySelectorAll('#zoom-kenburns-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            kenBurnsEnabled = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#zoom-kenburns-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            document.getElementById('kenburns-speed-group').style.display = kenBurnsEnabled ? '' : 'none';
+            if (kenBurnsEnabled) {
+                // Save current view and start KB from matching zoom to avoid jump
+                preKBZoom = vidZoom;
+                preKBPanX = vidPanX;
+                preKBPanY = vidPanY;
+                let range = Math.max(kenBurnsMaxZoom - kenBurnsMinZoom, 0.01);
+                let normZ = constrain((vidZoom - kenBurnsMinZoom) / range, 0, 1);
+                kenBurnsTime = Math.asin(constrain(normZ * 2 - 1, -0.99, 0.99)) / 0.5;
+                kenBurnsReturning = false;
+            } else {
+                // Smooth return to original view
+                kenBurnsReturning = true;
+            }
+        });
+    });
+    // Ken Burns speed
+    const kbSpeedSlider = document.getElementById('slider-kb-speed');
+    const kbSpeedInput = document.getElementById('val-kb-speed');
+    if (kbSpeedSlider) {
+        kbSpeedSlider.addEventListener('input', (e) => { kenBurnsSpeed = parseFloat(e.target.value); kbSpeedInput.value = e.target.value; });
+        kbSpeedInput.addEventListener('input', (e) => { kenBurnsSpeed = parseFloat(e.target.value) || 0.3; kbSpeedSlider.value = kenBurnsSpeed; });
+        kbSpeedInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Ken Burns min zoom
+    const kbMinSlider = document.getElementById('slider-kb-min');
+    const kbMinInput = document.getElementById('val-kb-min');
+    if (kbMinSlider) {
+        kbMinSlider.addEventListener('input', (e) => {
+            kenBurnsMinZoom = Math.min(parseFloat(e.target.value), kenBurnsMaxZoom - 0.1);
+            kbMinInput.value = kenBurnsMinZoom.toFixed(1); kbMinSlider.value = kenBurnsMinZoom;
+        });
+        kbMinInput.addEventListener('input', (e) => {
+            let v = parseFloat(e.target.value) || 1.0;
+            kenBurnsMinZoom = Math.min(v, kenBurnsMaxZoom - 0.1);
+            kbMinSlider.value = kenBurnsMinZoom;
+        });
+        kbMinInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Ken Burns max zoom
+    const kbMaxSlider = document.getElementById('slider-kb-max');
+    const kbMaxInput = document.getElementById('val-kb-max');
+    if (kbMaxSlider) {
+        kbMaxSlider.addEventListener('input', (e) => {
+            kenBurnsMaxZoom = Math.max(parseFloat(e.target.value), kenBurnsMinZoom + 0.1);
+            kbMaxInput.value = kenBurnsMaxZoom.toFixed(1); kbMaxSlider.value = kenBurnsMaxZoom;
+        });
+        kbMaxInput.addEventListener('input', (e) => {
+            let v = parseFloat(e.target.value) || 2.5;
+            kenBurnsMaxZoom = Math.max(v, kenBurnsMinZoom + 0.1);
+            kbMaxSlider.value = kenBurnsMaxZoom;
+        });
+        kbMaxInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Ken Burns pan amount
+    const kbPanSlider = document.getElementById('slider-kb-pan');
+    const kbPanInput = document.getElementById('val-kb-pan');
+    if (kbPanSlider) {
+        kbPanSlider.addEventListener('input', (e) => { kenBurnsPanAmt = parseFloat(e.target.value); kbPanInput.value = e.target.value; });
+        kbPanInput.addEventListener('input', (e) => { kenBurnsPanAmt = parseFloat(e.target.value) || 0.15; kbPanSlider.value = kenBurnsPanAmt; });
+        kbPanInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Split zoom toggle
+    document.querySelectorAll('#zoom-split-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitZoomEnabled = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#zoom-split-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            document.getElementById('split-zoom-group').style.display = splitZoomEnabled ? '' : 'none';
+        });
+    });
+    // Split zoom level
+    const splitZoomSlider = document.getElementById('slider-split-zoom');
+    const splitZoomInput = document.getElementById('val-split-zoom');
+    if (splitZoomSlider) {
+        splitZoomSlider.addEventListener('input', (e) => { splitZoomLevel = parseFloat(e.target.value); splitZoomInput.value = e.target.value; });
+        splitZoomInput.addEventListener('input', (e) => { splitZoomLevel = parseFloat(e.target.value) || 3; splitZoomSlider.value = splitZoomLevel; });
+        splitZoomInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Split FX toggle
+    document.querySelectorAll('#split-fx-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitFxEnabled = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#split-fx-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Split position slider
+    const splitPosSlider = document.getElementById('slider-split-pos');
+    const splitPosInput = document.getElementById('val-split-pos');
+    if (splitPosSlider) {
+        splitPosSlider.addEventListener('input', (e) => { splitPosition = parseFloat(e.target.value); splitPosInput.value = e.target.value; });
+        splitPosInput.addEventListener('input', (e) => { splitPosition = parseFloat(e.target.value) || 50; splitPosSlider.value = splitPosition; });
+        splitPosInput.addEventListener('keydown', (e) => e.stopPropagation());
+    }
+    // Split mirror toggle
+    document.querySelectorAll('#split-mirror-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitMirrorFlip = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#split-mirror-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Split Dual FX toggle
+    document.querySelectorAll('#split-dualfx-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitDualFx = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#split-dualfx-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            document.getElementById('split-dualfx-group').style.display = splitDualFx ? '' : 'none';
+        });
+    });
+    // Populate dual FX dropdowns with effect names
+    const fxNames = Object.keys(FX_CATEGORIES);
+    ['split-left-fx', 'split-right-fx'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        fxNames.forEach(name => {
+            let opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = FX_UI_CONFIG[name] ? FX_UI_CONFIG[name].label : name;
+            sel.appendChild(opt);
+        });
+    });
+    const splitLeftSel = document.getElementById('split-left-fx');
+    const splitRightSel = document.getElementById('split-right-fx');
+    if (splitLeftSel) splitLeftSel.addEventListener('change', (e) => { splitLeftEffect = e.target.value; });
+    if (splitRightSel) splitRightSel.addEventListener('change', (e) => { splitRightEffect = e.target.value; });
+    // Split Zoom Viz toggle
+    document.querySelectorAll('#split-viz-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            splitVizZoom = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#split-viz-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // Depth blur toggle
+    document.querySelectorAll('#zoom-depth-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            depthBlurEnabled = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#zoom-depth-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+        });
+    });
+    // PiP map toggle
+    document.querySelectorAll('#zoom-pip-buttons .selector-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            pipEnabled = (e.target.dataset.value === 'on');
+            document.querySelectorAll('#zoom-pip-buttons .selector-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
         });
     });
 
@@ -1265,6 +2557,40 @@ function setupCoreUIListeners() {
     ui.btnSave.addEventListener('click', saveRecording);
     ui.btnPhoto.addEventListener('click', saveScreenshot);
 
+    // Top bar transport buttons (mirror left panel controls)
+    const tbPlay = document.getElementById('tb-play');
+    const tbRestart = document.getElementById('tb-restart');
+    const tbRecord = document.getElementById('tb-record');
+    const tbSave = document.getElementById('tb-save');
+    const tbPhoto = document.getElementById('tb-photo');
+    if (tbPlay) tbPlay.addEventListener('click', togglePlay);
+    if (tbRestart) tbRestart.addEventListener('click', restartVideo);
+    if (tbRecord) tbRecord.addEventListener('click', toggleRecording);
+    if (tbSave) tbSave.addEventListener('click', saveRecording);
+    if (tbPhoto) tbPhoto.addEventListener('click', saveScreenshot);
+
+    // Cross-link navigation between panels
+    let linkToCamera = document.getElementById('link-to-camera');
+    if (linkToCamera) linkToCamera.addEventListener('click', () => {
+        let cg = document.getElementById('camera-group');
+        let rp = document.getElementById('right-panel');
+        if (cg && rp) {
+            cg.classList.remove('collapsed');
+            cg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            cg.classList.add('highlight-pulse');
+            setTimeout(() => cg.classList.remove('highlight-pulse'), 600);
+        }
+    });
+    let linkToZoom = document.getElementById('link-to-zoom');
+    if (linkToZoom) linkToZoom.addEventListener('click', () => {
+        let zp = document.getElementById('zoom-options-panel');
+        if (zp) {
+            zp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            zp.classList.add('highlight-pulse');
+            setTimeout(() => zp.classList.remove('highlight-pulse'), 600);
+        }
+    });
+
     // Background dim slider
     ui.bgDimSlider.addEventListener('input', (e) => {
         bgDim = parseInt(e.target.value);
@@ -1305,6 +2631,26 @@ function setupCoreUIListeners() {
     document.getElementById('help-btn').addEventListener('click', toggleHelp);
     document.getElementById('help-overlay').addEventListener('click', (e) => {
         if (e.target.id === 'help-overlay') toggleHelp();
+    });
+
+    // Accessibility: auto-label all range sliders from nearest label text
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+        if (slider.getAttribute('aria-label')) return;
+        // Check parent wrapper's previous sibling label
+        let wrapper = slider.closest('.slider-wrapper, .tl-sync-row');
+        let label = wrapper ? wrapper.previousElementSibling : null;
+        if (!label || label.tagName !== 'LABEL') {
+            // Try direct previous sibling
+            label = slider.previousElementSibling;
+        }
+        if (!label || label.tagName !== 'LABEL') {
+            // Try parent label
+            label = slider.closest('label');
+        }
+        if (label) {
+            let txt = label.textContent.replace(/[\d.]+$/, '').trim();
+            if (txt) slider.setAttribute('aria-label', txt);
+        }
     });
 }
 
@@ -1435,10 +2781,58 @@ function updateButtonStates() {
     // Keep FX param groups in sync with active effects
     updateFxParamVisibility();
 
+    // Disabled states
+    if (ui.btnSave) ui.btnSave.disabled = !lastRecordedBlob;
+    if (ui.btnPhoto) ui.btnPhoto.disabled = !videoLoaded && !usingWebcam;
+
     // Contextual param dimming
     const colorModes = new Set([1, 2, 5, 10, 11, 13]);
     let g1 = document.getElementById('group-1');
     if (g1) g1.classList.toggle('param-dimmed', !colorModes.has(currentMode));
+}
+
+// ── TOP BAR STATUS ──────────────────────
+function updateTopBar() {
+    // FPS
+    let fpsEl = document.getElementById('tb-fps');
+    if (fpsEl) {
+        let fps = Math.round(frameRate());
+        fpsEl.textContent = fps + ' FPS';
+        fpsEl.className = 'tb-status tb-fps ' + (fps >= 30 ? 'good' : fps >= 15 ? 'warn' : 'bad');
+    }
+    // Source
+    let srcEl = document.getElementById('tb-source');
+    if (srcEl) {
+        if (usingWebcam) { srcEl.textContent = 'WEBCAM'; srcEl.classList.add('active'); }
+        else if (videoLoaded) { srcEl.textContent = 'VIDEO'; srcEl.classList.add('active'); }
+        else { srcEl.textContent = 'NO SOURCE'; srcEl.classList.remove('active'); }
+    }
+    // Mode
+    let modeEl = document.getElementById('tb-mode');
+    if (modeEl) {
+        modeEl.textContent = MODE_NAMES[currentMode] || 'OFF';
+        modeEl.classList.toggle('active', currentMode > 0);
+    }
+    // Recording time
+    let dotEl = document.getElementById('tb-rec-dot');
+    let timeEl = document.getElementById('tb-rec-time');
+    if (dotEl && timeEl) {
+        if (isRecording) {
+            dotEl.classList.add('visible');
+            let elapsed = Math.floor((millis() - recordingStartTime) / 1000);
+            let m = Math.floor(elapsed / 60);
+            let s = elapsed % 60;
+            timeEl.textContent = 'REC ' + m + ':' + String(s).padStart(2, '0');
+            timeEl.classList.add('active');
+        } else {
+            dotEl.classList.remove('visible');
+            timeEl.textContent = '';
+            timeEl.classList.remove('active');
+        }
+    }
+    // Save button disabled state in top bar
+    let tbSave = document.getElementById('tb-save');
+    if (tbSave) tbSave.disabled = !lastRecordedBlob;
 }
 
 function updateFxParamVisibility() {
@@ -1497,7 +2891,16 @@ function togglePlay() {
         let pauseIcon = `<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
         let playIcon = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
         if (videoPlaying) {
-             videoEl.loop();
+             videoEl.elt.loop = true;
+             let playPromise = videoEl.elt.play();
+             if (playPromise) {
+                 playPromise.catch(() => {
+                     // Browser blocked autoplay — retry on next user gesture
+                     videoPlaying = false;
+                     ui.btnPlay.innerHTML = playIcon;
+                     ui.tlBtnPlay.innerHTML = playIcon;
+                 });
+             }
              ui.btnPlay.innerHTML = pauseIcon;
              ui.tlBtnPlay.innerHTML = pauseIcon;
              if (audioElement && audioLoaded) {
@@ -1509,7 +2912,7 @@ function togglePlay() {
                  }
              }
         } else {
-             videoEl.pause();
+             videoEl.elt.pause();
              ui.btnPlay.innerHTML = playIcon;
              ui.tlBtnPlay.innerHTML = playIcon;
              if (audioElement && audioLoaded) { audioElement.pause(); audioPlaying = false; }
@@ -1549,7 +2952,7 @@ function syncUI() {
     updateButtonStates();
 }
 
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+function windowResized() { pixelDensity(1); resizeCanvas(windowWidth, windowHeight); }
 
 // ── FILE / WEBCAM HANDLERS ────────────────
 
@@ -1699,12 +3102,24 @@ function toggleRecording() {
 
 function startRecording() {
     initAudioContext();
-    // Create cropped canvas (video area only, no black bars)
+    // Use original video resolution for recording (sharp output)
     let pd = pixelDensity();
+    let srcW = videoEl ? (videoEl.videoWidth || videoEl.width) : 0;
+    let srcH = videoEl ? (videoEl.videoHeight || videoEl.height) : 0;
+    let dispW = Math.round(videoW * pd);
+    let dispH = Math.round(videoH * pd);
+    // Use original video res if available, otherwise display res
+    let recW = srcW > 0 ? srcW : dispW;
+    let recH = srcH > 0 ? srcH : dispH;
+    // Codec requires even dimensions
+    recW = Math.round(recW / 2) * 2;
+    recH = Math.round(recH / 2) * 2;
     recordingCanvas = document.createElement('canvas');
-    recordingCanvas.width = Math.round(videoW * pd);
-    recordingCanvas.height = Math.round(videoH * pd);
+    recordingCanvas.width = recW;
+    recordingCanvas.height = recH;
     recordingCtx = recordingCanvas.getContext('2d');
+    recordingCtx.imageSmoothingEnabled = true;
+    recordingCtx.imageSmoothingQuality = 'high';
     // captureStream(0) = manual frame mode: only captures when requestFrame() is called
     // This syncs perfectly with p5's draw loop — no duplicated or skipped frames
     const canvasStream = recordingCanvas.captureStream(0);
@@ -1731,10 +3146,10 @@ function startRecording() {
                     ? 'video/webm;codecs=vp8,opus'
                     : 'video/webm';
 
-    // Scale bitrate to resolution: ~20 Mbps for 1080p, ~35 Mbps for 4K
+    // Scale bitrate to resolution: ~30 Mbps for 1080p, ~50 Mbps for 4K
     // Higher multiplier reduces VP9/VP8 quality fluctuation between keyframes
     let pixels = recordingCanvas.width * recordingCanvas.height;
-    let bitrate = Math.max(12000000, Math.round(pixels * 10));
+    let bitrate = Math.max(20000000, Math.round(pixels * 16));
 
     mediaRecorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: bitrate });
 
@@ -1752,10 +3167,14 @@ function startRecording() {
     // No timeslice — collect all data on stop to avoid chunk boundary quality drops
     mediaRecorder.start();
     isRecording = true;
+    recordingStartTime = millis();
     ui.btnRecord.classList.add('recording');
     ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg> Stop`;
     ui.tlBtnRecord.classList.add('recording');
     ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>`;
+    // Top bar record button sync
+    let tbRec = document.getElementById('tb-record');
+    if (tbRec) tbRec.classList.add('recording');
 }
 
 function stopRecording() {
@@ -1767,6 +3186,7 @@ function stopRecording() {
         recordingAudioDest = null;
     }
     isRecording = false;
+    recordingStartTime = 0;
     recordingCanvas = null;
     recordingCtx = null;
     recordingVideoTrack = null;
@@ -1774,6 +3194,9 @@ function stopRecording() {
     ui.btnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg> Record`;
     ui.tlBtnRecord.classList.remove('recording');
     ui.tlBtnRecord.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>`;
+    // Top bar record button sync
+    let tbRec = document.getElementById('tb-record');
+    if (tbRec) tbRec.classList.remove('recording');
 }
 
 function saveRecording() {
@@ -1834,6 +3257,24 @@ function keyPressed(event) {
     if (_helpVisible) return false;
 
     let changed = false;
+
+    // Video zoom: [ zoom out, ] zoom in, \ reset
+    if (key === ']') {
+        let nz = Math.min(8, (zoomSmooth ? zoomTargetLevel : vidZoom) * 1.3);
+        if (zoomSmooth) { zoomTargetLevel = nz; } else { vidZoom = nz; zoomTargetLevel = nz; }
+        updateZoomUI(); return false;
+    }
+    if (key === '[') {
+        let nz = Math.max(0.25, (zoomSmooth ? zoomTargetLevel : vidZoom) / 1.3);
+        if (zoomSmooth) { zoomTargetLevel = nz; } else { vidZoom = nz; zoomTargetLevel = nz; }
+        if (nz < 1) { zoomTargetPanX = 0; zoomTargetPanY = 0; if (!zoomSmooth) { vidPanX = 0; vidPanY = 0; } }
+        updateZoomUI(); return false;
+    }
+    if (key === '\\') {
+        zoomTargetLevel = 1; zoomTargetPanX = 0; zoomTargetPanY = 0;
+        if (!zoomSmooth) { vidZoom = 1; vidPanX = 0; vidPanY = 0; }
+        updateZoomUI(); return false;
+    }
 
     if (key === ' ') { togglePlay(); return false; }
     if (key === 'r' || key === 'R') { restartVideo(); return false; }
