@@ -83,11 +83,11 @@
             --sp-6: 32px;
 
             /* Typography scale */
-            --font-xs: 9px;
-            --font-sm: 10px;
-            --font-md: 11px;
-            --font-lg: 13px;
-            --font-xl: 14px;
+            --font-xs: 11px;
+            --font-sm: 12px;
+            --font-md: 13px;
+            --font-lg: 14px;
+            --font-xl: 16px;
 
             /* Radii */
             --radius-sm: 3px;
@@ -210,7 +210,7 @@
         }
 
         .subtitle {
-            font-size: 10px;
+            font-size: var(--font-sm);
             color: var(--text-muted);
             font-weight: 400;
         }
@@ -242,7 +242,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 10px;
+            font-size: var(--font-sm);
             font-weight: 600;
             color: var(--text-muted);
             margin-bottom: 6px;
@@ -347,7 +347,7 @@
             color: var(--btn-text);
             font-size: var(--font-xs);
             font-weight: 700;
-            padding: 6px;
+            padding: 6px 10px;
             min-height: 30px;
             cursor: pointer;
             transition: all 0.15s;
@@ -384,13 +384,47 @@
         }
 
         /* Focus visible — global keyboard focus ring */
-        *:focus-visible {
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        a:focus-visible,
+        [tabindex]:focus-visible {
             outline: 2px solid var(--color-accent);
             outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.3);
         }
         /* Remove outline on mouse click but keep for keyboard */
         *:focus:not(:focus-visible) {
             outline: none;
+            box-shadow: none;
+        }
+        /* Range slider focus — highlight track */
+        input[type="range"]:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+        input[type="range"]:focus-visible::-webkit-slider-runnable-track {
+            background: var(--color-accent);
+            box-shadow: 0 0 6px rgba(108, 92, 231, 0.4);
+        }
+        /* Tab button focus */
+        .panel-tab:focus-visible,
+        .fx-view-btn:focus-visible,
+        .fx-preset-cat-btn:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.3);
+        }
+        /* Toggle switch focus */
+        .selector-btn:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.3);
+        }
+        .fx-toggle-switch input:focus-visible + .toggle-slider {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.3);
         }
 
         /* Button hierarchy: Primary (accent fill) */
@@ -414,6 +448,19 @@
         }
 
         /* Panel Tabs */
+        /* Visually hidden — accessible to screen readers */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
         .panel-tabs {
             display: flex;
             gap: 3px;
@@ -428,7 +475,7 @@
             background: transparent;
             border: 1px solid transparent;
             color: var(--text-muted);
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             padding: 8px 0;
             cursor: pointer;
@@ -481,7 +528,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             color: var(--text-muted);
-            font-size: 8px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -531,7 +578,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            font-size: 10px;
+            font-size: var(--font-sm);
             font-weight: 700;
             color: var(--text-main);
             text-transform: uppercase;
@@ -545,7 +592,7 @@
 
         #file-name {
             margin-top: 6px;
-            font-size: 9px;
+            font-size: var(--font-xs);
             color: var(--text-muted);
             white-space: nowrap;
             overflow: hidden;
@@ -611,7 +658,7 @@
             margin-bottom: 4px;
         }
         .fx-param-title {
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -665,7 +712,7 @@
             border-radius: 3px;
             color: var(--text-main);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 9px;
+            font-size: var(--font-xs);
             padding: 4px 6px;
             text-transform: uppercase;
         }
@@ -759,7 +806,7 @@
             margin: 4px 0;
         }
         .fx-toggle-row label {
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 600;
             color: var(--text-muted);
         }
@@ -775,11 +822,11 @@
             background: var(--btn-bg);
             border: 1px solid var(--btn-border);
             border-radius: 5px;
-            padding: 6px 4px;
+            padding: 6px 10px;
             cursor: pointer;
             transition: all 0.15s;
             text-align: center;
-            font-size: 8px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -828,9 +875,9 @@
         .fx-favorites-row:empty { display: none; }
         .fx-favorites-row .fx-card {
             flex: 0 0 auto;
-            padding: 4px 8px;
+            padding: 6px 10px;
             min-height: 24px;
-            font-size: 8px;
+            font-size: var(--font-xs);
             border-color: rgba(253, 203, 110, 0.3);
         }
 
@@ -850,7 +897,7 @@
             border-radius: 5px;
             color: var(--text-muted);
             font-family: inherit;
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -877,11 +924,11 @@
             border-radius: 12px;
             color: var(--btn-text);
             font-family: inherit;
-            font-size: 8px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
-            padding: 4px 10px;
+            padding: 6px 10px;
             cursor: pointer;
             transition: all 0.15s;
         }
@@ -920,7 +967,7 @@
             box-shadow: inset 0 0 0 1px var(--preset-cat-color, var(--color-accent)), 0 0 8px rgba(108,92,231,0.2);
         }
         .fx-preset-card-name {
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -928,7 +975,7 @@
             margin-bottom: 2px;
         }
         .fx-preset-card-desc {
-            font-size: 8px;
+            font-size: var(--font-xs);
             color: var(--text-muted);
             line-height: 1.3;
         }
@@ -939,8 +986,8 @@
             flex-wrap: wrap;
         }
         .fx-preset-card-effects span {
-            font-size: 7px;
-            padding: 1px 4px;
+            font-size: var(--font-xs);
+            padding: 2px 6px;
             border-radius: 3px;
             background: rgba(255,255,255,0.06);
             color: var(--text-muted);
@@ -967,12 +1014,12 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 8px;
+            padding: 6px 10px;
             margin-bottom: var(--sp-2);
             background: rgba(108,92,231,0.1);
             border: 1px solid rgba(108,92,231,0.3);
             border-radius: 6px;
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -985,9 +1032,9 @@
             border-radius: 4px;
             color: var(--text-muted);
             font-family: inherit;
-            font-size: 8px;
+            font-size: var(--font-xs);
             font-weight: 600;
-            padding: 2px 8px;
+            padding: 6px 10px;
             cursor: pointer;
             transition: all 0.15s;
         }
@@ -1007,7 +1054,7 @@
             margin-bottom: var(--sp-2);
         }
         .fx-preset-custom-header span {
-            font-size: 9px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -1019,11 +1066,11 @@
             border-radius: 4px;
             color: #6C5CE7;
             font-family: inherit;
-            font-size: 8px;
+            font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
-            padding: 4px 10px;
+            padding: 6px 10px;
             cursor: pointer;
             transition: all 0.15s;
         }
@@ -1122,7 +1169,7 @@
         }
         #audio-name {
             margin-top: 6px;
-            font-size: 9px;
+            font-size: var(--font-xs);
             color: var(--text-muted);
             white-space: nowrap;
             overflow: hidden;
@@ -1199,7 +1246,7 @@
         }
         #group-modes .mode-cat-row .selector-btn {
             flex: 1 0 calc(16.66% - 4px);
-            min-width: 38px;
+            min-width: 48px;
         }
         #group-modes .mode-cat:last-child .selector-btn.active {
             background: var(--color-accent-bg, rgba(108, 92, 231, 0.25));
@@ -1221,7 +1268,7 @@
         }
         #viz-buttons .selector-btn {
             flex: 1 0 calc(16.66% - 3px);
-            padding: 6px 0;
+            padding: 6px 10px;
         }
         #viz-buttons .viz-zoom-standalone {
             flex: 1 0 100%;
@@ -1234,10 +1281,9 @@
             border: 1px solid #2a2a2a;
             color: var(--text-main);
             font-family: inherit;
-            font-size: 10px;
+            font-size: var(--font-sm);
             padding: 6px 8px;
             margin-bottom: 4px;
-            outline: none;
             letter-spacing: 0.5px;
         }
         .text-input:focus {
@@ -1611,7 +1657,6 @@
             font-family: 'Commit Mono', 'Roboto Mono', monospace;
             font-weight: 600;
             padding: 1px 4px;
-            outline: none;
             text-align: center;
         }
         .tl-audio-start-input.hidden { display: none; }
@@ -1712,7 +1757,7 @@
         .tl-sync-row input[type="range"] {
             width: 60px; height: 3px;
             -webkit-appearance: none; appearance: none;
-            background: rgba(255,255,255,0.15); border-radius: 2px; outline: none;
+            background: rgba(255,255,255,0.15); border-radius: 2px;
         }
         .tl-sync-row input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; width: 10px; height: 10px;
@@ -2322,39 +2367,217 @@
             font-family: inherit;
             font-size: 9px;
         }
+        /* ═══ ACCORDION SECTIONS ═══ */
+        .accordion-section {
+            border-radius: var(--radius-md);
+        }
+        .accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+        }
+        .accordion-title {
+            font-size: var(--font-xs);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--color-text-muted);
+        }
+        .accordion-chevron {
+            font-size: 10px;
+            color: var(--color-text-muted);
+            transition: transform 0.2s;
+        }
+        .accordion-section.collapsed .accordion-chevron {
+            transform: rotate(-90deg);
+        }
+        .accordion-body {
+            overflow: hidden;
+            max-height: 800px;
+            transition: max-height 0.25s ease-out, opacity 0.2s ease-out;
+            opacity: 1;
+        }
+        .accordion-section.collapsed .accordion-body {
+            max-height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ═══ SLIDER CARD GROUPS ═══ */
+        .slider-card {
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            padding: var(--sp-3);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .slider-card + .slider-card {
+            margin-top: var(--sp-2);
+        }
+        .slider-card-label {
+            font-size: var(--font-xs);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--color-text-muted);
+            margin-bottom: 2px;
+        }
+
+        /* ═══ CSS TOOLTIPS ═══ */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel-bg);
+            color: var(--text-main);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: var(--font-xs);
+            white-space: nowrap;
+            z-index: 1001;
+            border: 1px solid var(--color-border);
+            pointer-events: none;
+        }
+
         /* ═══ RESPONSIVE ═══ */
+        /* Drawer toggle buttons — hidden on desktop */
+        .drawer-toggle {
+            display: none;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            color: var(--color-text);
+            padding: 4px 8px;
+            min-height: 24px;
+            min-width: 44px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: var(--font-sm);
+            font-weight: 700;
+            align-items: center;
+            justify-content: center;
+        }
+        .drawer-toggle:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.15);
+        }
+        /* Panel overlay (off-canvas backdrop) */
+        .panel-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 9;
+        }
+        .panel-overlay.visible { display: block; }
+
+        /* Panel close button — hidden on desktop */
+        .panel-close-btn {
+            display: none;
+            position: absolute;
+            top: var(--sp-2);
+            right: var(--sp-2);
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: var(--radius-md);
+            color: var(--color-text);
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            z-index: 11;
+        }
+
         @media (max-width: 1200px) {
             .panel { width: 240px; padding: var(--sp-4); }
         }
         @media (max-width: 900px) {
-            .panel { width: 200px; padding: var(--sp-3); }
-            #timeline-container { left: 220px; right: 220px; }
+            /* Off-canvas drawer mode */
+            .drawer-toggle { display: flex; }
+            .panel-close-btn { display: flex; align-items: center; justify-content: center; }
+
+            .panel {
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                max-height: 100vh;
+                padding: var(--sp-4);
+                padding-top: 48px;
+                border-radius: 0;
+                transition: transform 0.3s ease;
+                z-index: 10;
+            }
+            #left-panel {
+                left: 0;
+                transform: translateX(-100%);
+            }
+            #left-panel.drawer-open {
+                transform: translateX(0);
+            }
+            #right-panel {
+                right: 0;
+                left: auto;
+                transform: translateX(100%);
+            }
+            #right-panel.drawer-open {
+                transform: translateX(0);
+            }
+            #timeline-container { left: 20px; right: 20px; }
+            /* Touch-friendly buttons */
+            .selector-btn,
+            .action-btn,
+            .tb-btn,
+            .panel-tab,
+            .fx-card,
+            .fx-view-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
         }
         @media (max-width: 700px) {
-            .panel { width: 180px; padding: var(--sp-2); font-size: 9px; }
-            #timeline-container { left: 200px; right: 200px; }
+            /* Hide non-essential top bar items */
+            #top-bar .tb-fps,
+            #top-bar #tb-source,
+            #top-bar #tb-mode,
+            #top-bar .tb-zone-right .tb-divider {
+                display: none;
+            }
             #top-bar { padding: 0 var(--sp-2); gap: var(--sp-1); }
+            .panel { width: 280px; padding: var(--sp-3); font-size: var(--font-sm); }
+            #timeline-container { left: 10px; right: 10px; }
         }
     </style>
 </head>
 <body>
 
     <!-- ═══ TOP BAR ═══ -->
-    <div id="top-bar">
+    <header id="top-bar" role="toolbar" aria-label="Main toolbar">
+        <button class="drawer-toggle" id="drawer-toggle-left" title="Open tracking panel" aria-label="Open tracking panel">&#9776;</button>
         <div class="tb-zone">
-            <button class="tb-btn" id="tb-play" title="Play/Pause (Space)" aria-label="Play or Pause">
+            <button class="tb-btn" id="tb-play" title="Play/Pause (Space)" aria-label="Play or Pause" data-tooltip="Play/Pause (Space)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
             </button>
-            <button class="tb-btn" id="tb-restart" title="Restart (Home)" aria-label="Restart">
+            <button class="tb-btn" id="tb-restart" title="Restart (Home)" aria-label="Restart" data-tooltip="Restart (Home)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
             </button>
-            <button class="tb-btn" id="tb-record" title="Record (Shift+R)" aria-label="Toggle Recording">
+            <button class="tb-btn" id="tb-record" title="Record (Shift+R)" aria-label="Toggle Recording" data-tooltip="Record (Shift+R)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>
             </button>
-            <button class="tb-btn" id="tb-save" title="Save Recording" aria-label="Save Recording">
+            <button class="tb-btn" id="tb-save" title="Save Recording" aria-label="Save Recording" data-tooltip="Save Recording">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             </button>
-            <button class="tb-btn" id="tb-photo" title="Screenshot (P)" aria-label="Take Screenshot">
+            <button class="tb-btn" id="tb-photo" title="Screenshot (P)" aria-label="Take Screenshot" data-tooltip="Screenshot (P)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
             </button>
         </div>
@@ -2370,18 +2593,23 @@
             <div class="tb-divider"></div>
             <span class="tb-status" id="tb-mode">OFF</span>
         </div>
-    </div>
+        <button class="drawer-toggle" id="drawer-toggle-right" title="Open effects panel" aria-label="Open effects panel">FX</button>
+    </header>
+
+    <!-- Off-canvas overlay -->
+    <div class="panel-overlay" id="panel-overlay"></div>
 
     <div id="debug-panel"></div>
 
     <!-- LEFT PANEL -->
-    <div id="left-panel" class="panel">
+    <aside id="left-panel" class="panel" aria-label="Tracking controls">
+        <button class="panel-close-btn" id="close-left-panel" aria-label="Close tracking panel">&times;</button>
         <div class="header-section">
             <div class="title-row">
                 <h1>Hues of Dispositions</h1>
                 <div style="display:flex;align-items:center;gap:6px">
                     <button class="help-btn" id="help-btn" title="Help (?)" aria-label="Help and keyboard shortcuts">?</button>
-                    <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls">
+                    <div id="toggle-btn" class="toggle-chevron" title="Toggle Controls" role="button" aria-label="Toggle tracking panel controls">
                         <svg viewBox="0 0 24 24">
                             <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
                         </svg>
@@ -2394,14 +2622,14 @@
             </div>
         </div>
 
-        <div class="panel-tabs">
-            <button class="panel-tab active" data-tab="track">TRACK</button>
-            <button class="panel-tab" data-tab="audio">AUDIO</button>
+        <div class="panel-tabs" role="tablist" aria-label="Left panel tabs">
+            <button class="panel-tab active" data-tab="track" role="tab" aria-selected="true" aria-controls="tab-track">TRACK</button>
+            <button class="panel-tab" data-tab="audio" role="tab" aria-selected="false" aria-controls="tab-audio">AUDIO</button>
         </div>
 
         <div id="ui-controls">
 
-            <div class="tab-content active" data-tab="track">
+            <div class="tab-content active" data-tab="track" id="tab-track" role="tabpanel" aria-label="Track controls">
 
             <div class="source-row">
                 <div id="file-input-container" onclick="document.getElementById('videoUpload').click()">
@@ -2422,7 +2650,7 @@
 
             <!-- Zoom — compact viewport controls -->
             <div class="control-group" id="zoom-options-panel">
-                <label>Zoom <span id="zoom-level" style="color:#00CEC9;margin-left:6px;font-weight:bold">1.00x</span></label>
+                <label for="slider-vid-zoom">Zoom <span id="zoom-level" style="color:#00CEC9;margin-left:6px;font-weight:bold">1.00x</span></label>
                 <div class="slider-wrapper">
                     <input type="range" id="slider-vid-zoom" min="0.25" max="8" value="1" step="0.05">
                 </div>
@@ -2432,8 +2660,8 @@
                     <button class="selector-btn" data-value="2">2x</button>
                     <button class="selector-btn" data-value="4">4x</button>
                 </div>
-                <label>Smooth</label>
-                <div class="selector-row" id="zoom-smooth-buttons">
+                <label id="label-smooth">Smooth</label>
+                <div class="selector-row" id="zoom-smooth-buttons" aria-labelledby="label-smooth">
                     <button class="selector-btn active" data-value="on">ON</button>
                     <button class="selector-btn" data-value="off">OFF</button>
                 </div>
@@ -2452,8 +2680,8 @@
                         </div>
                     </div>
                     <div class="mode-cat">
-                        <div class="mode-cat-label">Color</div>
-                        <div class="mode-cat-row">
+                        <div class="mode-cat-label" id="mode-color-label">Color</div>
+                        <div class="mode-cat-row" role="group" aria-labelledby="mode-color-label">
                             <button class="selector-btn active" data-value="1">BLUE</button>
                             <button class="selector-btn" data-value="2">RED</button>
                             <button class="selector-btn" data-value="5">Custom</button>
@@ -2463,8 +2691,8 @@
                         </div>
                     </div>
                     <div class="mode-cat">
-                        <div class="mode-cat-label">Analysis</div>
-                        <div class="mode-cat-row">
+                        <div class="mode-cat-label" id="mode-analysis-label">Analysis</div>
+                        <div class="mode-cat-row" role="group" aria-labelledby="mode-analysis-label">
                             <button class="selector-btn" data-value="3">Motion</button>
                             <button class="selector-btn" data-value="6">Bright</button>
                             <button class="selector-btn" data-value="7">DARK</button>
@@ -2475,8 +2703,8 @@
                         </div>
                     </div>
                     <div class="mode-cat">
-                        <div class="mode-cat-label">AI</div>
-                        <div class="mode-cat-row">
+                        <div class="mode-cat-label" id="mode-ai-label">AI</div>
+                        <div class="mode-cat-row" role="group" aria-labelledby="mode-ai-label">
                             <button class="selector-btn" data-value="14">MASK</button>
                             <button class="selector-btn" data-value="15">EYES</button>
                             <button class="selector-btn" data-value="16">LIPS</button>
@@ -2487,7 +2715,7 @@
             </div>
 
             <div class="control-group" id="custom-color-group" style="display:none">
-                <label>Target Color</label>
+                <label for="custom-color-picker">Target Color</label>
                 <input type="color" id="custom-color-picker" value="#00b7eb" style="width:100%;height:28px;border:none;background:transparent;cursor:pointer;">
             </div>
 
@@ -2500,7 +2728,7 @@
                     Click object to track. &#x21E7;+click adds, &#x2325;+click removes.
                 </div>
                 <div style="display:flex;gap:6px">
-                    <button class="selector-btn" id="mask-clear-btn" style="flex:1;padding:6px 0">CLEAR</button>
+                    <button class="selector-btn" id="mask-clear-btn" style="flex:1;padding:6px 0" title="Clear mask selection" aria-label="Clear mask selection">CLEAR</button>
                 </div>
             </div>
 
@@ -2514,9 +2742,15 @@
                 </div>
             </div>
 
+            <div class="accordion-section collapsed" id="accordion-viz">
+                <div class="accordion-header" aria-expanded="false">
+                    <span class="accordion-title">Visualization</span>
+                    <span class="accordion-chevron">&#9662;</span>
+                </div>
+                <div class="accordion-body">
             <div class="control-group" id="group-viz">
-                <label>Visualization</label>
-                <div class="selector-row" id="viz-buttons">
+                <label id="label-viz">Visualization</label>
+                <div class="selector-row" id="viz-buttons" role="group" aria-label="Visualization modes">
                     <button class="selector-btn" data-value="0">XY</button>
                     <button class="selector-btn active" data-value="1">RGB</button>
                     <button class="selector-btn" data-value="2">SAT</button>
@@ -2532,18 +2766,20 @@
                     <button class="selector-btn viz-zoom-standalone" data-value="12">ASCII</button>
                 </div>
             </div>
+                </div><!-- /accordion-body -->
+            </div><!-- /accordion-section viz -->
 
             <!-- Zoom Viz options (shown when ZOOM viz active) -->
             <div class="control-group" id="viz-zoom-options" style="display:none">
-                <label>Zoom Viz <span id="viz-zoom-val" style="color:#00CEC9;margin-left:6px">3.0x</span></label>
+                <label for="slider-viz-zoom">Zoom Viz <span id="viz-zoom-val" style="color:#00CEC9;margin-left:6px">3.0x</span></label>
                 <div class="slider-wrapper">
                     <input type="range" id="slider-viz-zoom" min="-8" max="8" value="3" step="0.5">
                 </div>
                 <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:-2px">
                     <span>WIDE</span><span>1:1</span><span>MACRO</span>
                 </div>
-                <label>Color Box</label>
-                <div class="selector-row" id="viz-zoom-box-buttons">
+                <label id="label-colorbox">Color Box</label>
+                <div class="selector-row" id="viz-zoom-box-buttons" aria-labelledby="label-colorbox">
                     <button class="selector-btn" data-value="on">ON</button>
                     <button class="selector-btn active" data-value="off">OFF</button>
                 </div>
@@ -2552,86 +2788,107 @@
             <!-- Blob Parameters -->
             <div id="blob-edit-banner">editing blob segment</div>
 
-            <div class="control-group" id="group-0">
-                <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
+            <!-- ── Blob Parameters Card ── -->
+            <section aria-label="Blob parameters">
+            <div class="slider-card">
+                <div class="slider-card-label">Blob Parameters</div>
+                <div class="control-group" id="group-0">
+                    <label>Quantity <input type="number" class="value-input" id="val-0" value="15"></label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-0" min="0" max="100" value="15" step="1">
+                    </div>
+                </div>
+                <div class="control-group" id="group-1">
+                    <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
+                    <span id="desc-spectrum" class="visually-hidden">Controls the range of colors sampled from the tracked region</span>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1" aria-describedby="desc-spectrum">
+                    </div>
+                </div>
+                <div class="control-group" id="group-4">
+                    <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
+                    </div>
+                </div>
+                <div class="control-group" id="group-6">
+                    <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
+                    <span id="desc-blobvar" class="visually-hidden">Variation in blob size — higher values produce more varied blob sizes</span>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-6" min="0" max="100" value="40" step="1" aria-describedby="desc-blobvar">
+                    </div>
                 </div>
             </div>
+            </section>
 
-            <div class="control-group" id="group-1">
-                <label>Spectrum <input type="number" class="value-input" id="val-1" value="30"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-1" min="0" max="100" value="30" step="0.1">
+            <!-- ── Animation Card ── -->
+            <section aria-label="Animation">
+            <div class="slider-card">
+                <div class="slider-card-label">Animation</div>
+                <div class="control-group" id="group-5">
+                    <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
+                    <span id="desc-rate" class="visually-hidden">Spawn interval in milliseconds — lower values create blobs faster</span>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-5" min="0" max="100" value="4" step="1" aria-describedby="desc-rate">
+                    </div>
                 </div>
             </div>
+            </section>
 
-            <div class="control-group" id="group-4">
-                <label>Blob Size <input type="number" class="value-input" id="val-4" value="20"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-4" min="0" max="100" value="20" step="1">
+            <!-- ── Appearance Card ── -->
+            <div class="accordion-section collapsed" id="accordion-appearance">
+                <div class="accordion-header" aria-expanded="false">
+                    <span class="accordion-title">Appearance</span>
+                    <span class="accordion-chevron">&#9662;</span>
+                </div>
+                <div class="accordion-body">
+            <section aria-label="Appearance controls">
+            <div class="slider-card">
+                <div class="control-group">
+                    <label for="trackbox-color-picker">Box Color</label>
+                    <div class="fx-color-picker">
+                        <input type="color" class="fx-color-input" id="trackbox-color-picker" value="#969696">
+                        <input type="text" class="fx-hex-input" id="trackbox-color-hex" value="#969696" maxlength="7">
+                    </div>
+                    <label>Box Weight <input type="number" class="value-input" id="val-box-weight" value="1.2" step="0.2"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-box-weight" min="0.2" max="6" value="1.2" step="0.2"></div>
+                </div>
+                <div class="control-group" id="group-2">
+                    <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
+                    </div>
+                </div>
+                <div class="control-group" id="group-3">
+                    <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label id="label-lines">Lines</label>
+                    <div class="selector-row" id="line-buttons" aria-labelledby="label-lines">
+                        <button class="selector-btn active" data-value="off">OFF</button>
+                        <button class="selector-btn" data-value="on">ON</button>
+                    </div>
                 </div>
             </div>
-
-            <div class="control-group" id="group-5">
-                <label>Rate (ms) <input type="number" class="value-input" id="val-5" value="4"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-5" min="0" max="100" value="4" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-6">
-                <label>Blob Var <input type="number" class="value-input" id="val-6" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-6" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <!-- ── Zoom Controls ── -->
-            <div class="control-group">
-                <label>Lines</label>
-                <div class="selector-row" id="line-buttons">
-                    <button class="selector-btn active" data-value="off">OFF</button>
-                    <button class="selector-btn" data-value="on">ON</button>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Box Color</label>
-                <div class="fx-color-picker">
-                    <input type="color" class="fx-color-input" id="trackbox-color-picker" value="#969696">
-                    <input type="text" class="fx-hex-input" id="trackbox-color-hex" value="#969696" maxlength="7">
-                </div>
-                <label>Box Weight <input type="number" class="value-input" id="val-box-weight" value="1.2" step="0.2"></label>
-                <div class="slider-wrapper"><input type="range" id="slider-box-weight" min="0.2" max="6" value="1.2" step="0.2"></div>
-            </div>
+            </section>
+                </div><!-- /accordion-body -->
+            </div><!-- /accordion-section appearance -->
 
             <div class="control-group" id="line-options-group" style="display:none">
-                <label>Line Color</label>
+                <label for="line-color-picker">Line Color</label>
                 <div class="fx-color-picker">
                     <input type="color" class="fx-color-input" id="line-color-picker" value="#ffffff">
                     <input type="text" class="fx-hex-input" id="line-color-hex" value="#ffffff" maxlength="7">
                 </div>
                 <label>Stroke Weight <input type="number" class="value-input" id="val-line-weight" value="1"></label>
                 <div class="slider-wrapper"><input type="range" id="slider-line-weight" min="0.5" max="8" value="1" step="0.5"></div>
-                <label>Style</label>
-                <div class="selector-row" id="line-style-buttons">
+                <label id="label-style">Style</label>
+                <div class="selector-row" id="line-style-buttons" aria-labelledby="label-style">
                     <button class="selector-btn active" data-value="curved">CURVED</button>
                     <button class="selector-btn" data-value="straight">STRAIGHT</button>
-                </div>
-            </div>
-
-            <div class="control-group" id="group-2">
-                <label>Opacity <input type="number" class="value-input" id="val-2" value="40"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-2" min="0" max="100" value="40" step="1">
-                </div>
-            </div>
-
-            <div class="control-group" id="group-3">
-                <label>Curvature <input type="number" class="value-input" id="val-3" value="3"></label>
-                <div class="slider-wrapper">
-                    <input type="range" id="slider-3" min="0" max="100" value="3" step="0.1">
                 </div>
             </div>
 
@@ -2647,28 +2904,28 @@
             </div>
 
             <div class="playback-row">
-                <button id="btn-play" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <button id="btn-play" class="action-btn" title="Play" aria-label="Play animation">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
                 </button>
-                <button id="btn-restart" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                <button id="btn-restart" class="action-btn" title="Restart" aria-label="Restart animation">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                     Restart
                 </button>
             </div>
 
             <!-- Record & Save -->
             <div class="playback-row">
-                <button id="btn-record" class="action-btn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+                <button id="btn-record" class="action-btn" title="Record (Shift+R)" aria-label="Toggle recording">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>
                     Record
                 </button>
-                <button id="btn-save" class="action-btn">
-                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <button id="btn-save" class="action-btn" title="Save recording" aria-label="Save recording">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                     Save
                 </button>
             </div>
-            <button id="btn-photo" class="action-btn" style="width:100%">
-                <svg viewBox="0 0 24 24"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
+            <button id="btn-photo" class="action-btn" style="width:100%" title="Take screenshot (P)" aria-label="Take screenshot">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
                 Photo
             </button>
 
@@ -2677,7 +2934,7 @@
 
             <!-- FX content moved to right panel -->
 
-            <div class="tab-content" data-tab="audio">
+            <div class="tab-content" data-tab="audio" id="tab-audio" role="tabpanel" aria-label="Audio controls">
 
             <!-- Audio Upload -->
             <div class="control-group">
@@ -2701,15 +2958,15 @@
             <!-- Audio Controls (hidden until audio loaded) -->
             <div id="audio-controls-group" style="display:none">
                 <div class="control-group">
-                    <label>Audio Sync</label>
-                    <div class="selector-row" id="sync-buttons">
+                    <label id="label-audio-sync">Audio Sync</label>
+                    <div class="selector-row" id="sync-buttons" aria-labelledby="label-audio-sync">
                         <button class="selector-btn active" data-value="off">OFF</button>
                         <button class="selector-btn" data-value="on">ON</button>
                     </div>
                 </div>
                 <div class="control-group">
-                    <label>Freq Range</label>
-                    <div class="selector-row" id="freq-preset-buttons">
+                    <label id="label-freq-range">Freq Range</label>
+                    <div class="selector-row" id="freq-preset-buttons" aria-labelledby="label-freq-range">
                         <button class="selector-btn" data-value="kick">KICK</button>
                         <button class="selector-btn" data-value="bass">BASS</button>
                         <button class="selector-btn" data-value="vocal">VOCAL</button>
@@ -2738,8 +2995,8 @@
                     <div class="slider-wrapper"><input type="range" id="slider-11" min="0" max="100" value="40" step="1"></div>
                 </div>
                 <div class="control-group">
-                    <label>Auto-Gain</label>
-                    <div class="selector-row" id="autogain-buttons">
+                    <label id="label-autogain">Auto-Gain</label>
+                    <div class="selector-row" id="autogain-buttons" aria-labelledby="label-autogain">
                         <button class="selector-btn active" data-value="off">OFF</button>
                         <button class="selector-btn" data-value="on">ON</button>
                     </div>
@@ -2748,8 +3005,8 @@
                 <!-- Sync-specific controls (hidden until sync ON) -->
                 <div id="sync-controls-group" style="display:none">
                     <div class="control-group">
-                        <label>Sync Target</label>
-                        <div class="selector-row" id="sync-target-buttons">
+                        <label id="label-sync-target">Sync Target</label>
+                        <div class="selector-row" id="sync-target-buttons" aria-labelledby="label-sync-target">
                             <button class="selector-btn active" data-value="all">MIX</button>
                             <button class="selector-btn" data-value="qty">QTY</button>
                             <button class="selector-btn" data-value="size">SIZE</button>
@@ -2784,8 +3041,8 @@
                 </div>
 
                 <div class="control-group">
-                    <label>BPM Lock <span id="bpm-display" style="font-size:10px;color:var(--text-muted)">— BPM</span></label>
-                    <div class="selector-row" id="bpm-lock-buttons">
+                    <label id="label-bpm-lock">BPM Lock <span id="bpm-display" style="font-size:10px;color:var(--text-muted)">— BPM</span></label>
+                    <div class="selector-row" id="bpm-lock-buttons" aria-labelledby="label-bpm-lock">
                         <button class="selector-btn active" data-value="off">OFF</button>
                         <button class="selector-btn" data-value="on">ON</button>
                     </div>
@@ -2795,14 +3052,15 @@
             </div><!-- /tab-content audio -->
 
         </div>
-    </div>
+    </aside>
 
     <!-- RIGHT PANEL — EFFECTS -->
-    <div id="right-panel" class="panel">
+    <aside id="right-panel" class="panel" aria-label="Effects panel">
+        <button class="panel-close-btn" id="close-right-panel" aria-label="Close effects panel">&times;</button>
         <div class="header-section">
             <div class="title-row">
                 <h1>Effects</h1>
-                <div id="toggle-btn-right" class="toggle-chevron" title="Toggle Controls">
+                <div id="toggle-btn-right" class="toggle-chevron" title="Toggle Controls" role="button" aria-label="Toggle effects panel controls">
                     <svg viewBox="0 0 24 24">
                         <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
                     </svg>
@@ -2816,14 +3074,14 @@
                     <span>Effects</span>
                     <label class="fx-toggle-switch"><input type="checkbox" id="master-fx-toggle" checked><span class="toggle-slider"></span></label>
                 </div>
-                <div id="fx-view-switcher" class="fx-view-switcher">
-                    <button class="fx-view-btn active" data-view="effects">Effects</button>
-                    <button class="fx-view-btn" data-view="presets">Presets</button>
+                <div id="fx-view-switcher" class="fx-view-switcher" role="tablist" aria-label="Effects view switcher">
+                    <button class="fx-view-btn active" data-view="effects" role="tab" aria-selected="true">Effects</button>
+                    <button class="fx-view-btn" data-view="presets" role="tab" aria-selected="false">Presets</button>
                 </div>
                 <div id="fx-effects-view">
                     <div id="fx-favorites-row" class="fx-favorites-row"></div>
-                    <div id="fx-cat-tabs"></div>
-                    <div id="fx-card-grid" class="fx-card-grid"></div>
+                    <div id="fx-cat-tabs" role="tablist" aria-label="Effect categories"></div>
+                    <div id="fx-card-grid" class="fx-card-grid" role="grid" aria-label="Effects grid"></div>
                     <div id="fx-selector-row"></div>
                     <div id="fx-params-container"></div>
                 </div>
@@ -2842,8 +3100,8 @@
                     <div class="fx-postprocess-header">
                         <span class="fx-postprocess-title">Post Process</span>
                         <div class="fx-postprocess-actions">
-                            <button class="fx-action-btn" id="fx-pp-randomize" title="Randomize all">&#x1F3B2;</button>
-                            <button class="fx-action-btn" id="fx-pp-add" title="Add current effect">+</button>
+                            <button class="fx-action-btn" id="fx-pp-randomize" title="Randomize all" aria-label="Randomize all effects">&#x1F3B2;</button>
+                            <button class="fx-action-btn" id="fx-pp-add" title="Add current effect" aria-label="Add current effect to post-process chain">+</button>
                         </div>
                     </div>
                     <div id="fx-pp-list"></div>
@@ -2854,15 +3112,15 @@
 
             <!-- FX Layer toggle -->
             <div class="control-group" id="group-fxlayer">
-                <label>FX Layer</label>
-                <div class="selector-row" id="fx-layer-buttons">
+                <label id="label-fx-layer">FX Layer</label>
+                <div class="selector-row" id="fx-layer-buttons" aria-labelledby="label-fx-layer">
                     <button class="selector-btn active" data-value="video">VIDEO</button>
                     <button class="selector-btn" data-value="all">ALL</button>
                 </div>
             </div>
 
             <div class="control-group" id="group-bgdim">
-                <label>Background Dim <input type="number" class="value-input" id="val-bgdim" value="0"></label>
+                <label for="slider-bgdim">Background Dim <input type="number" class="value-input" id="val-bgdim" value="0"></label>
                 <div class="slider-wrapper">
                     <input type="range" id="slider-bgdim" min="0" max="100" value="0" step="1">
                 </div>
@@ -2873,13 +3131,13 @@
                 <label class="collapsible-toggle">Camera <span class="disc-chevron">&#9662;</span></label>
                 <div class="collapsible-body">
                     <span class="panel-crosslink" id="link-to-zoom" title="Jump to Zoom controls in left panel">← Zoom controls</span>
-                    <label>Auto-Follow</label>
-                    <div class="selector-row" id="zoom-autofollow-buttons">
+                    <label id="label-autofollow">Auto-Follow</label>
+                    <div class="selector-row" id="zoom-autofollow-buttons" aria-labelledby="label-autofollow">
                         <button class="selector-btn" data-value="on">ON</button>
                         <button class="selector-btn active" data-value="off">OFF</button>
                     </div>
-                    <label>Ken Burns</label>
-                    <div class="selector-row" id="zoom-kenburns-buttons">
+                    <label id="label-kenburns">Ken Burns</label>
+                    <div class="selector-row" id="zoom-kenburns-buttons" aria-labelledby="label-kenburns">
                         <button class="selector-btn" data-value="on">ON</button>
                         <button class="selector-btn active" data-value="off">OFF</button>
                     </div>
@@ -2893,8 +3151,8 @@
                         <label>Pan Amount <input type="number" class="value-input" id="val-kb-pan" value="0.15" step="0.05"></label>
                         <div class="slider-wrapper"><input type="range" id="slider-kb-pan" min="0" max="0.5" value="0.15" step="0.01"></div>
                     </div>
-                    <label>Split View</label>
-                    <div class="selector-row" id="zoom-split-buttons">
+                    <label id="label-splitview">Split View</label>
+                    <div class="selector-row" id="zoom-split-buttons" aria-labelledby="label-splitview">
                         <button class="selector-btn" data-value="on">ON</button>
                         <button class="selector-btn active" data-value="off">OFF</button>
                     </div>
@@ -2903,47 +3161,47 @@
                         <div class="slider-wrapper"><input type="range" id="slider-split-pos" min="10" max="90" value="50" step="1"></div>
                         <label>Split Zoom <input type="number" class="value-input" id="val-split-zoom" value="3" step="0.5"></label>
                         <div class="slider-wrapper"><input type="range" id="slider-split-zoom" min="1.5" max="8" value="3" step="0.5"></div>
-                        <label>Flip Sides</label>
-                        <div class="selector-row" id="split-mirror-buttons">
+                        <label id="label-flip">Flip Sides</label>
+                        <div class="selector-row" id="split-mirror-buttons" aria-labelledby="label-flip">
                             <button class="selector-btn" data-value="on">ON</button>
                             <button class="selector-btn active" data-value="off">OFF</button>
                         </div>
-                        <label>Split FX</label>
-                        <div class="selector-row" id="split-fx-buttons">
+                        <label id="label-splitfx">Split FX</label>
+                        <div class="selector-row" id="split-fx-buttons" aria-labelledby="label-splitfx">
                             <button class="selector-btn active" data-value="on">ON</button>
                             <button class="selector-btn" data-value="off">OFF</button>
                         </div>
-                        <label>Dual FX</label>
-                        <div class="selector-row" id="split-dualfx-buttons">
+                        <label id="label-dualfx">Dual FX</label>
+                        <div class="selector-row" id="split-dualfx-buttons" aria-labelledby="label-dualfx">
                             <button class="selector-btn" data-value="on">ON</button>
                             <button class="selector-btn active" data-value="off">OFF</button>
                         </div>
                         <div id="split-dualfx-group" style="display:none">
-                            <label>Left Effect</label>
+                            <label for="split-left-fx">Left Effect</label>
                             <select class="value-input" id="split-left-fx" style="width:100%;margin:2px 0 6px;padding:3px 4px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px"><option value="">None</option></select>
-                            <label>Right Effect</label>
+                            <label for="split-right-fx">Right Effect</label>
                             <select class="value-input" id="split-right-fx" style="width:100%;margin:2px 0 6px;padding:3px 4px;background:#2a2a2a;color:#ddd;border:1px solid #555;border-radius:3px"><option value="">None</option></select>
                         </div>
-                        <label>Split Zoom Viz</label>
-                        <div class="selector-row" id="split-viz-buttons">
+                        <label id="label-splitviz">Split Zoom Viz</label>
+                        <div class="selector-row" id="split-viz-buttons" aria-labelledby="label-splitviz">
                             <button class="selector-btn" data-value="on">ON</button>
                             <button class="selector-btn active" data-value="off">OFF</button>
                         </div>
-                        <label>Feed Shape</label>
-                        <div class="selector-row" id="split-shape-buttons">
+                        <label id="label-feedshape">Feed Shape</label>
+                        <div class="selector-row" id="split-shape-buttons" aria-labelledby="label-feedshape">
                             <button class="selector-btn active" data-value="rect">RECT</button>
                             <button class="selector-btn" data-value="rounded">ROUND</button>
                             <button class="selector-btn" data-value="circle">CIRCLE</button>
                             <button class="selector-btn" data-value="pill">PILL</button>
                         </div>
                     </div>
-                    <label>Depth Blur</label>
-                    <div class="selector-row" id="zoom-depth-buttons">
+                    <label id="label-depthblur">Depth Blur</label>
+                    <div class="selector-row" id="zoom-depth-buttons" aria-labelledby="label-depthblur">
                         <button class="selector-btn" data-value="on">ON</button>
                         <button class="selector-btn active" data-value="off">OFF</button>
                     </div>
-                    <label>PiP Map</label>
-                    <div class="selector-row" id="zoom-pip-buttons">
+                    <label id="label-pip">PiP Map</label>
+                    <div class="selector-row" id="zoom-pip-buttons" aria-labelledby="label-pip">
                         <button class="selector-btn" data-value="on">ON</button>
                         <button class="selector-btn active" data-value="off">OFF</button>
                     </div>
@@ -2951,17 +3209,17 @@
             </div>
 
         </div>
-    </div>
+    </aside>
 
     <!-- TIMELINE -->
     <div id="timeline-container" class="hidden">
         <div id="tl-resize-handle"></div>
         <!-- Row 1: Transport + mode selectors -->
         <div class="timeline-controls">
-            <button id="tl-btn-play" class="action-btn" title="Play/Pause">
+            <button id="tl-btn-play" class="action-btn" title="Play/Pause" aria-label="Play or Pause">
                 <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             </button>
-            <button id="tl-btn-restart" class="action-btn" title="Restart">
+            <button id="tl-btn-restart" class="action-btn" title="Restart" aria-label="Restart playback">
                 <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
             </button>
             <div class="tl-band-selector" id="tl-ruler-selector">
@@ -2979,7 +3237,7 @@
                 <input id="tl-audio-start-input" class="tl-audio-start-input hidden" type="text" placeholder="m:ss" maxlength="6">
             </span>
             <span id="timeline-time">0:00 / 0:00</span>
-            <button id="tl-btn-record" class="action-btn" title="Record">
+            <button id="tl-btn-record" class="action-btn" title="Record" aria-label="Toggle recording">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
             </button>
         </div>

@@ -2182,6 +2182,55 @@ function setupCoreUIListeners() {
         });
     });
 
+    // Accordion section toggle
+    document.querySelectorAll('.accordion-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.closest('.accordion-section');
+            const isCollapsed = section.classList.toggle('collapsed');
+            header.setAttribute('aria-expanded', !isCollapsed);
+        });
+    });
+
+    // Off-canvas drawer toggle (responsive)
+    const overlay = document.getElementById('panel-overlay');
+    const leftPanel = document.getElementById('left-panel');
+    const rightPanel = document.getElementById('right-panel');
+
+    function openDrawer(panel) {
+        panel.classList.add('drawer-open');
+        panel.setAttribute('aria-hidden', 'false');
+        if (overlay) overlay.classList.add('visible');
+        // Focus trap: focus first focusable element
+        const first = panel.querySelector('button, input, select, [tabindex]');
+        if (first) first.focus();
+    }
+    function closeDrawer(panel) {
+        panel.classList.remove('drawer-open');
+        panel.setAttribute('aria-hidden', 'true');
+        if (overlay) overlay.classList.remove('visible');
+    }
+    function closeAllDrawers() {
+        if (leftPanel) closeDrawer(leftPanel);
+        if (rightPanel) closeDrawer(rightPanel);
+    }
+
+    const toggleLeft = document.getElementById('drawer-toggle-left');
+    const toggleRight = document.getElementById('drawer-toggle-right');
+    const closeLeft = document.getElementById('close-left-panel');
+    const closeRight = document.getElementById('close-right-panel');
+
+    if (toggleLeft) toggleLeft.addEventListener('click', () => {
+        closeAllDrawers();
+        openDrawer(leftPanel);
+    });
+    if (toggleRight) toggleRight.addEventListener('click', () => {
+        closeAllDrawers();
+        openDrawer(rightPanel);
+    });
+    if (closeLeft) closeLeft.addEventListener('click', () => closeDrawer(leftPanel));
+    if (closeRight) closeRight.addEventListener('click', () => closeDrawer(rightPanel));
+    if (overlay) overlay.addEventListener('click', closeAllDrawers);
+
     [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
         ui.sliders[idx] = document.getElementById(`slider-${idx}`);
         ui.inputs[idx] = document.getElementById(`val-${idx}`);
