@@ -41,6 +41,14 @@ const DEFAULT_CONFIG = {
 
 let paramValues = [...DEFAULT_CONFIG.parametros];
 
+// Parameter ownership priority: USER > TIMELINE > AUDIO
+const PARAM_SRC_USER = 0;
+const PARAM_SRC_AUDIO = 1;
+const PARAM_SRC_TIMELINE = 2;
+let paramOwner = new Uint8Array(8);
+let paramOwnerPrev = new Uint8Array(8);
+let paramBaseline = [...DEFAULT_CONFIG.parametros];
+
 const navOrder = [0, 1, 4, 5, 6, 2, 3, 7];
 let navIndex = 0;
 
@@ -427,7 +435,7 @@ const MODE_NAMES = {
 // Face landmark tracking state (MediaPipe Face Landmarker)
 let faceLandmarkCache = null;   // cached landmark results
 let faceDetectFrame = 0;        // frame counter for throttled detection
-const FACE_DETECT_INTERVAL = 1; // detect every frame for smooth tracking
+const FACE_DETECT_INTERVAL = 3; // detect every 3rd frame to reduce CPU load (smoothing fills gaps)
 
 // Landmark smoothing (EMA — exponential moving average)
 let smoothedLandmarks = null;   // smoothed landmark positions per face
@@ -1467,7 +1475,7 @@ const ui = {
     audioUpload: document.getElementById('audioUpload'),
     audioName: document.getElementById('audio-name'),
     audioMeterFill: document.getElementById('audio-meter-fill'),
-    modeButtons: document.querySelectorAll('#group-modes .selector-btn'),
+    modeButtons: document.querySelectorAll('#group-modes .tracking-grid .selector-btn'),
     vizButtons: document.querySelectorAll('#viz-buttons .selector-btn'),
     fxCards: [], // FX cards replaced by Effecto dropdown — now JS-generated
     fxLayerButtons: document.querySelectorAll('#fx-layer-buttons .selector-btn'),
@@ -1596,7 +1604,6 @@ function generateSpecialCode() {
 function setup() {
     pixelDensity(1); // 1x density for fast pixel effects (4x fewer pixels on Retina)
     let canvas = createCanvas(windowWidth, windowHeight);
-    pixelDensity(1);
     resizeCanvas(windowWidth, windowHeight); // force 1x buffer
     p5Canvas = canvas.elt;
     p5Canvas.setAttribute('tabindex', '0');
@@ -1717,6 +1724,7 @@ function updateZoomUI() {
 
 function draw() {
     background(0);
+    paramOwner.fill(PARAM_SRC_USER);
     handleContinuousInput();
     updateSmoothedAudio();
     applyAudioSync();
@@ -1733,10 +1741,9 @@ function draw() {
         let dispW = width;
         let dispH = height;
 
-        // Reserve space for timeline if visible
-        let tlEl = document.getElementById('timeline-container');
-        if (tlEl && !tlEl.classList.contains('hidden')) {
-            dispH -= tlEl.offsetHeight + 20; // +20 for bottom gap
+        // Reserve space for timeline if visible (use cached height to avoid per-frame reflow)
+        if (window._cachedTimelineHeight > 0) {
+            dispH -= window._cachedTimelineHeight + 20; // +20 for bottom gap
         }
 
         // Fit video into available space (base size before zoom)
@@ -1899,12 +1906,18 @@ function draw() {
             lastTrackTime = millis();
         }
 
-        // Update face tracking status display continuously
+        // Update face tracking status display continuously (cached DOM refs)
         if (currentMode >= 15 && currentMode <= 17 && frameCount % 15 === 0) {
-            let fStatusEl = document.getElementById('face-status');
-            let fHintEl = document.getElementById('face-hint');
+            if (!window._faceStatusEl) window._faceStatusEl = document.getElementById('face-status');
+            if (!window._faceHintEl) window._faceHintEl = document.getElementById('face-hint');
+            let fStatusEl = window._faceStatusEl;
+            let fHintEl = window._faceHintEl;
             if (fStatusEl) {
-                if (!window.mpFaceLandmarkerReady) {
+                if (window.mpFaceInitError) {
+                    fStatusEl.textContent = 'ERROR';
+                    fStatusEl.style.color = '#E17055';
+                    if (fHintEl) fHintEl.textContent = window.mpFaceInitError;
+                } else if (!window.mpFaceLandmarkerReady) {
                     fStatusEl.textContent = 'LOADING';
                     fStatusEl.style.color = '#FDCB6E';
                 } else if (faceLandmarkCache && faceLandmarkCache.length > 0) {
@@ -2008,7 +2021,7 @@ function draw() {
 
                 // ASCII: green terminal-style ASCII art inside blob box
                 if (activeVizModes.has(12)) {
-                    let _chars = ' .,:-~=+*!?#%@$MW';
+                    let _chars = ASCII_CHARSETS[asciiCharSet] || ASCII_CHARSETS.classic;
                     // Scale up the box so ASCII is actually readable
                     let asciiScale = 2.8;
                     let aW = Math.max(zW * asciiScale, 140);
@@ -2272,8 +2285,8 @@ function draw() {
         applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
         image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
 
-        // Apply effects to zoom side
-        if (splitFxEnabled && masterFxEnabled && activeEffects.size > 0) {
+        // Apply effects to zoom side (respect fxLayerAll — false means VIDEO layer only)
+        if (splitFxEnabled && masterFxEnabled && activeEffects.size > 0 && !fxLayerAll) {
             try { applyActiveEffects(); } catch(e) {}
         }
 
@@ -2367,6 +2380,8 @@ function draw() {
 
     // Update zoom UI each frame (for smooth transitions)
     if (zoomSmooth && (Math.abs(vidZoom - zoomTargetLevel) > 0.002)) updateZoomUI();
+
+    paramOwnerPrev.set(paramOwner);
 }
 
 // ── CORE UI LISTENERS ─────────────────────
@@ -2445,6 +2460,8 @@ function setupCoreUIListeners() {
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
             if (currentMode < 15 || currentMode > 17) { faceLandmarkCache = null; smoothedLandmarks = null; }
+            if (currentMode === 14 && window.initSegmenterLazy) window.initSegmenterLazy();
+            if (currentMode >= 15 && currentMode <= 17 && window.initFaceLandmarkerLazy) window.initFaceLandmarkerLazy();
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
             updateButtonStates();
         });
@@ -2514,6 +2531,7 @@ function setupCoreUIListeners() {
                 renderTimelineSegments();
             } else {
                 paramValues[idx] = val;
+                paramBaseline[idx] = val;
             }
             if (ui.inputs[idx]) ui.inputs[idx].value = val;
             currentParam = idx;
@@ -2531,6 +2549,7 @@ function setupCoreUIListeners() {
                     renderTimelineSegments();
                 } else {
                     paramValues[idx] = val;
+                    paramBaseline[idx] = val;
                 }
                 ui.sliders[idx].value = val;
                 e.target.value = val;
@@ -2556,7 +2575,10 @@ function setupCoreUIListeners() {
         });
         btn.addEventListener('click', (e) => {
             if (modeDragState && modeDragState.dragging) return; // was a drag, not a click
-            currentMode = parseInt(e.target.dataset.value);
+            e.stopPropagation();
+            let newMode = parseInt(btn.dataset.value);
+            if (isNaN(newMode)) return;
+            currentMode = newMode;
             _userMode = currentMode;
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
@@ -2564,9 +2586,16 @@ function setupCoreUIListeners() {
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
             if (currentMode === 14) {
                 enterMaskSelecting();
+                if (window.initSegmenterLazy) window.initSegmenterLazy();
             } else {
                 exitMaskMode();
             }
+            if (currentMode >= 15 && currentMode <= 17) {
+                if (window.initFaceLandmarkerLazy) window.initFaceLandmarkerLazy();
+            }
+            // Ensure tracking stays on when selecting a mode
+            let tt = document.getElementById('tracking-toggle');
+            if (tt && !tt.checked) tt.checked = true;
             updateButtonStates();
         });
     });
@@ -2999,6 +3028,20 @@ function setupCoreUIListeners() {
     document.getElementById('help-overlay').addEventListener('click', (e) => {
         if (e.target.id === 'help-overlay') toggleHelp();
     });
+    let helpCloseBtn = document.getElementById('help-close-btn');
+    if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
+
+    // Wire file/audio input containers (moved from inline onclick for consistency)
+    let fileContainer = document.getElementById('file-input-container');
+    if (fileContainer) fileContainer.addEventListener('click', () => document.getElementById('videoUpload').click());
+    let audioContainer = document.getElementById('audio-input-container');
+    if (audioContainer) audioContainer.addEventListener('click', () => document.getElementById('audioUpload').click());
+
+    // Keyboard support for toggle button
+    let toggleBtn = document.getElementById('toggle-btn');
+    if (toggleBtn) toggleBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBtn.click(); }
+    });
 
     // Hints toggle
     const hintsBtn = document.getElementById('hints-btn');
@@ -3106,7 +3149,12 @@ function updateButtonStates() {
     if (isFaceMode) {
         let fStatusEl = document.getElementById('face-status');
         let fHintEl = document.getElementById('face-hint');
-        if (!window.mpFaceLandmarkerReady) {
+        if (window.mpFaceInitError) {
+            fStatusEl.textContent = 'ERROR';
+            fStatusEl.style.color = '#E17055';
+            document.getElementById('face-loading').style.display = '';
+            fHintEl.textContent = window.mpFaceInitError;
+        } else if (!window.mpFaceLandmarkerReady) {
             fStatusEl.textContent = 'LOADING';
             fStatusEl.style.color = '#FDCB6E';
             document.getElementById('face-loading').style.display = '';
@@ -3319,7 +3367,7 @@ function togglePlay() {
     if (videoEl && videoLoaded) {
         videoPlaying = !videoPlaying;
         if (videoPlaying) {
-             videoEl.elt.loop = true;
+             videoEl.elt.loop = (loopMode === 'loop' || loopMode === 'through');
              let playPromise = videoEl.elt.play();
              if (playPromise) {
                  playPromise.catch(() => {
@@ -3376,7 +3424,12 @@ function syncUI() {
     updateButtonStates();
 }
 
-function windowResized() { pixelDensity(1); resizeCanvas(windowWidth, windowHeight); }
+function windowResized() {
+    pixelDensity(1); resizeCanvas(windowWidth, windowHeight);
+    // Update cached timeline height on resize
+    let tlEl = document.getElementById('timeline-container');
+    window._cachedTimelineHeight = (tlEl && !tlEl.classList.contains('hidden')) ? tlEl.offsetHeight : 0;
+}
 
 // ── FILE / WEBCAM HANDLERS ────────────────
 
@@ -3440,8 +3493,12 @@ function handleFile(event) {
             currentMode = 1; _userMode = 1;
             updateButtonStates();
             syncPlayIcon(true);
+            // Remove previous timeupdate listener to prevent accumulation across file loads
+            if (window._timeupdateHandler && videoEl.elt) {
+                videoEl.elt.removeEventListener('timeupdate', window._timeupdateHandler);
+            }
             // Keep audio in sync with video — handles offset and loop modes
-            videoEl.elt.addEventListener('timeupdate', () => {
+            window._timeupdateHandler = () => {
                 if (!audioElement || !audioLoaded || !videoPlaying) return;
                 let videoTime = videoEl.elt.currentTime;
                 let expectedAudioTime = getAudioTimeForVideo(videoTime);
@@ -3475,7 +3532,8 @@ function handleFile(event) {
                         syncPlayIcon(false);
                     }
                 }
-            });
+            };
+            videoEl.elt.addEventListener('timeupdate', window._timeupdateHandler);
             // Capture duration for timeline
             videoEl.elt.addEventListener('loadedmetadata', () => {
                 videoDuration = videoEl.elt.duration;
@@ -3504,6 +3562,7 @@ function changeValue(amount) {
     let newVal = paramValues[currentParam] + amount;
     newVal = constrain(newVal, 0, 100);
     paramValues[currentParam] = newVal;
+    paramBaseline[currentParam] = newVal;
     syncUI();
 }
 
@@ -3949,6 +4008,7 @@ function mouseDragged() {
         let delta = (mouseX - lastX) * 0.2;
         if (currentParam !== 4) {
             paramValues[currentParam] = constrain(paramValues[currentParam] + delta, 0, 100);
+            paramBaseline[currentParam] = paramValues[currentParam];
             syncUI();
         }
         lastX = mouseX;
@@ -3958,6 +4018,9 @@ function mouseDragged() {
 }
 
 function mousePressed() {
+    // Don't handle clicks that landed on UI elements (buttons, inputs, panels)
+    let el = document.elementFromPoint(mouseX, mouseY);
+    if (el && el.closest('.panel, #tl-container, .modal-overlay, .settings-modal')) return;
     if (mouseButton === RIGHT) { lastX = mouseX; return; }
     if (currentMode === 14 && mouseButton === LEFT) {
         if (mouseX >= videoX && mouseX <= videoX + videoW && mouseY >= videoY && mouseY <= videoY + videoH) {

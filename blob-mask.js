@@ -4,30 +4,7 @@
 // multi-click refinement, auto-finalize
 // ══════════════════════════════════════════
 
-function enterMaskSelecting() {
-    if (!videoLoaded || !videoEl) return;
-    maskSelecting = true;
-    maskReady = false;
-    maskClickNorm = null;
-    maskSegData = null;
-    maskConfData = null;
-    maskSegW = 0;
-    maskSegH = 0;
-    maskFrameCount = 0;
-    maskPoints = [];
-    maskPrevCentroid = null;
-    if (maskOverlay) { maskOverlay.remove(); maskOverlay = null; }
-    // No pause — video keeps playing for live selection
-    document.getElementById('mask-controls-group').style.display = '';
-    if (!window.mpSegmenterReady) {
-        document.getElementById('mask-loading').style.display = '';
-        document.getElementById('mask-hint').textContent = 'Loading AI model, please wait...';
-    }
-    updateButtonStates();
-}
-
-function exitMaskMode() {
-    let wasSelecting = maskSelecting;
+function _resetMaskState() {
     maskSelecting = false;
     maskReady = false;
     maskClickNorm = null;
@@ -39,6 +16,23 @@ function exitMaskMode() {
     maskPoints = [];
     maskPrevCentroid = null;
     if (maskOverlay) { maskOverlay.remove(); maskOverlay = null; }
+}
+
+function enterMaskSelecting() {
+    if (!videoLoaded || !videoEl) return;
+    _resetMaskState();
+    maskSelecting = true;
+    // No pause — video keeps playing for live selection
+    document.getElementById('mask-controls-group').style.display = '';
+    if (!window.mpSegmenterReady) {
+        document.getElementById('mask-loading').style.display = '';
+        document.getElementById('mask-hint').textContent = 'Loading AI model, please wait...';
+    }
+    updateButtonStates();
+}
+
+function exitMaskMode() {
+    _resetMaskState();
     document.getElementById('mask-controls-group').style.display = 'none';
 }
 
@@ -72,6 +66,7 @@ function maskSegmentWithPoint(normX, normY, autoFinalize, compositeMode) {
 
     try {
         window.mpSegmenter.segment(videoEl.elt, roi, (result) => {
+          try {
             maskSegInFlight = false;
             // Discard result if user left MASK mode during segmentation
             if (currentMode !== 14) { if (result.close) result.close(); return; }
@@ -117,7 +112,11 @@ function maskSegmentWithPoint(normX, normY, autoFinalize, compositeMode) {
                 newConfData = null;
             }
 
-            // Free GPU memory
+            // Free GPU memory — close individual mask handles before result
+            if (result.confidenceMasks) {
+                for (let m of result.confidenceMasks) { if (m && m.close) m.close(); }
+            }
+            if (result.categoryMask && result.categoryMask.close) result.categoryMask.close();
             if (result.close) result.close();
 
             if (!newSegData) return;
@@ -184,6 +183,10 @@ function maskSegmentWithPoint(normX, normY, autoFinalize, compositeMode) {
             // Build overlay for brief visual feedback on selection
             if (maskSelecting || autoFinalize) buildMaskOverlay();
             updateButtonStates();
+          } catch (cbErr) {
+            maskSegInFlight = false;
+            console.error('[Mask] Callback error:', cbErr);
+          }
         });
     } catch (e) {
         maskSegInFlight = false;
@@ -193,8 +196,13 @@ function maskSegmentWithPoint(normX, normY, autoFinalize, compositeMode) {
 
 function buildMaskOverlay() {
     if (!maskSegW || maskSegW === 0) return;
-    if (maskOverlay) maskOverlay.remove();
-    maskOverlay = createGraphics(maskSegW, maskSegH);
+    // Reuse existing overlay if dimensions match, otherwise recreate
+    if (maskOverlay && maskOverlay.width === maskSegW && maskOverlay.height === maskSegH) {
+        // Reuse — just clear and redraw
+    } else {
+        if (maskOverlay) maskOverlay.remove();
+        maskOverlay = createGraphics(maskSegW, maskSegH);
+    }
     maskOverlay.pixelDensity(1);
     maskOverlay.loadPixels();
     for (let i = 0; i < (maskConfData || maskSegData).length; i++) {
@@ -239,15 +247,8 @@ function finalizeMask() {
 }
 
 function clearMask() {
-    maskReady = false;
-    maskSelecting = true;
-    maskSegData = null;
-    maskConfData = null;
-    maskClickNorm = null;
-    maskPoints = [];
-    maskPrevCentroid = null;
-    maskFrameCount = 0;
-    if (maskOverlay) { maskOverlay.remove(); maskOverlay = null; }
+    _resetMaskState();
+    maskSelecting = true; // Re-enter selecting mode after clear
     updateButtonStates();
 }
 

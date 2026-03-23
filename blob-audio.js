@@ -58,6 +58,9 @@ function handleAudioFile(event) {
         }
     });
 
+    // Keep audioPlaying flag in sync with actual element state
+    audioElement.addEventListener('pause', () => { audioPlaying = false; });
+
     audioElement.addEventListener('canplaythrough', () => {
         if (audioContext.state === 'suspended') audioContext.resume();
         audioSource = audioContext.createMediaElementSource(audioElement);
@@ -95,6 +98,7 @@ function handleAudioFile(event) {
 function getAudioEnergy() {
     if (!audioAnalyser || !frequencyData) return { band: 0, bass: 0, mid: 0, treble: 0, overall: 0 };
     audioAnalyser.getByteFrequencyData(frequencyData);
+    window._audioFFTFrame = typeof frameCount !== 'undefined' ? frameCount : 0; // Mark FFT as fresh this frame
 
     const binCount = frequencyData.length;
     const sampleRate = audioContext.sampleRate;
@@ -297,10 +301,10 @@ function applyAudioSync() {
 
     // Sync is ON but audio isn't ready/playing — hold at base values
     if (!audioLoaded || !audioPlaying) {
-        if (audioBaseValues[0] !== undefined) paramValues[0] = audioBaseValues[0];
-        if (audioBaseValues[1] !== undefined) paramValues[1] = audioBaseValues[1];
-        if (audioBaseValues[5] !== undefined) paramValues[5] = audioBaseValues[5];
-        if (audioBaseValues[6] !== undefined) paramValues[6] = audioBaseValues[6];
+        if (audioBaseValues[0] !== undefined && paramOwnerPrev[0] < PARAM_SRC_TIMELINE) paramValues[0] = audioBaseValues[0];
+        if (audioBaseValues[1] !== undefined && paramOwnerPrev[1] < PARAM_SRC_TIMELINE) paramValues[1] = audioBaseValues[1];
+        if (audioBaseValues[5] !== undefined && paramOwnerPrev[5] < PARAM_SRC_TIMELINE) paramValues[5] = audioBaseValues[5];
+        if (audioBaseValues[6] !== undefined && paramOwnerPrev[6] < PARAM_SRC_TIMELINE) paramValues[6] = audioBaseValues[6];
         if (++_syncUIFrameCount % 8 === 0) syncUI();
         return;
     }
@@ -315,17 +319,17 @@ function applyAudioSync() {
 
     if (target === 'qty') {
         let val = smoothBand * sens + activeBand.intensity * 1.0 * sens;
-        paramValues[0] = map(constrain(val, 0, 1), 0, 1, syncMinQty, syncMaxQty);
+        if (paramOwnerPrev[0] < PARAM_SRC_TIMELINE) paramValues[0] = map(constrain(val, 0, 1), 0, 1, syncMinQty, syncMaxQty);
     }
 
     else if (target === 'size') {
         let val = smoothBand * sens + activeBand.intensity * 1.0 * sens;
-        paramValues[6] = map(constrain(val, 0, 1), 0, 1, syncMinSize, syncMaxSize);
+        if (paramOwnerPrev[6] < PARAM_SRC_TIMELINE) paramValues[6] = map(constrain(val, 0, 1), 0, 1, syncMinSize, syncMaxSize);
     }
 
     else if (target === 'color') {
         let val = smoothBand * sens + activeBand.intensity * 0.8 * sens;
-        paramValues[1] = constrain(val * 100, 0, 100);
+        if (paramOwnerPrev[1] < PARAM_SRC_TIMELINE) paramValues[1] = constrain(val * 100, 0, 100);
     }
 
     else if (target === 'pulse') {
@@ -341,19 +345,19 @@ function applyAudioSync() {
     else if (target === 'rate') {
         let val = smoothBand * sens + activeBand.intensity * 1.0 * sens;
         // Invert: high energy → low rate (fast), low energy → high rate (slow)
-        paramValues[5] = map(constrain(val, 0, 1), 0, 1, syncMaxRate, syncMinRate);
+        if (paramOwnerPrev[5] < PARAM_SRC_TIMELINE) paramValues[5] = map(constrain(val, 0, 1), 0, 1, syncMaxRate, syncMinRate);
     }
 
     else if (target === 'all') {
         // MIX: kick → qty, overall → size, mid+snare+hat → color
         let qtyVal = kick * 1.0 * sens + smoothBand * 0.3 * sens;
-        paramValues[0] = map(constrain(qtyVal, 0, 1), 0, 1, syncMinQty, syncMaxQty);
+        if (paramOwnerPrev[0] < PARAM_SRC_TIMELINE) paramValues[0] = map(constrain(qtyVal, 0, 1), 0, 1, syncMinQty, syncMaxQty);
 
         let sizeVal = smoothOverall * sens + snare * 0.5 * sens;
-        paramValues[6] = map(constrain(sizeVal, 0, 1), 0, 1, syncMinSize, syncMaxSize);
+        if (paramOwnerPrev[6] < PARAM_SRC_TIMELINE) paramValues[6] = map(constrain(sizeVal, 0, 1), 0, 1, syncMinSize, syncMaxSize);
 
         let colorVal = smoothMid * 0.5 * sens + snare * 0.3 * sens + hat * 0.3 * sens;
-        paramValues[1] = constrain(colorVal * 100, 0, 100);
+        if (paramOwnerPrev[1] < PARAM_SRC_TIMELINE) paramValues[1] = constrain(colorVal * 100, 0, 100);
     }
 
     // Decay pulse when not in pulse mode
@@ -362,11 +366,11 @@ function applyAudioSync() {
     // BPM Lock: override rate to match detected tempo (works with any target)
     if (bpmLocked && bpmValue > 0) {
         let beatPeriod = 60000 / bpmValue;
-        paramValues[5] = constrain(beatPeriod / 10, syncMinRate, syncMaxRate);
+        if (paramOwnerPrev[5] < PARAM_SRC_TIMELINE) paramValues[5] = constrain(beatPeriod / 10, syncMinRate, syncMaxRate);
     }
 
     // Hard cutoff — only zero out if user's floor allows it
-    if (syncMinQty === 0 && paramValues[0] < 2) paramValues[0] = 0;
+    if (syncMinQty === 0 && paramValues[0] < 2 && paramOwnerPrev[0] < PARAM_SRC_TIMELINE) paramValues[0] = 0;
 
     if (++_syncUIFrameCount % 8 === 0) {
         syncUI();
@@ -386,7 +390,11 @@ function renderMiniSpectrum() {
     let h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
-    audioAnalyser.getByteFrequencyData(frequencyData);
+    // Reuse frequencyData already populated by getAudioEnergy() this frame
+    // Only fetch fresh if not yet populated this frame
+    if (!window._audioFFTFrame || window._audioFFTFrame !== frameCount) {
+        audioAnalyser.getByteFrequencyData(frequencyData);
+    }
     const binCount = frequencyData.length;
     const sampleRate = audioContext ? audioContext.sampleRate : 44100;
     const nyquist = sampleRate / 2;
@@ -436,7 +444,10 @@ function renderDebug() {
 
     let rawBand = 0;
     if (audioAnalyser && frequencyData) {
-        audioAnalyser.getByteFrequencyData(frequencyData);
+        // Reuse frequencyData already populated this frame
+        if (!window._audioFFTFrame || window._audioFFTFrame !== frameCount) {
+            audioAnalyser.getByteFrequencyData(frequencyData);
+        }
         let lb = Math.max(0, Math.min(parseInt(lowBin), bins - 1));
         let hb = Math.max(lb + 1, Math.min(parseInt(highBin), bins));
         let sum = 0;
@@ -713,6 +724,16 @@ function toggleMicrophone() {
 
 function startMicrophone() {
     initAudioContext();
+    // Save file-based audio graph so we can restore on mic stop
+    window._savedFileAudioSource = audioSource || null;
+    window._savedFileAudioAnalyser = audioAnalyser || null;
+    window._savedFileAudioGainNode = audioGainNode || null;
+    window._savedFileAudioLoaded = audioLoaded;
+    // Disconnect file graph if active
+    if (audioSource) { try { audioSource.disconnect(); } catch(e){} }
+    if (audioAnalyser) { try { audioAnalyser.disconnect(); } catch(e){} }
+    if (audioGainNode) { try { audioGainNode.disconnect(); } catch(e){} }
+
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         micStream = stream;
         micSource = audioContext.createMediaStreamSource(stream);
@@ -753,7 +774,24 @@ function stopMicrophone() {
     if (audioAnalyser) { try { audioAnalyser.disconnect(); } catch(e){} }
     if (audioGainNode) { try { audioGainNode.disconnect(); } catch(e){} }
     micActive = false;
-    audioLoaded = false;
+
+    // Restore file-based audio graph if it existed
+    if (window._savedFileAudioSource && window._savedFileAudioAnalyser) {
+        audioSource = window._savedFileAudioSource;
+        audioAnalyser = window._savedFileAudioAnalyser;
+        audioGainNode = window._savedFileAudioGainNode;
+        try {
+            audioSource.connect(audioAnalyser);
+            audioAnalyser.connect(audioGainNode);
+            audioGainNode.connect(audioContext.destination);
+        } catch(e) {}
+        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        floatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+        prevFloatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+        audioLoaded = window._savedFileAudioLoaded;
+    } else {
+        audioLoaded = false;
+    }
 
     const micBtn = document.getElementById('mic-btn');
     if (micBtn) micBtn.classList.remove('active');

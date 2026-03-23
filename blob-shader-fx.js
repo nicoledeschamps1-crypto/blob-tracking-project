@@ -1259,6 +1259,25 @@ class ShaderFXPipeline {
         }
         this.gl = gl;
         console.log('[ShaderFX] WebGL2 context created:', gl.getParameter(gl.VERSION));
+
+        // Handle WebGL context loss/restore
+        this.glCanvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            this.ready = false;
+            console.warn('[ShaderFX] Context lost');
+        });
+        this.glCanvas.addEventListener('webglcontextrestored', () => {
+            console.log('[ShaderFX] Context restored — reinitializing');
+            this.ready = false;
+            this._initQuad();
+            this.sourceTexture = this._createTexture();
+            this._initFramebuffers();
+            this.registerEffect('passthrough', VERT_PASSTHROUGH, FRAG_PASSTHROUGH);
+            this.ready = true;
+            // Re-register effects on restore
+            try { registerCoreShaderEffects(); shaderFX.setEffectChain(SHADER_CHAIN_ORDER); } catch(e) {}
+        });
+
         this._initQuad();
         this.sourceTexture = this._createTexture();
         this._initFramebuffers();
@@ -1463,6 +1482,14 @@ class ShaderFXPipeline {
 
                 // Blend pass: combine pre-effect + effect output
                 const blendEntry = this._blendProgram;
+                if (!blendEntry) {
+                    // Blend shader failed to compile — fall back to normal blend path
+                    if (!isLast) {
+                        inputTexture = this.fbTextures[this._pingPongIdx];
+                        this._pingPongIdx = 1 - this._pingPongIdx;
+                    }
+                    continue;
+                }
                 const blendTarget = isLast ? null : this.framebuffers[blendIdx];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, blendTarget);
                 gl.viewport(0, 0, this.width, this.height);
@@ -1503,7 +1530,15 @@ class ShaderFXPipeline {
         for (let i = 0; i < 2; i++) {
             gl.bindTexture(gl.TEXTURE_2D, this.fbTextures[i]);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            // Re-attach textures to framebuffers after reallocation
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffers[i]);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.fbTextures[i], 0);
+            let status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                console.warn('[ShaderFX] Framebuffer ' + i + ' incomplete after resize:', status);
+            }
         }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         console.log('[ShaderFX] Resized to', w, 'x', h);
     }
 
@@ -1544,7 +1579,7 @@ const SHADER_CHAIN_ORDER = [
     'gradmap', 'thermal', 'rgbgain', 'colorbal',
     // Distortion tier
     'chroma', 'rgbshift', 'blursharp', 'emboss',
-    'wave', 'swirl', 'ripple',
+    'wave', 'swirl', 'ripple', 'curve',
     // Pattern tier
     'bloom', 'pixel', 'dither',
     // Overlay tier
@@ -1784,7 +1819,7 @@ function initShaderFX() {
     if (ok) {
         registerCoreShaderEffects();
         shaderFX.setEffectChain(SHADER_CHAIN_ORDER);
-        console.log('[ShaderFX] Phase 2.5 ready — 30 GPU effects + blend modes');
+        console.log('[ShaderFX] Phase 2.5 ready — 31 GPU effects + blend modes');
     }
     return ok;
 }

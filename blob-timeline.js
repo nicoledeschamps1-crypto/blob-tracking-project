@@ -7,6 +7,27 @@
 
 let _rulerRedrawPending = false;
 
+// ── Timeline Interpolation ──
+const TL_DEFAULT_FADE = 0.3;
+
+function segEnvelope(seg, currentTime) {
+    let fadeIn = seg.fadeIn ?? TL_DEFAULT_FADE;
+    let fadeOut = seg.fadeOut ?? TL_DEFAULT_FADE;
+    let maxFade = (seg.endTime - seg.startTime) / 2;
+    fadeIn = Math.min(fadeIn, maxFade);
+    fadeOut = Math.min(fadeOut, maxFade);
+    let elapsed = currentTime - seg.startTime;
+    let remaining = seg.endTime - currentTime;
+    let env = 1.0;
+    if (fadeIn > 0 && elapsed < fadeIn) env = Math.min(env, elapsed / fadeIn);
+    if (fadeOut > 0 && remaining < fadeOut) env = Math.min(env, remaining / fadeOut);
+    return env;
+}
+
+function lerpParam(baseline, target, env) {
+    return baseline + (target - baseline) * env;
+}
+
 // ── Segment keyboard shortcuts (capture phase — fires before p5/browser) ──
 window.addEventListener('keydown', (e) => {
     let tag = document.activeElement.tagName;
@@ -130,7 +151,7 @@ function tlUndo() {
     timelineSegments = JSON.parse(tlUndoStack.pop());
     let maxId = 0;
     for (let s of timelineSegments) if (s.id > maxId) maxId = s.id;
-    nextSegId = maxId + 1;
+    nextSegId = Math.max(nextSegId, maxId + 1); // Never decrease — prevents ID collisions with redo stack
     selectedSegments.clear();
     syncSelectedSegment();
     assignLanes();
@@ -143,7 +164,7 @@ function tlRedo() {
     timelineSegments = JSON.parse(tlRedoStack.pop());
     let maxId = 0;
     for (let s of timelineSegments) if (s.id > maxId) maxId = s.id;
-    nextSegId = maxId + 1;
+    nextSegId = Math.max(nextSegId, maxId + 1); // Never decrease — prevents ID collisions
     selectedSegments.clear();
     syncSelectedSegment();
     assignLanes();
@@ -201,7 +222,9 @@ function addModeSegmentAt(modeValue, startTime) {
         modeValue: modeValue,
         startTime: startTime,
         endTime: endTime,
-        params: [...paramValues], // snapshot core params
+        fadeIn: TL_DEFAULT_FADE,
+        fadeOut: TL_DEFAULT_FADE,
+        params: [...paramBaseline],
         lane: 0,
         color: '#aaaaaa'
     };
@@ -231,7 +254,9 @@ function addBlobSegmentAt(startTime) {
         customHue: _userCustomHue,
         startTime: startTime,
         endTime: endTime,
-        params: _userParamValues ? [..._userParamValues] : [...paramValues],
+        fadeIn: TL_DEFAULT_FADE,
+        fadeOut: TL_DEFAULT_FADE,
+        params: [...paramBaseline],
         lane: 0,
         color: BLOB_SEG_COLOR
     };
@@ -261,6 +286,8 @@ function addTimelineSegmentAt(effectName, startTime) {
         effect: effectName,
         startTime: startTime,
         endTime: endTime,
+        fadeIn: TL_DEFAULT_FADE,
+        fadeOut: TL_DEFAULT_FADE,
         params: captureEffectParams(effectName),
         lane: 0,
         color: FX_CAT_COLORS[FX_CATEGORIES[effectName]] || '#888'
@@ -391,9 +418,14 @@ function getAudioTimeForVideo(videoTime) {
 
 function showTimeline() {
     ui.tlContainer.classList.remove('hidden');
+    // Cache height for draw loop (avoids per-frame reflow from offsetHeight)
+    requestAnimationFrame(() => {
+        window._cachedTimelineHeight = ui.tlContainer ? ui.tlContainer.offsetHeight : 0;
+    });
 }
 function hideTimeline() {
     ui.tlContainer.classList.add('hidden');
+    window._cachedTimelineHeight = 0;
 }
 
 // ── Time Ruler ───────────────────────────
@@ -1013,9 +1045,6 @@ function setupSegmentDrag(el, seg) {
 
 // ── Timeline Effect Application ───
 
-// Saved user param values — restored when no blob/mode segments are active
-let _userParamValues = null;
-
 function applyTimelineEffects() {
     if (timelineSegments.length === 0) return;
     let currentTime = (tlRulerMode === 'audio' && audioElement && audioLoaded)
@@ -1032,14 +1061,10 @@ function applyTimelineEffects() {
     let fxSegs = active.filter(s => s.type !== 'mode' && s.type !== 'blob');
     let hasBlobsOnTimeline = timelineSegments.some(s => s.type === 'blob');
 
-    // Handle blob/mode param overrides
-    if (blobSegs.length > 0 || modeSegs.length > 0) {
-        if (!_userParamValues) _userParamValues = [...paramValues];
-    } else {
-        // Restore user params when no blob/mode segments active
-        if (_userParamValues) {
-            for (let i = 0; i < _userParamValues.length; i++) paramValues[i] = _userParamValues[i];
-            _userParamValues = null;
+    // When no blob/mode segments active, restore from stable baseline
+    if (blobSegs.length === 0 && modeSegs.length === 0) {
+        for (let i = 0; i < paramBaseline.length; i++) {
+            if (paramOwner[i] < PARAM_SRC_AUDIO) paramValues[i] = paramBaseline[i];
         }
         // PULSE: suppress blobs between blob segments (on/off pulsing)
         if (hasBlobsOnTimeline) {
@@ -1047,50 +1072,76 @@ function applyTimelineEffects() {
         }
     }
 
-    // Apply blob segments: override paramValues + tracking mode (last one wins)
+    // Apply blob segments with envelope lerp (last one wins)
     if (blobSegs.length > 0) {
         let blobSeg = blobSegs[blobSegs.length - 1];
-        if (blobSeg.modeValue !== undefined) currentMode = blobSeg.modeValue;
-        if (blobSeg.customHue !== undefined) customHue = blobSeg.customHue;
+        let env = segEnvelope(blobSeg, currentTime);
         if (blobSeg.params && Array.isArray(blobSeg.params)) {
             for (let i = 0; i < blobSeg.params.length; i++) {
-                paramValues[i] = blobSeg.params[i];
+                paramValues[i] = lerpParam(paramBaseline[i], blobSeg.params[i], env);
+                paramOwner[i] = PARAM_SRC_TIMELINE;
             }
+        }
+        // Discrete values snap at envelope > 0.5
+        if (env > 0.5) {
+            if (blobSeg.modeValue !== undefined) currentMode = blobSeg.modeValue;
+            if (blobSeg.customHue !== undefined) customHue = blobSeg.customHue;
         }
     }
 
-    // Apply mode segments: last one wins (override currentMode + params)
+    // Apply mode segments with envelope lerp (last one wins)
     if (modeSegs.length > 0) {
         let modeSeg = modeSegs[modeSegs.length - 1];
-        currentMode = modeSeg.modeValue;
+        let env = segEnvelope(modeSeg, currentTime);
+        if (env > 0.5) currentMode = modeSeg.modeValue;
         if (modeSeg.params && Array.isArray(modeSeg.params)) {
             for (let i = 0; i < modeSeg.params.length; i++) {
-                paramValues[i] = modeSeg.params[i];
+                paramValues[i] = lerpParam(paramBaseline[i], modeSeg.params[i], env);
+                paramOwner[i] = PARAM_SRC_TIMELINE;
             }
         }
     }
 
-    // Apply FX effect segments (always, regardless of blob/mode state)
+    // Apply FX effect segments with envelope lerp
     if (fxSegs.length === 0) return;
-    if (!window._fxDebugThrottle) window._fxDebugThrottle = 0;
-    if (++window._fxDebugThrottle % 60 === 1) {
-        console.log('[TL-FX] t=' + currentTime.toFixed(2) + ' active=' + active.length +
-            ' fx=' + fxSegs.map(s => s.effect + '[' + s.startTime.toFixed(1) + '-' + s.endTime.toFixed(1) + ']').join(','));
-    }
     const catOrder = ['color', 'distortion', 'pattern', 'overlay'];
     fxSegs.sort((a, b) => catOrder.indexOf(FX_CATEGORIES[a.effect]) - catOrder.indexOf(FX_CATEGORIES[b.effect]));
     const drawOnly = new Set(['grid', 'scanlines', 'vignette']);
+
+    // Batch pixel-based effects into a single loadPixels/updatePixels cycle
+    let pixelsLoaded = false;
+    let needsPixelUpdate = false;
     for (let seg of fxSegs) {
         let saved = captureEffectParams(seg.effect);
-        restoreEffectParams(seg.effect, seg.params);
+        let env = segEnvelope(seg, currentTime);
+        // Build interpolated params: lerp from current toward segment values
+        let lerpedParams = {};
+        let fxMap = FX_PARAM_MAP[seg.effect];
+        if (fxMap) {
+            for (let p of fxMap) {
+                let tgt = seg.params[p.v];
+                let cur = saved[p.v];
+                if (tgt !== undefined && typeof tgt === 'number' && typeof cur === 'number') {
+                    lerpedParams[p.v] = lerpParam(cur, tgt, env);
+                } else {
+                    lerpedParams[p.v] = (env > 0.5 && tgt !== undefined) ? tgt : cur;
+                }
+            }
+        }
+        restoreEffectParams(seg.effect, lerpedParams);
         let fn = EFFECT_FN_MAP[seg.effect];
         if (fn) {
-            if (!drawOnly.has(seg.effect)) loadPixels();
+            if (!drawOnly.has(seg.effect)) {
+                if (!pixelsLoaded) { loadPixels(); pixelsLoaded = true; }
+                needsPixelUpdate = true;
+            } else if (needsPixelUpdate) {
+                updatePixels(); needsPixelUpdate = false;
+            }
             fn();
-            if (!drawOnly.has(seg.effect)) updatePixels();
         }
         restoreEffectParams(seg.effect, saved);
     }
+    if (needsPixelUpdate) updatePixels();
 }
 
 // ── Beat-Synced Blob Generator ──────────────────
@@ -1227,7 +1278,9 @@ function generateSyncedBlobs(sensitivity, duration) {
             customHue: _userCustomHue,
             startTime: startTime,
             endTime: endTime,
-            params: _userParamValues ? [..._userParamValues] : [...paramValues],
+            fadeIn: TL_DEFAULT_FADE,
+            fadeOut: TL_DEFAULT_FADE,
+            params: [...paramBaseline],
             lane: 0,
             color: BLOB_SEG_COLOR
         });

@@ -12,6 +12,46 @@
 // ============================================================================
 
 // ---------------------------------------------------------------------------
+// Shared scratch buffers — reused across all pixel effects to avoid per-frame allocation
+// ---------------------------------------------------------------------------
+let _scratchUint8 = null;
+let _scratchUint8_2 = null; // second buffer for effects that need two copies
+
+function getScratchBuffer(len) {
+    if (!_scratchUint8 || _scratchUint8.length < len) {
+        _scratchUint8 = new Uint8Array(len);
+    }
+    return _scratchUint8;
+}
+
+function getScratchBuffer2(len) {
+    if (!_scratchUint8_2 || _scratchUint8_2.length < len) {
+        _scratchUint8_2 = new Uint8Array(len);
+    }
+    return _scratchUint8_2;
+}
+
+// Float32 scratch buffers for bloom/emboss (avoids per-frame allocation)
+let _scratchFloat32 = null;
+let _scratchFloat32_2 = null;
+function getScratchFloat(len) {
+    if (!_scratchFloat32 || _scratchFloat32.length < len) {
+        _scratchFloat32 = new Float32Array(len);
+    } else {
+        _scratchFloat32.fill(0, 0, len);
+    }
+    return _scratchFloat32;
+}
+function getScratchFloat2(len) {
+    if (!_scratchFloat32_2 || _scratchFloat32_2.length < len) {
+        _scratchFloat32_2 = new Float32Array(len);
+    } else {
+        _scratchFloat32_2.fill(0, 0, len);
+    }
+    return _scratchFloat32_2;
+}
+
+// ---------------------------------------------------------------------------
 // EFFECT_TYPES — unified classification of all 23 effects by render method
 // ---------------------------------------------------------------------------
 const EFFECT_TYPES = {
@@ -469,7 +509,7 @@ function applyChromatic() {
     let ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d);
     let ey = Math.floor((videoY + videoH) * d);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     // Copy only the video region rows for performance
     for (let y = sy; y < ey; y++) {
         let rowStart = (sx + y * totalW) * 4;
@@ -690,7 +730,7 @@ function applyBloom() {
     // Extract bright pixels into a separate buffer
     let regionW = ex - sx;
     let regionH = ey - sy;
-    let bright = new Float32Array(regionW * regionH * 3);
+    let bright = getScratchFloat(regionW * regionH * 3);
     for (let y = 0; y < regionH; y++) {
         for (let x = 0; x < regionW; x++) {
             let idx = ((sx + x) + (sy + y) * totalW) * 4;
@@ -703,7 +743,7 @@ function applyBloom() {
         }
     }
     // Simple box blur on bright pixels (horizontal + vertical)
-    let tmp = new Float32Array(bright.length);
+    let tmp = getScratchFloat2(bright.length);
     let isAnamorphic = bloomAnamorphic;
     // Horizontal pass
     for (let y = 0; y < regionH; y++) {
@@ -742,9 +782,9 @@ function applyBloom() {
         bright.set(tmp);
     }
     // Multi-pass blur based on bloomSpread
-    let passes = Math.max(1, Math.round(bloomSpread / 30));
+    let passes = Math.min(2, Math.max(1, Math.round(bloomSpread / 30))); // Cap at 2 passes for perf
     for (let p = 1; p < passes; p++) {
-        let tmp2 = new Float32Array(bright.length);
+        tmp.fill(0, 0, bright.length); // Reuse tmp buffer for extra passes
         let hRad2 = isAnamorphic ? rad * 3 : rad;
         for (let y = 0; y < regionH; y++) {
             for (let x = 0; x < regionW; x++) {
@@ -754,7 +794,7 @@ function applyBloom() {
                     if (nx >= 0 && nx < regionW) { let bi = (nx + y * regionW) * 3; sr += bright[bi]; sg += bright[bi+1]; sb += bright[bi+2]; cnt++; }
                 }
                 let bi = (x + y * regionW) * 3;
-                tmp2[bi] = sr/cnt; tmp2[bi+1] = sg/cnt; tmp2[bi+2] = sb/cnt;
+                tmp[bi] = sr/cnt; tmp[bi+1] = sg/cnt; tmp[bi+2] = sb/cnt;
             }
         }
         if (!isAnamorphic) {
@@ -763,14 +803,14 @@ function applyBloom() {
                     let sr = 0, sg = 0, sb = 0, cnt = 0;
                     for (let k = -rad; k <= rad; k++) {
                         let ny = y + k;
-                        if (ny >= 0 && ny < regionH) { let bi = (x + ny * regionW) * 3; sr += tmp2[bi]; sg += tmp2[bi+1]; sb += tmp2[bi+2]; cnt++; }
+                        if (ny >= 0 && ny < regionH) { let bi = (x + ny * regionW) * 3; sr += tmp[bi]; sg += tmp[bi+1]; sb += tmp[bi+2]; cnt++; }
                     }
                     let bi = (x + y * regionW) * 3;
                     bright[bi] = sr/cnt; bright[bi+1] = sg/cnt; bright[bi+2] = sb/cnt;
                 }
             }
         } else {
-            bright.set(tmp2);
+            bright.set(tmp.subarray(0, bright.length));
         }
     }
     // Exposure scaling
@@ -932,7 +972,7 @@ function applyWave() {
     let ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d);
     let ey = Math.floor((videoY + videoH) * d);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -998,6 +1038,11 @@ function applyGlitch() {
     let spd = Math.max(1, Math.round((100 - glitchSpeed) / 10));
     if (typeof applyGlitch._frame === 'undefined') applyGlitch._frame = 0;
     applyGlitch._frame++;
+    // Invalidate cache if video region changed
+    if (applyGlitch._lastSx !== sx || applyGlitch._lastSy !== sy ||
+        applyGlitch._lastEx !== ex || applyGlitch._lastEy !== ey) {
+        applyGlitch._lastPixels = null;
+    }
     if (applyGlitch._frame % spd !== 0 && applyGlitch._lastPixels) {
         // Reuse last glitch frame
         for (let y = sy; y < ey; y++) {
@@ -1007,7 +1052,7 @@ function applyGlitch() {
         }
         return;
     }
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -1257,10 +1302,12 @@ function applyGlitch() {
             y += blockH - 1;
         }
     }
-    // Cache for speed throttle
+    // Cache for speed throttle (also store region bounds for invalidation)
     if (!applyGlitch._lastPixels || applyGlitch._lastPixels.length !== pixels.length) {
         applyGlitch._lastPixels = new Uint8Array(pixels.length);
     }
+    applyGlitch._lastSx = sx; applyGlitch._lastSy = sy;
+    applyGlitch._lastEx = ex; applyGlitch._lastEy = ey;
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -1280,7 +1327,7 @@ function applyJitter() {
     let ey = Math.floor((videoY + videoH) * d);
     let offD = maxOff * d;
     let bsD = bs * d;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -1386,7 +1433,7 @@ function applyCurve() {
     let cy = (sy + ey) / 2;
     let hw = (ex - sx) / 2;
     let hh = (ey - sy) / 2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -1577,7 +1624,7 @@ function applyMblur() {
     let ey = Math.floor((videoY + videoH) * d);
     let dx = Math.cos(angle);
     let dy = Math.sin(angle);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4;
         let end = (ex + y * totalW) * 4;
@@ -1784,7 +1831,7 @@ function applyRGBShift() {
     let ryOff = Math.round(rgbShiftRY * d * intensity);
     let bxOff = Math.round(rgbShiftBX * d * intensity);
     let byOff = Math.round(rgbShiftBY * d * intensity);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -1863,7 +1910,7 @@ function applyCRT() {
     // Chromatic aberration on pixels
     if (crtChroma > 0) {
         let chrOff = Math.round(crtChroma * d);
-        let original = new Uint8Array(pixels.length);
+        let original = getScratchBuffer(pixels.length);
         for (let y = sy; y < ey; y++) {
             let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
             original.set(pixels.subarray(start, end), start);
@@ -2475,10 +2522,7 @@ function selectFxEffect(name) {
     // Switch to the correct category if needed
     let cat = FX_CATEGORIES[name];
     if (cat && cat !== currentFxCat) switchFxCategory(cat);
-    // Auto-enable: selecting an effect activates it
-    if (!activeEffects.has(name)) {
-        activeEffects.add(name);
-    }
+    // Browsing does NOT auto-enable — user must explicitly toggle via eye button
     showFxParams(name);
     updateFxOnButton();
     updateCardHighlights();
@@ -2496,10 +2540,7 @@ function cycleFxEffect(dir) {
     let idx = effects.indexOf(currentViewedEffect);
     idx = (idx + dir + effects.length) % effects.length;
     currentViewedEffect = effects[idx];
-    // Auto-enable: cycling to an effect activates it
-    if (!activeEffects.has(currentViewedEffect)) {
-        activeEffects.add(currentViewedEffect);
-    }
+    // Cycling does NOT auto-enable — user must explicitly toggle via eye button
     let sel = document.getElementById('fx-effect-select');
     if (sel) sel.value = currentViewedEffect;
     showFxParams(currentViewedEffect);
@@ -2621,6 +2662,13 @@ function applyPreset(presetKey, isCustom) {
 
     // 3. Update state
     currentPreset = presetKey;
+
+    // Sync viewed effect to first effect in preset so panel shows relevant controls
+    let presetEffects = Object.keys(preset.effects);
+    if (presetEffects.length > 0) {
+        currentViewedEffect = presetEffects[0];
+        showFxParams(currentViewedEffect);
+    }
 
     // 4. Update all UI
     updateEffectCardStates();
@@ -2765,11 +2813,26 @@ function createPresetCard(key, preset, isCustom) {
         return cfg ? cfg.label : e;
     });
 
-    card.innerHTML =
-        `<div class="fx-preset-card-name">${preset.name}</div>` +
-        `<div class="fx-preset-card-desc">${preset.desc || ''}</div>` +
-        `<div class="fx-preset-card-effects">${effectNames.map(n => `<span>${n}</span>`).join('')}</div>` +
-        (isCustom ? `<span class="fx-preset-delete" title="Delete preset">&times;</span>` : '');
+    // Build card content safely — use textContent for user-supplied strings to prevent XSS
+    let nameDiv = document.createElement('div');
+    nameDiv.className = 'fx-preset-card-name';
+    nameDiv.textContent = preset.name;
+    let descDiv = document.createElement('div');
+    descDiv.className = 'fx-preset-card-desc';
+    descDiv.textContent = preset.desc || '';
+    let effectsDiv = document.createElement('div');
+    effectsDiv.className = 'fx-preset-card-effects';
+    effectNames.forEach(n => { let s = document.createElement('span'); s.textContent = n; effectsDiv.appendChild(s); });
+    card.appendChild(nameDiv);
+    card.appendChild(descDiv);
+    card.appendChild(effectsDiv);
+    if (isCustom) {
+        let delSpan = document.createElement('span');
+        delSpan.className = 'fx-preset-delete';
+        delSpan.title = 'Delete preset';
+        delSpan.innerHTML = '&times;';
+        card.appendChild(delSpan);
+    }
 
     card.addEventListener('click', (e) => {
         if (e.target.classList.contains('fx-preset-delete')) return;
@@ -2797,10 +2860,16 @@ function updatePresetActiveIndicator() {
     let preset = FX_PRESETS[currentPreset] || (getCustomPresets()[currentPreset]);
     if (!preset) { indicator.style.display = 'none'; return; }
     indicator.style.display = 'flex';
-    indicator.innerHTML =
-        `<span>\u2605 ${preset.name}</span>` +
-        `<button class="fx-preset-active-clear" title="Clear preset">Clear</button>`;
-    indicator.querySelector('.fx-preset-active-clear').addEventListener('click', clearPreset);
+    let nameSpan = document.createElement('span');
+    nameSpan.textContent = '\u2605 ' + preset.name;
+    let clearBtn = document.createElement('button');
+    clearBtn.className = 'fx-preset-active-clear';
+    clearBtn.title = 'Clear preset';
+    clearBtn.textContent = 'Clear';
+    indicator.innerHTML = '';
+    indicator.appendChild(nameSpan);
+    indicator.appendChild(clearBtn);
+    clearBtn.addEventListener('click', clearPreset);
 }
 
 function updatePresetCardHighlights() {
@@ -3247,7 +3316,7 @@ function applyBlurSharp() {
     let d = pixelDensity(), totalW = width * d;
     let sx = Math.floor(videoX * d), ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3294,7 +3363,7 @@ function applyModulate() {
     let d = pixelDensity(), totalW = width * d;
     let sx = Math.floor(videoX * d), ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3332,7 +3401,7 @@ function applyRipple() {
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let cx = (sx + ex) / 2, cy = (sy + ey) / 2;
     let maxR = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy)) / 2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3365,7 +3434,7 @@ function applySwirl() {
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let cx = (sx + ex) / 2, cy = (sy + ey) / 2;
     let maxR = Math.min(ex-sx, ey-sy) / 2 * radius;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3401,7 +3470,7 @@ function applyReedGlass() {
     let sx = Math.floor(videoX * d), ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let ribWD = ribW * d;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3439,7 +3508,7 @@ function applyPolar2Rect() {
     let rw = ex - sx, rh = ey - sy;
     let cx = sx + rw/2, cy = sy + rh/2;
     let maxR = Math.min(rw, rh) / 2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3474,7 +3543,7 @@ function applyRect2Polar() {
     let rw = ex - sx, rh = ey - sy;
     let cx = sx + rw/2, cy = sy + rh/2;
     let maxR = Math.min(rw, rh) / 2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3507,7 +3576,7 @@ function applyRadialBlur() {
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let cx = (sx+ex)/2, cy = (sy+ey)/2;
     let maxOff = intensity * 20;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3545,7 +3614,7 @@ function applyZoomBlur() {
     let sx = Math.floor(videoX * d), ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let cx = (sx+ex)/2, cy = (sy+ey)/2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3580,7 +3649,7 @@ function applyCircBlur() {
     let sx = Math.floor(videoX * d), ex = Math.floor((videoX + videoW) * d);
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let cx = (sx+ex)/2, cy = (sy+ey)/2;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3621,7 +3690,7 @@ function applyElasticGrid() {
     let sy = Math.floor(videoY * d), ey = Math.floor((videoY + videoH) * d);
     let rw = ex - sx, rh = ey - sy;
     let cellW = rw / gridSz, cellH = rh / gridSz;
-    let original = new Uint8Array(pixels.length);
+    let original = getScratchBuffer(pixels.length);
     for (let y = sy; y < ey; y++) {
         let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
@@ -3721,7 +3790,7 @@ function applyPrintStamp() {
     }
     // Paper grain overlay
     if (grainAmt > 0) {
-        for (let i = 0; i < grainAmt * 500; i++) {
+        for (let i = 0, n = Math.min(200, Math.round(grainAmt * 500)); i < n; i++) {
             let gx = videoX + Math.random() * videoW;
             let gy = videoY + Math.random() * videoH;
             fill(0, Math.random() * 30 * grainAmt);
@@ -3743,7 +3812,7 @@ function applyNTSC() {
     // Chroma bleeding: horizontal smear of color channels
     if (chromaBleed > 0) {
         let bleedPx = Math.round(chromaBleed * 8 * d);
-        let original = new Uint8Array(pixels.length);
+        let original = getScratchBuffer(pixels.length);
         for (let y = sy; y < ey; y++) {
             let start = (sx + y * totalW) * 4, end = (ex + y * totalW) * 4;
             original.set(pixels.subarray(start, end), start);

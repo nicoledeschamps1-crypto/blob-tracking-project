@@ -12,7 +12,14 @@ function trackPoints() {
     // FACE LANDMARK modes (EYES=15, LIPS=16, FACE=17)
     if (currentMode >= 15 && currentMode <= 17) {
         if (!window.mpFaceLandmarkerReady || !window.mpFaceLandmarker) {
-            console.warn('Face landmarker not ready:', { ready: window.mpFaceLandmarkerReady, instance: !!window.mpFaceLandmarker });
+            if (!window._faceWarnThrottle || Date.now() - window._faceWarnThrottle > 3000) {
+                window._faceWarnThrottle = Date.now();
+                console.warn('[FaceTrack] Not ready:', {
+                    ready: window.mpFaceLandmarkerReady,
+                    instance: !!window.mpFaceLandmarker,
+                    initError: window.mpFaceInitError || 'none'
+                });
+            }
             return;
         }
 
@@ -23,12 +30,34 @@ function trackPoints() {
         if (faceDetectFrame >= FACE_DETECT_INTERVAL || !faceLandmarkCache) {
             faceDetectFrame = 0;
             try {
-                // Ensure video element has valid frame data
+                // Use offscreen canvas — more reliable than raw video element with MediaPipe + p5.js
                 const vid = videoEl.elt;
                 if (!vid || vid.readyState < 2 || vid.videoWidth === 0) return;
+                if (!window._mpFaceCanvas) {
+                    window._mpFaceCanvas = document.createElement('canvas');
+                }
+                const fc = window._mpFaceCanvas;
+                if (fc.width !== vid.videoWidth || fc.height !== vid.videoHeight) {
+                    fc.width = vid.videoWidth;
+                    fc.height = vid.videoHeight;
+                }
+                if (!window._mpFaceCtx) window._mpFaceCtx = fc.getContext('2d');
+                window._mpFaceCtx.drawImage(vid, 0, 0);
                 const ts = performance.now();
-                const result = window.mpFaceLandmarker.detectForVideo(vid, ts);
+                const result = window.mpFaceLandmarker.detectForVideo(fc, ts);
+                // Log first few detection results for debugging
+                if (!window._faceDetectCount) window._faceDetectCount = 0;
+                window._faceDetectCount++;
+                if (window._faceDetectCount <= 5 || window._faceDetectCount % 60 === 0) {
+                    const faces = result?.faceLandmarks?.length || 0;
+                    console.log('[FaceTrack] Frame ' + window._faceDetectCount +
+                        ': ' + faces + ' face(s), canvas=' + fc.width + 'x' + fc.height);
+                }
                 if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
+                    window._faceDetectErrors = 0; // Reset error counter on success
+                    if (window.mpFaceInitError && window.mpFaceInitError.startsWith('Detection failing')) {
+                        window.mpFaceInitError = null; // Clear transient error
+                    }
                     let rawLandmarks = result.faceLandmarks;
 
                     // EMA smoothing: blend new detections with previous positions
@@ -57,8 +86,17 @@ function trackPoints() {
                     faceLandmarkCache = smoothedLandmarks;
                 }
             } catch (e) {
-                console.warn('Face detection error:', e.message || e);
-                // Detection failed — use cache
+                if (!window._faceDetectErrors) window._faceDetectErrors = 0;
+                window._faceDetectErrors++;
+                if (window._faceDetectErrors <= 5 || window._faceDetectErrors % 30 === 0) {
+                    console.warn('[FaceTrack] Detection error #' + window._faceDetectErrors + ':', e.message || e);
+                }
+                // After 10 consecutive errors, clear stale cache and signal error
+                if (window._faceDetectErrors >= 10) {
+                    faceLandmarkCache = null;
+                    smoothedLandmarks = null;
+                    window.mpFaceInitError = 'Detection failing: ' + (e.message || 'unknown error');
+                }
             }
         }
 
@@ -108,7 +146,7 @@ function trackPoints() {
                 let r = videoEl.pixels[idx], g = videoEl.pixels[idx + 1], b_v = videoEl.pixels[idx + 2];
                 extras.push(new CandidatePoint(mx, my, color(r, g, b_v)));
             }
-            candidates = candidates.concat(extras);
+            candidates.push(...extras);
         }
 
         candidates.sort(() => Math.random() - 0.5);
