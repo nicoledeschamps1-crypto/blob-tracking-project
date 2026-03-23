@@ -93,19 +93,36 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec3 orig = texture(u_texture, v_texCoord).rgb;
-    vec2 off = (1.0 / u_resolution) * max(1.0, abs(u_amount) / 20.0);
-    vec3 blur =
-        texture(u_texture, v_texCoord + vec2(-off.x,-off.y)).rgb * 0.0625 +
-        texture(u_texture, v_texCoord + vec2(0,-off.y)).rgb * 0.125 +
-        texture(u_texture, v_texCoord + vec2(off.x,-off.y)).rgb * 0.0625 +
-        texture(u_texture, v_texCoord + vec2(-off.x,0)).rgb * 0.125 +
-        orig * 0.25 +
-        texture(u_texture, v_texCoord + vec2(off.x,0)).rgb * 0.125 +
-        texture(u_texture, v_texCoord + vec2(-off.x,off.y)).rgb * 0.0625 +
-        texture(u_texture, v_texCoord + vec2(0,off.y)).rgb * 0.125 +
-        texture(u_texture, v_texCoord + vec2(off.x,off.y)).rgb * 0.0625;
+    float radius = abs(u_amount) / 100.0 * 12.0;
+    vec2 texel = 1.0 / u_resolution;
+    // 13-tap separable Gaussian approximation (H+V in single pass)
+    float weights[7];
+    float sigma = max(radius, 0.5);
+    float total = 0.0;
+    for (int i = 0; i < 7; i++) {
+        float x = float(i);
+        weights[i] = exp(-0.5 * x * x / (sigma * sigma));
+        total += (i == 0) ? weights[i] : weights[i] * 2.0;
+    }
+    for (int i = 0; i < 7; i++) weights[i] /= total;
+    vec3 blur = orig * weights[0];
+    for (int i = 1; i < 7; i++) {
+        float off = float(i) * max(1.0, radius / 6.0);
+        vec2 dH = vec2(texel.x * off, 0.0);
+        vec2 dV = vec2(0.0, texel.y * off);
+        blur += (texture(u_texture, v_texCoord + dH).rgb +
+                 texture(u_texture, v_texCoord - dH).rgb +
+                 texture(u_texture, v_texCoord + dV).rgb +
+                 texture(u_texture, v_texCoord - dV).rgb) * weights[i] * 0.5;
+    }
     float t = abs(u_amount) / 100.0;
-    vec3 result = u_amount > 0.0 ? mix(orig, blur, t) : orig + (orig - blur) * t * 3.0;
+    vec3 result;
+    if (u_amount < 0.0) {
+        result = mix(orig, blur, t);
+    } else {
+        vec3 sharp = orig + (orig - blur) * t * 4.0;
+        result = sharp;
+    }
     fragColor = vec4(mix(orig, clamp(result, 0.0, 1.0), u_opacity), 1.0);
 }`;
 
@@ -236,18 +253,23 @@ void main() {
     vec3 result;
     if (u_radial > 0.5) {
         vec2 cc = v_texCoord - 0.5;
+        float dist = length(cc);
         vec2 dir = normalize(cc + 0.0001);
-        float radOff = length(cc) * u_offset * texel.x * 2.0;
+        // Quadratic radial falloff — stronger at edges (mimics real lens)
+        float falloff = dist * dist * 4.0;
+        float radOff = falloff * u_offset * texel.x * 2.0;
+        // 3-channel dispersion with green slightly offset too
         result = vec3(
-            texture(u_texture, v_texCoord + dir*radOff).r,
-            orig.g,
-            texture(u_texture, v_texCoord - dir*radOff).b);
+            texture(u_texture, v_texCoord + dir * radOff * 1.0).r,
+            texture(u_texture, v_texCoord + dir * radOff * 0.1).g,
+            texture(u_texture, v_texCoord - dir * radOff * 1.0).b);
     } else {
         float off = u_offset * texel.x;
+        // Wavelength-proportional offsets (R=1.0, G=0.1, B=-1.0)
         result = vec3(
-            texture(u_texture, vec2(v_texCoord.x+off, v_texCoord.y)).r,
-            orig.g,
-            texture(u_texture, vec2(v_texCoord.x-off, v_texCoord.y)).b);
+            texture(u_texture, vec2(v_texCoord.x + off, v_texCoord.y)).r,
+            texture(u_texture, vec2(v_texCoord.x + off * 0.1, v_texCoord.y)).g,
+            texture(u_texture, vec2(v_texCoord.x - off, v_texCoord.y)).b);
     }
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
@@ -265,18 +287,32 @@ uniform float u_mono;
 uniform float u_opacity;
 out vec4 fragColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+// Value noise with smooth interpolation
+float vnoise(vec2 p, float seed) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f); // smoothstep
+    float a = hash(i + seed);
+    float b = hash(i + vec2(1.0, 0.0) + seed);
+    float c = hash(i + vec2(0.0, 1.0) + seed);
+    float d = hash(i + vec2(1.0, 1.0) + seed);
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    vec2 cell = floor(v_texCoord * u_resolution / u_scale);
     float seed = floor(u_time * 30.0);
+    vec2 p = v_texCoord * u_resolution / u_scale;
+    // Luminance-aware masking (stronger in midtones like film grain)
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float mask = mix(0.3, 1.0, 1.0 - abs(lum - 0.5) * 2.0);
     vec3 n;
     if (u_mono > 0.5) {
-        float v = hash(cell+seed)*2.0-1.0;
+        float v = vnoise(p, seed) * 2.0 - 1.0;
         n = vec3(v);
     } else {
-        n = vec3(hash(cell+seed)*2.0-1.0, hash(cell+seed+100.0)*2.0-1.0, hash(cell+seed+200.0)*2.0-1.0);
+        n = vec3(vnoise(p, seed)*2.0-1.0, vnoise(p, seed+100.0)*2.0-1.0, vnoise(p, seed+200.0)*2.0-1.0);
     }
-    vec3 result = clamp(orig.rgb + n * u_intensity * 0.5, 0.0, 1.0);
+    vec3 result = clamp(orig.rgb + n * u_intensity * 0.5 * mask, 0.0, 1.0);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -294,9 +330,20 @@ out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     float coord = u_vertical > 0.5 ? v_texCoord.x : v_texCoord.y;
-    float line = sin(coord * u_count * 3.14159) * 0.5 + 0.5;
-    vec3 result = orig.rgb * (1.0 - (1.0-line) * u_intensity);
-    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+    float px = u_vertical > 0.5 ? v_texCoord.x * u_resolution.x : v_texCoord.y * u_resolution.y;
+    // Sharp scanline with phosphor-like bright/dark pattern
+    float phase = coord * u_count * 3.14159;
+    float line = sin(phase);
+    // Sharpen the sine into a more CRT-like pattern
+    line = sign(line) * pow(abs(line), 0.6);
+    line = line * 0.5 + 0.5;
+    // Luminance-dependent: darks get stronger scanlines
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lumWeight = mix(1.0, 0.5, lum);
+    // Phosphor glow on bright lines
+    float glow = smoothstep(0.6, 1.0, line) * lum * 0.15;
+    vec3 result = orig.rgb * (1.0 - (1.0 - line) * u_intensity * lumWeight) + glow;
+    fragColor = vec4(mix(orig.rgb, clamp(result, 0.0, 1.0), u_opacity), 1.0);
 }`;
 
 // ── 9. Levels ────────────────────────────────────────────────
@@ -394,9 +441,13 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
-    vec3 tinted = u_tintColor * lum;
-    vec3 result = mix(orig.rgb, tinted, u_intensity);
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    // Soft light blend preserves saturation better than multiply
+    vec3 tinted = mix(u_tintColor * lum, orig.rgb * u_tintColor, 0.5);
+    // Preserve original luminance
+    float tintLum = dot(tinted, vec3(0.2126, 0.7152, 0.0722));
+    tinted *= lum / max(tintLum, 0.001);
+    vec3 result = mix(orig.rgb, clamp(tinted, 0.0, 1.0), u_intensity);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -415,7 +466,7 @@ void main() {
     vec3 c = orig.rgb + u_brightness;
     c = (c - 0.5) * u_contrast + 0.5;
     if (abs(u_saturation - 1.0) > 0.01) {
-        float gray = dot(c, vec3(0.299, 0.587, 0.114));
+        float gray = dot(c, vec3(0.2126, 0.7152, 0.0722));
         c = gray + (c - gray) * u_saturation;
     }
     fragColor = vec4(mix(orig.rgb, clamp(c, 0.0, 1.0), u_opacity), 1.0);
@@ -432,8 +483,10 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
-    float val = lum > u_level ? 1.0 : 0.0;
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    // Smooth threshold with anti-aliased edge (softness ~2% of range)
+    float soft = 0.02;
+    float val = smoothstep(u_level - soft, u_level + soft, lum);
     if (u_invert > 0.5) val = 1.0 - val;
     fragColor = vec4(mix(orig.rgb, vec3(val), u_opacity), 1.0);
 }`;
@@ -462,10 +515,21 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float rShift = u_temp > 0.0 ? u_temp * 0.157 : 0.0;
-    float bShift = u_temp < 0.0 ? -u_temp * 0.157 : 0.0;
-    float gShift = -abs(u_temp) * 0.039;
-    vec3 result = clamp(orig.rgb + vec3(rShift, gShift, bShift), 0.0, 1.0);
+    vec3 c = orig.rgb;
+    float t = u_temp;
+    // Perceptual warm/cool using luminance-preserving curves
+    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    // Warm: boost R in highlights, orange in mids, reduce B
+    // Cool: boost B in shadows, teal in mids, reduce R
+    vec3 warm = vec3(
+        c.r + t * 0.12 * (0.5 + lum * 0.5),
+        c.g + t * 0.03 * (1.0 - abs(lum - 0.5) * 1.5),
+        c.b - t * 0.10 * (0.3 + (1.0 - lum) * 0.7)
+    );
+    // Preserve overall luminance
+    float newLum = dot(warm, vec3(0.2126, 0.7152, 0.0722));
+    float lumAdj = lum / max(newLum, 0.001);
+    vec3 result = clamp(warm * mix(1.0, lumAdj, 0.6), 0.0, 1.0);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -697,8 +761,19 @@ out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     vec2 cellSize = vec2(u_size) / u_resolution;
-    vec2 cell = floor(v_texCoord / cellSize + 0.5) * cellSize;
-    vec3 result = texture(u_texture, clamp(cell, 0.0, 1.0)).rgb;
+    vec2 cellPos = floor(v_texCoord / cellSize + 0.5) * cellSize;
+    // 4-sample average for smoother color representation
+    vec2 halfCell = cellSize * 0.25;
+    vec3 result = (
+        texture(u_texture, clamp(cellPos + vec2(-halfCell.x, -halfCell.y), 0.0, 1.0)).rgb +
+        texture(u_texture, clamp(cellPos + vec2( halfCell.x, -halfCell.y), 0.0, 1.0)).rgb +
+        texture(u_texture, clamp(cellPos + vec2(-halfCell.x,  halfCell.y), 0.0, 1.0)).rgb +
+        texture(u_texture, clamp(cellPos + vec2( halfCell.x,  halfCell.y), 0.0, 1.0)).rgb
+    ) * 0.25;
+    // Subtle grid line at block edges
+    vec2 edge = abs(fract(v_texCoord / cellSize) - 0.5) * 2.0;
+    float grid = smoothstep(0.9, 1.0, max(edge.x, edge.y));
+    result = mix(result, result * 0.7, grid * 0.3);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 

@@ -674,23 +674,27 @@ const FX_PRESETS = {
     },
     bleach_bypass: {
         name:'Bleach Bypass', category:'film',
-        desc:'Desaturated high-contrast silver',
+        desc:'Silver-retained high-contrast punch',
         effects:{
-            bricon:{briValue:0,conValue:160,satValue:35},
-            levels:{levelsInBlack:30,levelsInWhite:210,levelsGamma:0.8,levelsOutBlack:0,levelsOutWhite:255},
-            grain:{grainIntensity:35,grainSize:14,grainColorMode:'mono'},
-            vignette:{vigIntensity:55,vigRadius:50,vigColor:'#000000'}
+            bricon:{briValue:-5,conValue:185,satValue:20},
+            levels:{levelsInBlack:40,levelsInWhite:200,levelsGamma:0.7,levelsOutBlack:0,levelsOutWhite:250},
+            bloom:{bloomIntensity:20,bloomRadius:35,bloomThreshold:50,bloomSpread:40,bloomBlendMode:'screen',bloomExposure:95,bloomAnamorphic:false},
+            grain:{grainIntensity:50,grainSize:10,grainColorMode:'mono'},
+            colorbal:{colorbalShadowR:0,colorbalShadowG:0,colorbalShadowB:5,colorbalMidR:0,colorbalMidG:0,colorbalMidB:0,colorbalHiR:5,colorbalHiG:0,colorbalHiB:-5},
+            vignette:{vigIntensity:65,vigRadius:42,vigColor:'#000000'}
         }
     },
     polaroid: {
         name:'Polaroid', category:'film',
-        desc:'Faded instant camera warmth',
+        desc:'Sun-bleached instant camera',
         effects:{
-            colortemp:{colortempValue:30},
-            levels:{levelsInBlack:0,levelsInWhite:235,levelsGamma:1.15,levelsOutBlack:15,levelsOutWhite:240},
-            bricon:{briValue:8,conValue:85,satValue:80},
-            bloom:{bloomIntensity:20,bloomRadius:30,bloomThreshold:55,bloomSpread:45,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
-            vignette:{vigIntensity:55,vigRadius:50,vigColor:'#1a1000'}
+            colortemp:{colortempValue:40},
+            levels:{levelsInBlack:0,levelsInWhite:225,levelsGamma:1.25,levelsOutBlack:20,levelsOutWhite:235},
+            bricon:{briValue:10,conValue:80,satValue:65},
+            bloom:{bloomIntensity:35,bloomRadius:50,bloomThreshold:35,bloomSpread:60,bloomBlendMode:'screen',bloomExposure:110,bloomAnamorphic:false},
+            grain:{grainIntensity:40,grainSize:12,grainColorMode:'color'},
+            colorbal:{colorbalShadowR:5,colorbalShadowG:10,colorbalShadowB:-10,colorbalMidR:10,colorbalMidG:5,colorbalMidB:-5,colorbalHiR:20,colorbalHiG:10,colorbalHiB:-15},
+            vignette:{vigIntensity:70,vigRadius:40,vigColor:'#1a0800'}
         }
     },
     cinema_teal: {
@@ -747,11 +751,13 @@ const FX_PRESETS = {
     },
     gameboy: {
         name:'Game Boy', category:'retro',
-        desc:'4-color green LCD',
+        desc:'4-color green LCD screen',
         effects:{
             palette:{palettePreset:'gameboy',paletteIntensity:100},
-            pixel:{pixelSize:4,pixelMode:'square'},
-            scanlines:{scanIntensity:20,scanCount:150,scanVertical:false}
+            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'gameboy',ditherColorCount:4,ditherPixelation:4,ditherStrength:85},
+            scanlines:{scanIntensity:35,scanCount:200,scanVertical:false},
+            vignette:{vigIntensity:40,vigRadius:55,vigColor:'#001a00'},
+            bricon:{briValue:5,conValue:130,satValue:100}
         }
     },
     synthwave: {
@@ -776,11 +782,13 @@ const FX_PRESETS = {
     },
     msx_ascii: {
         name:'Terminal', category:'digital',
-        desc:'Green phosphor ASCII console',
+        desc:'Green phosphor console',
         effects:{
-            ascii:{asciiCellSize:7,asciiColorMode:'mono',asciiCharSet:'classic',asciiInvert:false},
-            crt:{crtScanWeight:3,crtCurvature:30,crtGlow:55,crtChroma:0,crtStatic:20,crtPhosphor:'slot'},
-            noise:{noiseIntensity:12,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+            ascii:{asciiCellSize:6,asciiColorMode:'green',asciiCharSet:'classic',asciiInvert:false},
+            scanlines:{scanIntensity:25,scanCount:350,scanVertical:false},
+            bloom:{bloomIntensity:40,bloomRadius:45,bloomThreshold:30,bloomSpread:60,bloomBlendMode:'additive',bloomExposure:105,bloomAnamorphic:false},
+            noise:{noiseIntensity:15,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
+            vignette:{vigIntensity:55,vigRadius:45,vigColor:'#000500'}
         }
     },
     halftone_print: {
@@ -793,19 +801,24 @@ const FX_PRESETS = {
     },
     pixel_art: {
         name:'Pixel Art', category:'digital',
-        desc:'Low-res chunky pixels',
+        desc:'Retro game sprite look',
         effects:{
-            pixel:{pixelSize:8,pixelMode:'square'},
-            bricon:{briValue:0,conValue:125,satValue:130},
-            levels:{levelsInBlack:10,levelsInWhite:245,levelsGamma:1.0,levelsOutBlack:0,levelsOutWhite:255}
+            pixel:{pixelSize:6,pixelMode:'square'},
+            dither:{ditherColorMode:'color',ditherAlgorithm:'bayer4',ditherPalette:'synthwave',ditherColorCount:12,ditherPixelation:3,ditherStrength:60},
+            bricon:{briValue:5,conValue:140,satValue:150},
+            levels:{levelsInBlack:15,levelsInWhite:240,levelsGamma:0.95,levelsOutBlack:0,levelsOutWhite:255},
+            scanlines:{scanIntensity:12,scanCount:250,scanVertical:false}
         }
     },
     dither_1bit: {
         name:'1-Bit Dither', category:'digital',
-        desc:'Stark black & white Bayer dither',
+        desc:'High-contrast graphic poster',
         effects:{
-            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:3,ditherStrength:100},
-            levels:{levelsInBlack:20,levelsInWhite:235,levelsGamma:0.85,levelsOutBlack:0,levelsOutWhite:255}
+            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer8',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:2,ditherStrength:100},
+            levels:{levelsInBlack:30,levelsInWhite:220,levelsGamma:0.75,levelsOutBlack:0,levelsOutWhite:255},
+            bricon:{briValue:5,conValue:150,satValue:100},
+            vignette:{vigIntensity:55,vigRadius:45,vigColor:'#000000'},
+            scanlines:{scanIntensity:15,scanCount:400,scanVertical:false}
         }
     },
     rgb_hatch: {
@@ -849,13 +862,15 @@ const FX_PRESETS = {
     },
     dreamy: {
         name:'Dreamy', category:'creative',
-        desc:'Heavenly soft glow haze',
+        desc:'Ethereal halation glow',
         effects:{
-            bloom:{bloomIntensity:75,bloomRadius:80,bloomThreshold:25,bloomSpread:90,bloomBlendMode:'screen',bloomExposure:120,bloomAnamorphic:false},
-            blursharp:{blursharpAmount:-25},
-            exposure:{exposureEV:0.4},
-            colortemp:{colortempValue:15},
-            vignette:{vigIntensity:35,vigRadius:60,vigColor:'#1a0a20'}
+            bloom:{bloomIntensity:90,bloomRadius:95,bloomThreshold:15,bloomSpread:100,bloomBlendMode:'screen',bloomExposure:135,bloomAnamorphic:true},
+            blursharp:{blursharpAmount:-40},
+            exposure:{exposureEV:0.6},
+            colortemp:{colortempValue:25},
+            colorbal:{colorbalShadowR:10,colorbalShadowG:0,colorbalShadowB:20,colorbalMidR:15,colorbalMidG:5,colorbalMidB:10,colorbalHiR:25,colorbalHiG:15,colorbalHiB:5},
+            bricon:{briValue:5,conValue:80,satValue:75},
+            vignette:{vigIntensity:50,vigRadius:50,vigColor:'#1a0520'}
         }
     },
     psychedelic: {
@@ -872,19 +887,24 @@ const FX_PRESETS = {
         name:'Cross Process', category:'creative',
         desc:'Wrong chemicals, wild colors',
         effects:{
-            colorbal:{colorbalShadowR:-30,colorbalShadowG:25,colorbalShadowB:45,colorbalMidR:15,colorbalMidG:-10,colorbalMidB:-20,colorbalHiR:40,colorbalHiG:20,colorbalHiB:-30},
-            bricon:{briValue:5,conValue:135,satValue:125},
-            levels:{levelsInBlack:5,levelsInWhite:245,levelsGamma:1.1,levelsOutBlack:5,levelsOutWhite:250},
-            vignette:{vigIntensity:45,vigRadius:55,vigColor:'#050a00'}
+            colorbal:{colorbalShadowR:-40,colorbalShadowG:30,colorbalShadowB:55,colorbalMidR:20,colorbalMidG:-15,colorbalMidB:-25,colorbalHiR:50,colorbalHiG:25,colorbalHiB:-40},
+            bricon:{briValue:8,conValue:155,satValue:145},
+            levels:{levelsInBlack:10,levelsInWhite:235,levelsGamma:1.2,levelsOutBlack:10,levelsOutWhite:245},
+            bloom:{bloomIntensity:25,bloomRadius:40,bloomThreshold:40,bloomSpread:50,bloomBlendMode:'additive',bloomExposure:110,bloomAnamorphic:false},
+            grain:{grainIntensity:30,grainSize:10,grainColorMode:'color'},
+            vignette:{vigIntensity:60,vigRadius:45,vigColor:'#050a00'}
         }
     },
     orb: {
         name:'ORB', category:'creative',
-        desc:'Radial blur + green glow',
+        desc:'Pulsing radial energy sphere',
         effects:{
-            radblur:{radblurIntensity:55},
-            bloom:{bloomIntensity:70,bloomRadius:85,bloomThreshold:20,bloomSpread:95,bloomBlendMode:'additive',bloomExposure:125,bloomAnamorphic:false},
-            duotone:{duoShadow:'#0a1a0a',duoHighlight:'#33ff77',duoIntensity:80}
+            radblur:{radblurIntensity:70},
+            bloom:{bloomIntensity:85,bloomRadius:90,bloomThreshold:15,bloomSpread:100,bloomBlendMode:'additive',bloomExposure:140,bloomAnamorphic:false},
+            chroma:{chromaOffset:12,chromaMode:'radial'},
+            duotone:{duoShadow:'#050f05',duoHighlight:'#33ff77',duoIntensity:90},
+            vignette:{vigIntensity:75,vigRadius:35,vigColor:'#000a00'},
+            bricon:{briValue:5,conValue:130,satValue:140}
         }
     },
     underwater: {
@@ -968,6 +988,77 @@ const FX_PRESETS = {
             emboss:{embossAngle:135,embossStrength:75,embossColor:true},
             grunge:{grungeTint:'#886644',grungePosterize:3,grungeGrain:70},
             noise:{noiseIntensity:18,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+        }
+    },
+
+    // ── NEW PRESETS ──
+    film_halation: {
+        name:'Film Halation', category:'film',
+        desc:'Red glow bleed on highlights',
+        effects:{
+            bloom:{bloomIntensity:70,bloomRadius:80,bloomThreshold:30,bloomSpread:85,bloomBlendMode:'additive',bloomExposure:120,bloomAnamorphic:false},
+            chroma:{chromaOffset:8,chromaMode:'radial'},
+            colorbal:{colorbalShadowR:0,colorbalShadowG:0,colorbalShadowB:10,colorbalMidR:10,colorbalMidG:0,colorbalMidB:-5,colorbalHiR:35,colorbalHiG:-5,colorbalHiB:-15},
+            grain:{grainIntensity:35,grainSize:8,grainColorMode:'color'},
+            levels:{levelsInBlack:10,levelsInWhite:235,levelsGamma:0.95,levelsOutBlack:5,levelsOutWhite:248},
+            vignette:{vigIntensity:60,vigRadius:42,vigColor:'#0a0000'}
+        }
+    },
+    cyberpunk: {
+        name:'Cyberpunk', category:'creative',
+        desc:'Neon-soaked dystopia',
+        effects:{
+            gradmap:{gradColor1:'#000011',gradColor2:'#ff0066',gradColor3:'#6600ff',gradMidpoint:40,gradIntensity:60},
+            bloom:{bloomIntensity:75,bloomRadius:70,bloomThreshold:20,bloomSpread:85,bloomBlendMode:'additive',bloomExposure:125,bloomAnamorphic:true},
+            chroma:{chromaOffset:10,chromaMode:'radial'},
+            bricon:{briValue:0,conValue:145,satValue:140},
+            scanlines:{scanIntensity:15,scanCount:300,scanVertical:false},
+            vignette:{vigIntensity:65,vigRadius:40,vigColor:'#0a0015'}
+        }
+    },
+    analog_tv: {
+        name:'Analog TV', category:'retro',
+        desc:'Warm 70s broadcast signal',
+        effects:{
+            ntsc:{ntscChromaBleed:60,ntscInstability:40,ntscNoise:30,ntscRolling:false},
+            crt:{crtScanWeight:3,crtCurvature:35,crtGlow:60,crtChroma:4,crtStatic:15,crtPhosphor:'aperture'},
+            colortemp:{colortempValue:20},
+            bloom:{bloomIntensity:25,bloomRadius:35,bloomThreshold:45,bloomSpread:50,bloomBlendMode:'screen',bloomExposure:100,bloomAnamorphic:false},
+            vignette:{vigIntensity:55,vigRadius:45,vigColor:'#050200'}
+        }
+    },
+    lomography: {
+        name:'Lomo', category:'film',
+        desc:'Oversaturated tunnel-vision',
+        effects:{
+            bricon:{briValue:5,conValue:150,satValue:170},
+            colortemp:{colortempValue:15},
+            levels:{levelsInBlack:25,levelsInWhite:230,levelsGamma:1.05,levelsOutBlack:0,levelsOutWhite:250},
+            bloom:{bloomIntensity:30,bloomRadius:40,bloomThreshold:40,bloomSpread:55,bloomBlendMode:'additive',bloomExposure:105,bloomAnamorphic:false},
+            vignette:{vigIntensity:85,vigRadius:30,vigColor:'#000000'},
+            grain:{grainIntensity:30,grainSize:8,grainColorMode:'color'}
+        }
+    },
+    ink_wash: {
+        name:'Ink Wash', category:'creative',
+        desc:'Sumi-e watercolor dissolve',
+        effects:{
+            duotone:{duoShadow:'#0a0a0a',duoHighlight:'#e8e0d0',duoIntensity:100},
+            levels:{levelsInBlack:20,levelsInWhite:210,levelsGamma:0.7,levelsOutBlack:10,levelsOutWhite:240},
+            grain:{grainIntensity:50,grainSize:18,grainColorMode:'mono'},
+            blursharp:{blursharpAmount:-15},
+            vignette:{vigIntensity:45,vigRadius:55,vigColor:'#0a0800'}
+        }
+    },
+    matrix: {
+        name:'Matrix', category:'retro',
+        desc:'Digital rain phosphor green',
+        effects:{
+            gradmap:{gradColor1:'#000000',gradColor2:'#00ff41',gradColor3:'#003300',gradMidpoint:35,gradIntensity:90},
+            scanlines:{scanIntensity:30,scanCount:400,scanVertical:false},
+            bloom:{bloomIntensity:50,bloomRadius:55,bloomThreshold:25,bloomSpread:70,bloomBlendMode:'additive',bloomExposure:110,bloomAnamorphic:false},
+            noise:{noiseIntensity:20,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
+            vignette:{vigIntensity:60,vigRadius:40,vigColor:'#000500'}
         }
     }
 };
@@ -1808,6 +1899,28 @@ function draw() {
             lastTrackTime = millis();
         }
 
+        // Update face tracking status display continuously
+        if (currentMode >= 15 && currentMode <= 17 && frameCount % 15 === 0) {
+            let fStatusEl = document.getElementById('face-status');
+            let fHintEl = document.getElementById('face-hint');
+            if (fStatusEl) {
+                if (!window.mpFaceLandmarkerReady) {
+                    fStatusEl.textContent = 'LOADING';
+                    fStatusEl.style.color = '#FDCB6E';
+                } else if (faceLandmarkCache && faceLandmarkCache.length > 0) {
+                    fStatusEl.textContent = faceLandmarkCache.length + ' FACE' + (faceLandmarkCache.length > 1 ? 'S' : '');
+                    fStatusEl.style.color = '#00B894';
+                    document.getElementById('face-loading').style.display = 'none';
+                    if (fHintEl) fHintEl.textContent = currentMode === 15 ? 'Tracking eye landmarks' :
+                        currentMode === 16 ? 'Tracking lip landmarks' : 'Tracking full face mesh';
+                } else {
+                    fStatusEl.textContent = 'NO FACE';
+                    fStatusEl.style.color = '#E17055';
+                    if (fHintEl) fHintEl.textContent = 'Point camera or video at a face';
+                }
+            }
+        }
+
         // ── Auto-follow: pan toward centroid of tracked points
         if (autoFollow && trackedPoints.length > 0 && vidZoom > 1.05 && !kenBurnsEnabled) {
             let cx = 0, cy = 0;
@@ -1841,13 +1954,13 @@ function draw() {
             let pw = p.width * pScale;
             let ph = p.height * pScale;
 
-            if (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12) || (currentMode >= 15 && currentMode <= 17)) {
-                // ZOOM / THERMO — video crop inside blob
+            if (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12)) {
+                // ZOOM / THERMO / ASCII — video crop inside blob
                 push();
                 let srcX = map(p.posicao.x, videoX, videoX + videoW, 0, videoEl.width);
                 if (usingWebcam) srcX = videoEl.width - srcX; // mirror source for webcam
                 let srcY = map(p.posicao.y, videoY, videoY + videoH, 0, videoEl.height);
-                let isFaceZoom = currentMode >= 15 && currentMode <= 17;
+                let isFaceZoom = false;
                 let absZoom = Math.abs(vizZoomLevel);
                 let sampleR;
                 if (vizZoomLevel >= 0) {
@@ -1954,9 +2067,6 @@ function draw() {
                 if (vizZoomBox) {
                     stroke(red(_tbc), green(_tbc), blue(_tbc));
                     strokeWeight(trackBoxWeight);
-                } else if (isFaceZoom) {
-                    stroke(red(_tbc), green(_tbc), blue(_tbc), 40);
-                    strokeWeight(trackBoxWeight * 0.67);
                 } else {
                     stroke(red(_tbc), green(_tbc), blue(_tbc), 80);
                     strokeWeight(trackBoxWeight * 0.67);

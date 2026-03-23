@@ -11,7 +11,10 @@ function trackPoints() {
 
     // FACE LANDMARK modes (EYES=15, LIPS=16, FACE=17)
     if (currentMode >= 15 && currentMode <= 17) {
-        if (!window.mpFaceLandmarkerReady || !window.mpFaceLandmarker) return;
+        if (!window.mpFaceLandmarkerReady || !window.mpFaceLandmarker) {
+            console.warn('Face landmarker not ready:', { ready: window.mpFaceLandmarkerReady, instance: !!window.mpFaceLandmarker });
+            return;
+        }
 
         const w = videoEl.width, h = videoEl.height;
 
@@ -20,8 +23,11 @@ function trackPoints() {
         if (faceDetectFrame >= FACE_DETECT_INTERVAL || !faceLandmarkCache) {
             faceDetectFrame = 0;
             try {
+                // Ensure video element has valid frame data
+                const vid = videoEl.elt;
+                if (!vid || vid.readyState < 2 || vid.videoWidth === 0) return;
                 const ts = performance.now();
-                const result = window.mpFaceLandmarker.detectForVideo(videoEl.elt, ts);
+                const result = window.mpFaceLandmarker.detectForVideo(vid, ts);
                 if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
                     let rawLandmarks = result.faceLandmarks;
 
@@ -51,6 +57,7 @@ function trackPoints() {
                     faceLandmarkCache = smoothedLandmarks;
                 }
             } catch (e) {
+                console.warn('Face detection error:', e.message || e);
                 // Detection failed — use cache
             }
         }
