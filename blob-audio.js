@@ -24,7 +24,8 @@ function handleAudioFile(event) {
     if (audioObjectUrl) { URL.revokeObjectURL(audioObjectUrl); }
 
     ui.audioName.innerText = file.name;
-    // Set tooltip for truncated names
+    // Set tooltip for truncated names on both the container and the name element
+    ui.audioName.title = file.name;
     let audioContainer = document.getElementById('audio-input-container');
     if (audioContainer) audioContainer.title = file.name;
     const url = URL.createObjectURL(file);

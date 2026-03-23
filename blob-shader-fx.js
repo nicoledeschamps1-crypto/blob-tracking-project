@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // blob-shader-fx.js — WebGL2 GPU Shader Effects Pipeline
-// Phase 2.5: 30 effects, per-effect opacity, blend modes
+// Phase 2.5: 31 effects, per-effect opacity, blend modes
 // ═══════════════════════════════════════════════════════════════
 
 'use strict';
@@ -31,7 +31,7 @@ void main() {
 // All support u_opacity (0–1) for per-effect opacity blending.
 // ═══════════════════════════════════════════════════════════════
 
-// ── 1. Bloom ─────────────────────────────────────────────────
+// ── 1. Bloom (Cross-pattern Gaussian + Reinhard tone mapping) ─
 const FRAG_BLOOM = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -42,27 +42,44 @@ uniform float u_threshold;
 uniform float u_radius;
 uniform float u_opacity;
 out vec4 fragColor;
+float gaussian(float x, float sigma) {
+    return exp(-(x * x) / (2.0 * sigma * sigma));
+}
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     vec2 texel = 1.0 / u_resolution;
-    float maxRad = u_radius * 20.0;
+    float sigma = u_radius * 8.0;
+    const int samples = 16;
     vec3 bloom = vec3(0.0);
     float totalW = 0.0;
-    const float GA = 2.39996323;
-    for (int i = 0; i < 32; i++) {
-        float r = sqrt(float(i) + 0.5) / sqrt(32.0) * maxRad;
-        float th = float(i) * GA;
-        vec2 off = vec2(cos(th), sin(th)) * r * texel;
-        vec3 s = texture(u_texture, v_texCoord + off).rgb;
-        float lum = dot(s, vec3(0.299, 0.587, 0.114));
+    // Horizontal pass samples
+    for (int i = -samples; i <= samples; i++) {
+        float offset = float(i) * sigma / float(samples);
+        vec2 uv = v_texCoord + vec2(offset * texel.x, 0.0);
+        vec3 s = texture(u_texture, uv).rgb;
+        float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
         if (lum > u_threshold) {
-            float w = 1.0 - r / (maxRad + 0.001);
+            float w = gaussian(float(i), float(samples) * 0.4);
+            bloom += s * w; totalW += w;
+        }
+    }
+    // Vertical pass samples
+    for (int i = -samples; i <= samples; i++) {
+        float offset = float(i) * sigma / float(samples);
+        vec2 uv = v_texCoord + vec2(0.0, offset * texel.y);
+        vec3 s = texture(u_texture, uv).rgb;
+        float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
+        if (lum > u_threshold) {
+            float w = gaussian(float(i), float(samples) * 0.4);
             bloom += s * w; totalW += w;
         }
     }
     if (totalW > 0.0) bloom /= totalW;
-    vec3 result = clamp(orig.rgb + bloom * u_intensity, 0.0, 1.0);
-    fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+    vec3 result = orig.rgb + bloom * u_intensity * 1.5;
+    // Reinhard tone mapping to prevent harsh clipping
+    result = result / (result + vec3(1.0));
+    result *= 1.8;
+    fragColor = vec4(mix(orig.rgb, clamp(result, 0.0, 1.0), u_opacity), 1.0);
 }`;
 
 // ── 2. Blur / Sharpen ────────────────────────────────────────
@@ -92,7 +109,7 @@ void main() {
     fragColor = vec4(mix(orig, clamp(result, 0.0, 1.0), u_opacity), 1.0);
 }`;
 
-// ── 3. CRT ───────────────────────────────────────────────────
+// ── 3. CRT (phosphor dots, edge darkening, warm temp) ───────
 const FRAG_CRT = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -129,19 +146,38 @@ void main() {
         float n = hash(uv*u_resolution + u_time*1000.0);
         if (n > 1.0-u_static*0.3) col += vec3(n*0.25*u_static);
     }
-    if (u_glow > 0.2) {
-        vec3 g = vec3(0.0);
-        for (int i=-2;i<=2;i++) for (int j=-2;j<=2;j++) { if(i==0&&j==0) continue;
-            g += texture(u_texture, uv+vec2(float(i),float(j))*texel*2.0).rgb; }
-        col += g/24.0 * u_glow*0.15;
+    // Phosphor dot pattern (RGB triads)
+    if (u_glow > 0.1) {
+        vec2 dotPos = uv * u_resolution;
+        float subpixel = mod(floor(dotPos.x), 3.0);
+        vec3 phosphorMask = vec3(0.0);
+        if (subpixel < 0.5) phosphorMask = vec3(1.0, 0.2, 0.2);
+        else if (subpixel < 1.5) phosphorMask = vec3(0.2, 1.0, 0.2);
+        else phosphorMask = vec3(0.2, 0.2, 1.0);
+        col = col * mix(vec3(1.0), phosphorMask, u_glow * 0.5);
+        // Phosphor glow bleed between dots
+        vec3 glow = vec3(0.0);
+        for (int i = -1; i <= 1; i++) {
+            vec2 neighborUV = uv + vec2(float(i) * texel.x * 1.5, 0.0);
+            glow += texture(u_texture, neighborUV).rgb;
+        }
+        glow /= 3.0;
+        col += glow * 0.08 * u_glow;
     }
+    // Warm CRT color temperature
+    col *= vec3(1.02, 1.0, 0.96);
+    // Edge darkening from curvature
     if (u_curvature > 0.05) {
-        vec2 cc = uv-0.5; col *= clamp(1.0-dot(cc,cc)*u_curvature*3.0, 0.0, 1.0);
+        vec2 edge = smoothstep(vec2(0.0), vec2(0.05), uv) * smoothstep(vec2(0.0), vec2(0.05), 1.0 - uv);
+        float edgeDark = edge.x * edge.y;
+        float dist = length(uv - 0.5) * 2.0;
+        edgeDark *= 1.0 - dist * dist * u_curvature * 0.3;
+        col *= clamp(edgeDark, 0.0, 1.0);
     }
     fragColor = vec4(mix(orig.rgb, clamp(col,0.0,1.0), u_opacity), 1.0);
 }`;
 
-// ── 4. Vignette ──────────────────────────────────────────────
+// ── 4. Vignette (asymmetric + smoother falloff) ─────────────
 const FRAG_VIGNETTE = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -153,14 +189,19 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    vec2 cc = v_texCoord - 0.5;
-    float dist = length(cc) * 2.0;
-    float vig = smoothstep(u_radius*0.8, 0.9+(1.0-u_radius)*0.5, dist);
-    vec3 result = mix(orig.rgb, u_color, vig * u_intensity);
+    // Asymmetric: slightly stronger at bottom (like real lens)
+    vec2 center = vec2(0.5, 0.52);
+    vec2 d = v_texCoord - center;
+    d.y *= 0.9;
+    float dist = length(d) * 2.0;
+    // Smoother power curve falloff
+    float vig = 1.0 - pow(dist * u_intensity, 2.5);
+    vig = smoothstep(0.0, 1.0, vig);
+    vec3 result = mix(u_color, orig.rgb, clamp(vig, 0.0, 1.0));
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
-// ── 5. Duotone ───────────────────────────────────────────────
+// ── 5. Duotone (smoothstep + BT.709) ────────────────────────
 const FRAG_DUOTONE = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -172,8 +213,9 @@ uniform float u_opacity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
-    vec3 duo = mix(u_shadow, u_highlight, lum);
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float t = smoothstep(0.0, 1.0, lum);
+    vec3 duo = mix(u_shadow, u_highlight, t);
     vec3 result = mix(orig.rgb, duo, u_intensity);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
@@ -279,7 +321,7 @@ void main() {
     fragColor = vec4(mix(orig.rgb, clamp(result,0.0,1.0), u_opacity), 1.0);
 }`;
 
-// ── 10. Halftone ─────────────────────────────────────────────
+// ── 10. Halftone (anti-aliased smoothstep dots) ─────────────
 const FRAG_HALFTONE = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -303,11 +345,13 @@ void main() {
     vec2 sampleUV = clamp(samplePx / u_resolution, 0.0, 1.0);
     vec4 sampled = texture(u_texture, sampleUV);
     float dist = length(rotPx - cell);
-    float lum = dot(sampled.rgb, vec3(0.299, 0.587, 0.114));
+    float lum = dot(sampled.rgb, vec3(0.2126, 0.7152, 0.0722));
     lum = clamp(0.5 + (lum-0.5)*u_contrast, 0.0, 1.0);
     float dotR = (1.0-lum) * u_spacing * 0.48;
-    vec3 result = dist < dotR ?
-        (u_colorMode > 0.5 ? sampled.rgb * 0.8 : u_ink) : u_paper;
+    // Anti-aliased dot edge using smoothstep
+    float dotMask = 1.0 - smoothstep(dotR - 1.0, dotR + 1.0, dist);
+    vec3 inkColor = u_colorMode > 0.5 ? sampled.rgb * 0.8 : u_ink;
+    vec3 result = mix(u_paper, inkColor, dotMask);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -425,7 +469,7 @@ void main() {
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
-// ── 17. Grain ────────────────────────────────────────────────
+// ── 17. Grain (luminance-dependent intensity) ────────────────
 const FRAG_GRAIN = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -440,6 +484,10 @@ out vec4 fragColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
+    // Grain strongest in midtones, weaker in shadows/highlights
+    float grainMask = 1.0 - abs(lum - 0.5) * 2.0;
+    grainMask = mix(0.3, 1.0, grainMask);
     vec2 cell = floor(v_texCoord * u_resolution / u_size);
     float seed = floor(u_time * 24.0);
     vec3 n;
@@ -452,7 +500,7 @@ void main() {
             (hash(cell+seed+100.0) - 0.5),
             (hash(cell+seed+200.0) - 0.5)) * u_intensity * 0.314;
     }
-    vec3 result = clamp(orig.rgb + n, 0.0, 1.0);
+    vec3 result = clamp(orig.rgb + n * grainMask, 0.0, 1.0);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -468,9 +516,11 @@ uniform float u_freq;
 uniform float u_speed;
 uniform float u_channelShift;
 uniform float u_blockSize;
+uniform float u_mode;      // 0=shift,1=tear,2=corrupt,3=vhs,4=slice,5=drift,6=static
 uniform float u_opacity;
 out vec4 fragColor;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+float hash3(vec3 p) { return fract(sin(dot(p, vec3(12.9898,78.233,45.164)))*43758.5453); }
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     vec2 uv = v_texCoord;
@@ -478,22 +528,130 @@ void main() {
     float bsz = max(4.0, u_blockSize);
     float blockY = floor(uv.y * u_resolution.y / bsz);
     float h = hash(vec2(blockY, seed));
-    // Block row shift
-    if (h > 1.0 - u_freq) {
-        float offset = (hash(vec2(blockY+1.0, seed)) - 0.5) * u_intensity * 0.2;
-        uv.x = fract(uv.x + offset);
-    }
-    // RGB channel separation
     float chrOff = u_channelShift / u_resolution.x;
-    vec3 result = vec3(
-        texture(u_texture, vec2(uv.x + chrOff, uv.y)).r,
-        texture(u_texture, uv).g,
-        texture(u_texture, vec2(uv.x - chrOff, uv.y)).b);
-    // Random color corruption on some blocks
-    float h2 = hash(vec2(blockY + 50.0, seed));
-    if (h2 > 1.0 - u_freq * 0.3) {
-        result.rgb = vec3(result.r, result.b, result.g); // channel swap
+    vec3 result;
+
+    if (u_mode < 0.5) {
+        // SHIFT: block row shift + RGB separation
+        if (h > 1.0 - u_freq) {
+            float offset = (hash(vec2(blockY+1.0, seed)) - 0.5) * u_intensity * 0.2;
+            uv.x = fract(uv.x + offset);
+        }
+        result = vec3(
+            texture(u_texture, vec2(uv.x + chrOff, uv.y)).r,
+            texture(u_texture, uv).g,
+            texture(u_texture, vec2(uv.x - chrOff, uv.y)).b);
+        float h2 = hash(vec2(blockY + 50.0, seed));
+        if (h2 > 1.0 - u_freq * 0.3) result = vec3(result.r, result.b, result.g);
+
+    } else if (u_mode < 1.5) {
+        // TEAR: horizontal tear bands
+        float tearH = bsz * 1.5 / u_resolution.y;
+        float tearSeed = hash(vec2(blockY * 0.7, seed));
+        if (tearSeed > 1.0 - u_freq) {
+            float shift = (hash(vec2(blockY + 3.0, seed)) - 0.5) * u_intensity * 0.3;
+            uv.x = clamp(uv.x + shift, 0.0, 1.0);
+        }
+        result = texture(u_texture, uv).rgb;
+
+    } else if (u_mode < 2.5) {
+        // CORRUPT: block displacement + channel swap
+        float blockX = floor(uv.x * u_resolution.x / bsz);
+        float hb = hash(vec2(blockX + blockY * 100.0, seed));
+        if (hb > 1.0 - u_freq * 0.5) {
+            float ox = (hash(vec2(blockX + 10.0, seed + blockY)) - 0.5) * u_intensity * 0.15;
+            float oy = (hash(vec2(blockY + 20.0, seed + blockX)) - 0.5) * u_intensity * 0.08;
+            uv = clamp(uv + vec2(ox, oy), 0.0, 1.0);
+            float sw = hash(vec2(blockX + blockY, seed + 77.0));
+            vec4 s = texture(u_texture, uv);
+            result = sw > 0.66 ? vec3(s.b, s.g, s.r) : (sw > 0.33 ? vec3(s.g, s.r, s.b) : s.rgb);
+        } else {
+            result = orig.rgb;
+        }
+
+    } else if (u_mode < 3.5) {
+        // VHS: tracking lines + color bleed + noise band
+        if (h > 1.0 - u_freq * 0.5) {
+            float shift = (hash(vec2(blockY + 1.0, seed)) - 0.5) * u_intensity * 0.12;
+            uv.x = clamp(uv.x + shift, 0.0, 1.0);
+        }
+        float bleed = chrOff * 1.5;
+        result = vec3(
+            texture(u_texture, vec2(clamp(uv.x + bleed, 0.0, 1.0), uv.y)).r,
+            texture(u_texture, uv).g,
+            texture(u_texture, vec2(clamp(uv.x - bleed, 0.0, 1.0), uv.y)).b);
+        // Noise band
+        float bandCenter = fract(seed * 0.1) ;
+        float bandDist = abs(uv.y - bandCenter);
+        if (bandDist < 0.015) {
+            result += vec3(0.2);
+        }
+
+    } else if (u_mode < 4.5) {
+        // SLICE: image cut into slices that shift independently
+        float numSlices = floor(u_freq * 25.0) + 3.0;
+        float sliceIdx = floor(uv.y * numSlices);
+        float sliceH = hash(vec2(sliceIdx, seed));
+        float shift = (sliceH - 0.5) * u_intensity * 0.25;
+        // Some slices shift more
+        if (hash(vec2(sliceIdx + 99.0, seed)) > 0.7) shift *= 2.5;
+        uv.x = clamp(uv.x + shift, 0.0, 1.0);
+        // Occasional black gap
+        float gapChance = hash(vec2(sliceIdx + 200.0, seed));
+        if (gapChance > 0.92 && u_intensity > 0.3) {
+            result = vec3(0.0);
+        } else {
+            result = vec3(
+                texture(u_texture, vec2(uv.x + chrOff * 0.5, uv.y)).r,
+                texture(u_texture, uv).g,
+                texture(u_texture, vec2(uv.x - chrOff * 0.5, uv.y)).b);
+        }
+
+    } else if (u_mode < 5.5) {
+        // DRIFT: pixels melt downward with column-based displacement
+        float colIdx = floor(uv.x * u_resolution.x / max(2.0, bsz * 0.5));
+        float driftH = hash(vec2(colIdx, seed));
+        float driftAmt = 0.0;
+        if (driftH < u_freq) {
+            driftAmt = hash(vec2(colIdx + 5.0, seed)) * u_intensity * 0.3;
+            // Smoothed by neighboring columns
+            float dL = hash(vec2(colIdx - 1.0, seed)) < u_freq ? hash(vec2(colIdx + 4.0, seed)) * u_intensity * 0.3 : 0.0;
+            float dR = hash(vec2(colIdx + 1.0, seed)) < u_freq ? hash(vec2(colIdx + 6.0, seed)) * u_intensity * 0.3 : 0.0;
+            driftAmt = driftAmt * 0.5 + (dL + dR) * 0.25;
+        }
+        vec2 dUv = vec2(uv.x, clamp(uv.y - driftAmt, 0.0, 1.0));
+        result = texture(u_texture, dUv).rgb;
+        // Channel split on drifted areas
+        if (driftAmt > 0.01) {
+            float rX = clamp(dUv.x + chrOff, 0.0, 1.0);
+            result.r = texture(u_texture, vec2(rX, dUv.y)).r;
+        }
+
+    } else {
+        // STATIC: TV static + scanline interference + rolling bar
+        float inBand = 0.0;
+        float bandCenter = fract(seed * 0.07);
+        float bandSize = 0.1 + u_intensity * 0.15;
+        if (abs(uv.y - bandCenter) < bandSize) inBand = 1.0;
+        float rowNoise = inBand > 0.5 ? u_intensity * 0.8 : u_intensity * 0.12;
+        float scanShift = inBand > 0.5 ? (hash(vec2(blockY + 7.0, seed)) - 0.5) * u_intensity * 0.15 : 0.0;
+        vec2 sUv = vec2(clamp(uv.x + scanShift, 0.0, 1.0), uv.y);
+        // Per-pixel snow
+        float snowH = hash3(vec3(gl_FragCoord.xy, seed));
+        if (snowH < rowNoise * u_freq) {
+            float v = hash(gl_FragCoord.xy + seed);
+            result = vec3(v);
+        } else {
+            result = texture(u_texture, sUv).rgb;
+        }
+        // Rolling bar
+        float barPos = fract(u_time * 0.5);
+        float barDist = abs(uv.y - barPos);
+        if (barDist < 0.012 && u_intensity > 0.3) {
+            result += vec3(0.15);
+        }
     }
+
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
@@ -576,7 +734,7 @@ void main() {
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
-// ── 22. Thermal ──────────────────────────────────────────────
+// ── 22. Thermal (HD palettes with more color stops) ─────────
 const FRAG_THERMAL = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -586,41 +744,48 @@ uniform float u_palette;
 uniform float u_opacity;
 out vec4 fragColor;
 vec3 thermalLookup(float lum, float pal) {
-    const vec3 d[11] = vec3[11](
-        vec3(0,0,.502),vec3(0,0,1),vec3(0,.502,1),vec3(0,1,1),vec3(0,1,.502),
-        vec3(0,1,0),vec3(.502,1,0),vec3(1,1,0),vec3(1,.502,0),vec3(1,0,0),vec3(1,1,1));
-    const vec3 ir[9] = vec3[9](
-        vec3(0,0,0),vec3(0,0,.392),vec3(.314,0,.471),vec3(.627,0,.314),
-        vec3(.784,.196,0),vec3(1,.392,0),vec3(1,.784,.196),vec3(1,1,.588),vec3(1,1,1));
-    const vec3 rb[8] = vec3[8](
-        vec3(0,0,.502),vec3(0,0,1),vec3(0,1,1),vec3(0,1,0),
-        vec3(1,1,0),vec3(1,.502,0),vec3(1,0,0),vec3(1,0,.502));
-    const vec3 ar[7] = vec3[7](
-        vec3(0,.078,.235),vec3(0,.235,.471),vec3(.157,.471,.706),
-        vec3(.392,.706,.863),vec3(.706,.863,.941),vec3(.863,.941,1),vec3(1,1,1));
-    const vec3 ni[7] = vec3[7](
-        vec3(0,0,0),vec3(0,.078,0),vec3(0,.196,.039),
-        vec3(0,.353,.078),vec3(.039,.549,.118),vec3(.118,.784,.196),vec3(.706,1,.706));
+    const vec3 d[14] = vec3[14](
+        vec3(0,0,.125),vec3(0,0,.314),vec3(.063,0,.502),vec3(.188,0,.627),
+        vec3(.314,0,.706),vec3(.502,0,.627),vec3(.627,0,.392),vec3(.753,.125,0),
+        vec3(.863,.314,0),vec3(.941,.549,0),vec3(1,.784,0),vec3(1,.941,.235),
+        vec3(1,1,.627),vec3(1,1,1));
+    const vec3 ir[12] = vec3[12](
+        vec3(0,0,0),vec3(.039,0,.118),vec3(.157,0,.314),vec3(.314,0,.471),
+        vec3(.471,0,.549),vec3(.627,.078,.314),vec3(.784,.235,.078),
+        vec3(.902,.471,0),vec3(.98,.706,.078),vec3(1,.902,.314),
+        vec3(1,1,.706),vec3(1,1,1));
+    const vec3 rb[10] = vec3[10](
+        vec3(0,0,.502),vec3(0,0,.784),vec3(0,.314,1),vec3(0,.706,.863),
+        vec3(0,.863,.471),vec3(.314,1,0),vec3(.784,1,0),
+        vec3(1,.706,0),vec3(1,.314,0),vec3(1,0,.502));
+    const vec3 ar[9] = vec3[9](
+        vec3(0,.078,.235),vec3(0,.157,.392),vec3(0,.314,.588),
+        vec3(.118,.471,.706),vec3(.314,.627,.824),vec3(.502,.784,.902),
+        vec3(.706,.863,.941),vec3(.863,.941,1),vec3(1,1,1));
+    const vec3 ni[9] = vec3[9](
+        vec3(0,0,0),vec3(0,.039,0),vec3(0,.118,.024),
+        vec3(0,.235,.059),vec3(0,.392,.098),vec3(.024,.549,.137),
+        vec3(.059,.706,.235),vec3(.314,.863,.471),vec3(.706,1,.706));
     if (pal < 0.5) {
-        float p = lum * 10.0; int lo = int(floor(p));
-        return mix(d[min(lo,10)], d[min(lo+1,10)], fract(p));
+        float p = lum * 13.0; int lo = int(floor(p));
+        return mix(d[min(lo,13)], d[min(lo+1,13)], fract(p));
     } else if (pal < 1.5) {
-        float p = lum * 8.0; int lo = int(floor(p));
-        return mix(ir[min(lo,8)], ir[min(lo+1,8)], fract(p));
+        float p = lum * 11.0; int lo = int(floor(p));
+        return mix(ir[min(lo,11)], ir[min(lo+1,11)], fract(p));
     } else if (pal < 2.5) {
-        float p = lum * 7.0; int lo = int(floor(p));
-        return mix(rb[min(lo,7)], rb[min(lo+1,7)], fract(p));
+        float p = lum * 9.0; int lo = int(floor(p));
+        return mix(rb[min(lo,9)], rb[min(lo+1,9)], fract(p));
     } else if (pal < 3.5) {
-        float p = lum * 6.0; int lo = int(floor(p));
-        return mix(ar[min(lo,6)], ar[min(lo+1,6)], fract(p));
+        float p = lum * 8.0; int lo = int(floor(p));
+        return mix(ar[min(lo,8)], ar[min(lo+1,8)], fract(p));
     } else {
-        float p = lum * 6.0; int lo = int(floor(p));
-        return mix(ni[min(lo,6)], ni[min(lo+1,6)], fract(p));
+        float p = lum * 8.0; int lo = int(floor(p));
+        return mix(ni[min(lo,8)], ni[min(lo+1,8)], fract(p));
     }
 }
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float lum = dot(orig.rgb, vec3(0.299, 0.587, 0.114));
+    float lum = dot(orig.rgb, vec3(0.2126, 0.7152, 0.0722));
     vec3 thermal = thermalLookup(lum, u_palette);
     vec3 result = mix(orig.rgb, thermal, u_intensity);
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
@@ -683,7 +848,7 @@ void main() {
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
 }`;
 
-// ── 25. Dither (Bayer) ───────────────────────────────────────
+// ── 25. Dither (Bayer + gamma correction) ────────────────────
 const FRAG_DITHER = `#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -712,9 +877,14 @@ void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     vec2 px = floor(v_texCoord * u_resolution / u_pixelation) * u_pixelation;
     vec4 sampled = texture(u_texture, (px + 0.5) / u_resolution);
+    // Gamma correction before dithering
+    float gamma = 1.6;
+    vec3 col = pow(sampled.rgb, vec3(gamma));
     float bayerVal = bayer8(px) - 0.5;
     float levels = max(1.0, u_colorCount - 1.0);
-    vec3 dithered = floor(sampled.rgb * levels + bayerVal * u_strength + 0.5) / levels;
+    vec3 dithered = floor(col * levels + bayerVal * u_strength * 0.6 + 0.5) / levels;
+    // Reverse gamma
+    dithered = pow(dithered, vec3(1.0 / gamma));
     fragColor = vec4(mix(orig.rgb, clamp(dithered, 0.0, 1.0), u_opacity), 1.0);
 }`;
 
@@ -855,6 +1025,65 @@ void main() {
     float invG = u_gamma > 0.0 ? 1.0 / u_gamma : 1.0;
     vec3 result = pow(clamp(orig.rgb * vec3(u_rGain, u_gGain, u_bGain), 0.0, 1.0), vec3(invG));
     fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── Lens Curve (barrel/pincushion/fisheye/squeeze + chromatic fringe) ──
+const FRAG_CURVE = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_texture;
+uniform float u_intensity;   // 0-1
+uniform float u_mode;        // 0=barrel,1=pincushion,2=fisheye,3=squeeze,4=mustache
+uniform float u_fringe;      // chromatic fringe amount 0-1
+uniform float u_opacity;
+out vec4 fragColor;
+
+vec2 distort(vec2 uv, float k) {
+    vec2 centered = uv - 0.5;
+    float r2 = dot(centered, centered);
+    float mode = u_mode;
+    float factor;
+    if (mode < 0.5) {
+        // Barrel: edges push outward
+        factor = 1.0 + k * r2;
+    } else if (mode < 1.5) {
+        // Pincushion: edges pull inward
+        factor = 1.0 - k * r2;
+    } else if (mode < 2.5) {
+        // Fisheye: stronger radial with r^4 term
+        factor = 1.0 + k * r2 + k * 0.5 * r2 * r2;
+    } else if (mode < 3.5) {
+        // Squeeze: horizontal barrel + vertical pincushion
+        float kx = 1.0 + k * centered.x * centered.x;
+        float ky = 1.0 - k * 0.5 * centered.y * centered.y;
+        return vec2(centered.x * kx, centered.y * ky) + 0.5;
+    } else {
+        // Mustache: barrel center + pincushion edges (r^2 - r^4)
+        factor = 1.0 + k * (r2 - 2.5 * r2 * r2);
+    }
+    return centered * factor + 0.5;
+}
+
+void main() {
+    vec4 orig = texture(u_texture, v_texCoord);
+    float k = u_intensity * 2.0;
+
+    if (u_fringe > 0.01) {
+        // Chromatic fringe: offset R and B channels slightly
+        float fk = u_fringe * 0.15;
+        vec2 uvR = distort(v_texCoord, k * (1.0 + fk));
+        vec2 uvG = distort(v_texCoord, k);
+        vec2 uvB = distort(v_texCoord, k * (1.0 - fk));
+        float r = texture(u_texture, clamp(uvR, 0.0, 1.0)).r;
+        float g = texture(u_texture, clamp(uvG, 0.0, 1.0)).g;
+        float b = texture(u_texture, clamp(uvB, 0.0, 1.0)).b;
+        vec3 result = vec3(r, g, b);
+        fragColor = vec4(mix(orig.rgb, result, u_opacity), 1.0);
+    } else {
+        vec2 uv = distort(v_texCoord, k);
+        vec4 result = texture(u_texture, clamp(uv, 0.0, 1.0));
+        fragColor = vec4(mix(orig.rgb, result.rgb, u_opacity), 1.0);
+    }
 }`;
 
 // ── Blend Pass Shader ────────────────────────────────────────
@@ -1355,6 +1584,8 @@ function registerCoreShaderEffects() {
             shaderFX.setUniform('glitch','u_speed',Math.max(1,glitchSpeed/10));
             shaderFX.setUniform('glitch','u_channelShift',glitchChannelShift*0.3);
             shaderFX.setUniform('glitch','u_blockSize',Math.max(4,glitchBlockSize*0.5));
+            let modeIdx = {shift:0,tear:1,corrupt:2,vhs:3,slice:4,drift:5,static:6}[glitchMode]||0;
+            shaderFX.setUniform('glitch','u_mode',modeIdx);
         }},
         { name:'emboss', frag:FRAG_EMBOSS, sync:()=>{
             shaderFX.setUniform('emboss','u_angle',embossAngle*Math.PI/180);
@@ -1421,6 +1652,13 @@ function registerCoreShaderEffects() {
             shaderFX.setUniform('rgbgain','u_bGain',rgbGainB/100);
             shaderFX.setUniform('rgbgain','u_gamma',rgbGainGamma);
         }},
+        { name:'curve', frag:FRAG_CURVE, sync:()=>{
+            let sign = (curveDirection === 'barrel' || curveDirection === 'fisheye' || curveDirection === 'mustache') ? 1 : -1;
+            let modeIdx = {barrel:0,pinch:1,fisheye:2,squeeze:3,mustache:4}[curveDirection]||0;
+            shaderFX.setUniform('curve','u_intensity',sign * curveIntensity/100);
+            shaderFX.setUniform('curve','u_mode',modeIdx);
+            shaderFX.setUniform('curve','u_fringe',curveFringe/100);
+        }},
     ];
 
     let count = 0;
@@ -1436,7 +1674,7 @@ function registerCoreShaderEffects() {
         shaderFX._blendProgram = shaderFX.programs.get('_blend');
     }
 
-    console.log('[ShaderFX] Registered ' + count + '/30 core effects + blend pass');
+    console.log('[ShaderFX] Registered ' + count + '/31 core effects + blend pass');
     return count;
 }
 

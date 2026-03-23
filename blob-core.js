@@ -106,6 +106,7 @@ let noiseScale = 1;
 let noiseColorMode = 'mono';
 let curveIntensity = 30;
 let curveDirection = 'barrel';
+let curveFringe = 0;
 let briValue = 0;
 let conValue = 100;
 let satValue = 100;
@@ -365,9 +366,7 @@ let splitFxEnabled = true;       // apply effects to split view half
 let splitVizZoom = false;        // show zoom viz blobs on split half
 let splitPosition = 50;          // split divider position 0-100%
 let splitMirrorFlip = false;     // swap left/right sides
-let splitDualFx = false;         // different effect per side
-let splitLeftEffect = '';        // effect name for left side
-let splitRightEffect = '';       // effect name for right side
+let splitFxSide = 'both';        // which side effects apply to: 'left'|'right'|'both'
 let splitShape = 'rect';         // zoom side clip shape: rect|rounded|circle|pill
 let _splitDrag = null;           // drag state for split divider
 let _asciiSampler = null;        // offscreen canvas for ASCII viz sampling
@@ -481,7 +480,7 @@ const FX_PARAM_MAP = {
     palette: [{v:'palettePreset',g:()=>palettePreset,s:v=>palettePreset=v},{v:'paletteIntensity',g:()=>paletteIntensity,s:v=>paletteIntensity=v}],
     bricon: [{v:'briValue',g:()=>briValue,s:v=>briValue=v},{v:'conValue',g:()=>conValue,s:v=>conValue=v},{v:'satValue',g:()=>satValue,s:v=>satValue=v}],
     chroma: [{v:'chromaOffset',g:()=>chromaOffset,s:v=>chromaOffset=v},{v:'chromaMode',g:()=>chromaMode,s:v=>chromaMode=v}],
-    curve: [{v:'curveIntensity',g:()=>curveIntensity,s:v=>curveIntensity=v},{v:'curveDirection',g:()=>curveDirection,s:v=>curveDirection=v}],
+    curve: [{v:'curveIntensity',g:()=>curveIntensity,s:v=>curveIntensity=v},{v:'curveDirection',g:()=>curveDirection,s:v=>curveDirection=v},{v:'curveFringe',g:()=>curveFringe,s:v=>curveFringe=v}],
     wave: [{v:'waveAmp',g:()=>waveAmp,s:v=>waveAmp=v},{v:'waveFreq',g:()=>waveFreq,s:v=>waveFreq=v},{v:'waveSpeed',g:()=>waveSpeed,s:v=>waveSpeed=v},{v:'waveMode',g:()=>waveMode,s:v=>waveMode=v}],
     jitter: [{v:'jitterIntensity',g:()=>jitterIntensity,s:v=>jitterIntensity=v},{v:'jitterBlockSize',g:()=>jitterBlockSize,s:v=>jitterBlockSize=v},{v:'jitterMode',g:()=>jitterMode,s:v=>jitterMode=v}],
     mblur: [{v:'mblurIntensity',g:()=>mblurIntensity,s:v=>mblurIntensity=v},{v:'mblurAngle',g:()=>mblurAngle,s:v=>mblurAngle=v}],
@@ -583,7 +582,7 @@ const FX_DEFAULTS = {
     palette: {palettePreset:'noir',paletteIntensity:80},
     bricon: {briValue:0,conValue:100,satValue:100},
     chroma: {chromaOffset:5,chromaMode:'linear'},
-    curve: {curveIntensity:30,curveDirection:'barrel'},
+    curve: {curveIntensity:30,curveDirection:'barrel',curveFringe:0},
     wave: {waveAmp:20,waveFreq:5,waveSpeed:2,waveMode:'horizontal'},
     jitter: {jitterIntensity:20,jitterBlockSize:2,jitterMode:'random'},
     mblur: {mblurIntensity:30,mblurAngle:0},
@@ -641,230 +640,334 @@ const FX_PRESET_CATEGORIES = ['all','film','retro','digital','creative','glitch'
 const FX_PRESET_CAT_LABELS = {all:'All',film:'Film',retro:'Retro',digital:'Digital',creative:'Creative',glitch:'Glitch'};
 const FX_PRESET_CAT_COLORS = {all:'#888888',film:'#6C5CE7',retro:'#E17055',digital:'#00B894',creative:'#FDCB6E',glitch:'#FD79A8'};
 const FX_PRESETS = {
-    cyanotype: {
-        name:'Cyanotype', category:'film',
-        desc:'Classic blue sun-print look',
-        effects:{
-            duotone:{duoShadow:'#001133',duoHighlight:'#5588cc',duoIntensity:95},
-            grain:{grainIntensity:25,grainSize:12,grainColorMode:'mono'},
-            vignette:{vigIntensity:45,vigRadius:60,vigColor:'#000022'}
-        }
-    },
-    vintage_poster: {
-        name:'Vintage Poster', category:'film',
-        desc:'Warm retro poster aesthetic',
-        effects:{
-            sepia:{sepiaIntensity:55,sepiaWarmth:20},
-            exposure:{exposureEV:0.3},
-            grain:{grainIntensity:30,grainSize:18,grainColorMode:'mono'},
-            vignette:{vigIntensity:55,vigRadius:55,vigColor:'#1a0a00'}
-        }
-    },
-    vintage_print: {
-        name:'Vintage Print', category:'film',
-        desc:'Aged printed paper texture',
-        effects:{
-            sepia:{sepiaIntensity:40,sepiaWarmth:15},
-            paperscan:{paperscanIntensity:50,paperscanFiber:4,paperscanWarmth:40},
-            grain:{grainIntensity:35,grainSize:20,grainColorMode:'mono'}
-        }
-    },
-    soft_editorial: {
-        name:'Soft Editorial', category:'film',
-        desc:'Clean fashion editorial look',
-        effects:{
-            blursharp:{blursharpAmount:-15},
-            exposure:{exposureEV:0.4},
-            colortemp:{colortempValue:10},
-            vignette:{vigIntensity:25,vigRadius:80,vigColor:'#000000'}
-        }
-    },
+    // ── FILM ──
     noir: {
         name:'Noir', category:'film',
-        desc:'High-contrast black and white',
+        desc:'Crushed blacks, blown highlights',
         effects:{
-            levels:{levelsInBlack:30,levelsInWhite:220,levelsGamma:0.9,levelsOutBlack:0,levelsOutWhite:255},
-            duotone:{duoShadow:'#000000',duoHighlight:'#ffffff',duoIntensity:100},
-            vignette:{vigIntensity:60,vigRadius:50,vigColor:'#000000'},
-            grain:{grainIntensity:20,grainSize:10,grainColorMode:'mono'}
+            duotone:{duoShadow:'#000000',duoHighlight:'#d0d0d0',duoIntensity:100},
+            levels:{levelsInBlack:50,levelsInWhite:195,levelsGamma:0.65,levelsOutBlack:0,levelsOutWhite:240},
+            vignette:{vigIntensity:80,vigRadius:35,vigColor:'#000000'},
+            grain:{grainIntensity:40,grainSize:12,grainColorMode:'mono'}
         }
     },
+    cyanotype: {
+        name:'Cyanotype', category:'film',
+        desc:'Deep blue sun-print',
+        effects:{
+            duotone:{duoShadow:'#000820',duoHighlight:'#5588cc',duoIntensity:100},
+            levels:{levelsInBlack:20,levelsInWhite:220,levelsGamma:0.75,levelsOutBlack:5,levelsOutWhite:245},
+            grain:{grainIntensity:45,grainSize:16,grainColorMode:'mono'},
+            vignette:{vigIntensity:65,vigRadius:40,vigColor:'#000011'}
+        }
+    },
+    kodachrome: {
+        name:'Kodachrome', category:'film',
+        desc:'Saturated warm film stock',
+        effects:{
+            bricon:{briValue:0,conValue:130,satValue:145},
+            colortemp:{colortempValue:25},
+            levels:{levelsInBlack:10,levelsInWhite:245,levelsGamma:0.9,levelsOutBlack:5,levelsOutWhite:250},
+            grain:{grainIntensity:25,grainSize:10,grainColorMode:'color'},
+            vignette:{vigIntensity:45,vigRadius:55,vigColor:'#0a0500'}
+        }
+    },
+    bleach_bypass: {
+        name:'Bleach Bypass', category:'film',
+        desc:'Desaturated high-contrast silver',
+        effects:{
+            bricon:{briValue:0,conValue:160,satValue:35},
+            levels:{levelsInBlack:30,levelsInWhite:210,levelsGamma:0.8,levelsOutBlack:0,levelsOutWhite:255},
+            grain:{grainIntensity:35,grainSize:14,grainColorMode:'mono'},
+            vignette:{vigIntensity:55,vigRadius:50,vigColor:'#000000'}
+        }
+    },
+    polaroid: {
+        name:'Polaroid', category:'film',
+        desc:'Faded instant camera warmth',
+        effects:{
+            colortemp:{colortempValue:30},
+            levels:{levelsInBlack:0,levelsInWhite:235,levelsGamma:1.15,levelsOutBlack:15,levelsOutWhite:240},
+            bricon:{briValue:8,conValue:85,satValue:80},
+            bloom:{bloomIntensity:20,bloomRadius:30,bloomThreshold:55,bloomSpread:45,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
+            vignette:{vigIntensity:55,vigRadius:50,vigColor:'#1a1000'}
+        }
+    },
+    cinema_teal: {
+        name:'Cinema Teal', category:'film',
+        desc:'Orange & teal blockbuster grade',
+        effects:{
+            colorbal:{colorbalShadowR:-20,colorbalShadowG:15,colorbalShadowB:40,colorbalMidR:5,colorbalMidG:0,colorbalMidB:0,colorbalHiR:30,colorbalHiG:10,colorbalHiB:-15},
+            bricon:{briValue:0,conValue:120,satValue:115},
+            levels:{levelsInBlack:15,levelsInWhite:240,levelsGamma:0.9,levelsOutBlack:0,levelsOutWhite:250},
+            vignette:{vigIntensity:50,vigRadius:55,vigColor:'#000505'}
+        }
+    },
+    super8: {
+        name:'Super 8', category:'film',
+        desc:'Grainy 8mm home movie',
+        effects:{
+            sepia:{sepiaIntensity:35,sepiaWarmth:25},
+            grain:{grainIntensity:65,grainSize:22,grainColorMode:'mono'},
+            bloom:{bloomIntensity:30,bloomRadius:45,bloomThreshold:40,bloomSpread:55,bloomBlendMode:'additive',bloomExposure:105,bloomAnamorphic:false},
+            levels:{levelsInBlack:10,levelsInWhite:225,levelsGamma:1.1,levelsOutBlack:10,levelsOutWhite:245},
+            vignette:{vigIntensity:70,vigRadius:40,vigColor:'#0a0500'},
+            scanlines:{scanIntensity:12,scanCount:200,scanVertical:false}
+        }
+    },
+
+    // ── RETRO ──
     vhs: {
         name:'VHS', category:'retro',
-        desc:'Worn VHS tape distortion',
+        desc:'Trashed VHS tape playback',
         effects:{
-            ntsc:{ntscChromaBleed:65,ntscInstability:45,ntscNoise:35,ntscRolling:false},
-            noise:{noiseIntensity:15,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'},
-            scanlines:{scanIntensity:30,scanCount:250,scanVertical:false}
+            ntsc:{ntscChromaBleed:75,ntscInstability:55,ntscNoise:45,ntscRolling:true},
+            rgbshift:{rgbShiftRX:6,rgbShiftRY:2,rgbShiftBX:-5,rgbShiftBY:-1,rgbShiftIntensity:85},
+            bloom:{bloomIntensity:35,bloomRadius:50,bloomThreshold:40,bloomSpread:60,bloomBlendMode:'additive',bloomExposure:105,bloomAnamorphic:false},
+            noise:{noiseIntensity:25,noiseScale:2,noiseColorMode:'color',noiseAlgo:'random'},
+            scanlines:{scanIntensity:20,scanCount:300,scanVertical:false}
         }
     },
     crt_retro: {
-        name:'CRT Retro', category:'retro',
-        desc:'Old CRT monitor effect',
+        name:'CRT Monitor', category:'retro',
+        desc:'Curved phosphor screen',
         effects:{
-            crt:{crtScanWeight:3,crtCurvature:40,crtGlow:60,crtChroma:4,crtStatic:30,crtPhosphor:'slot'},
-            noise:{noiseIntensity:10,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+            crt:{crtScanWeight:4,crtCurvature:40,crtGlow:75,crtChroma:5,crtStatic:20,crtPhosphor:'shadow'},
+            bloom:{bloomIntensity:30,bloomRadius:40,bloomThreshold:35,bloomSpread:50,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
+            vignette:{vigIntensity:60,vigRadius:45,vigColor:'#000000'}
         }
     },
     y2k_blue: {
         name:'Y2K Blue', category:'retro',
-        desc:'Early 2000s blue digital glow',
+        desc:'Oversaturated early-2000s web',
         effects:{
-            y2kblue:{y2kBlueShift:85,y2kGlow:55,y2kGrain:25}
+            y2kblue:{y2kBlueShift:95,y2kGlow:70,y2kGrain:30},
+            bloom:{bloomIntensity:40,bloomRadius:55,bloomThreshold:30,bloomSpread:65,bloomBlendMode:'additive',bloomExposure:110,bloomAnamorphic:false}
         }
     },
-    ntsc_broadcast: {
-        name:'NTSC Broadcast', category:'retro',
-        desc:'Analog TV broadcast signal',
+    gameboy: {
+        name:'Game Boy', category:'retro',
+        desc:'4-color green LCD',
         effects:{
-            ntsc:{ntscChromaBleed:40,ntscInstability:20,ntscNoise:15,ntscRolling:false},
-            stripe:{stripeDensity:15,stripeAngle:0,stripeThickness:1,stripeOpacity:20,stripeMode:'linear'},
-            noise:{noiseIntensity:8,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
+            palette:{palettePreset:'gameboy',paletteIntensity:100},
+            pixel:{pixelSize:4,pixelMode:'square'},
+            scanlines:{scanIntensity:20,scanCount:150,scanVertical:false}
         }
     },
-    mod_dither: {
-        name:'Modulation Dither', category:'digital',
-        desc:'Wavy dithered pixel pattern',
+    synthwave: {
+        name:'Synthwave', category:'retro',
+        desc:'Neon pink/purple 80s grid',
         effects:{
-            modulate:{modulateFreq:8,modulateAmp:15,modulateSpeed:1,modulateDir:'horizontal'},
-            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:2,ditherStrength:100}
+            gradmap:{gradColor1:'#0a001a',gradColor2:'#ff44cc',gradColor3:'#6600aa',gradMidpoint:45,gradIntensity:75},
+            bloom:{bloomIntensity:65,bloomRadius:70,bloomThreshold:25,bloomSpread:85,bloomBlendMode:'additive',bloomExposure:115,bloomAnamorphic:true},
+            scanlines:{scanIntensity:18,scanCount:250,scanVertical:false},
+            vignette:{vigIntensity:55,vigRadius:45,vigColor:'#0a001a'}
         }
     },
-    digital_gobelin: {
-        name:'Digital Gobelin', category:'digital',
-        desc:'Woven tapestry pixel art',
-        effects:{
-            pixel:{pixelSize:6,pixelMode:'square'},
-            halftone:{halfSpacing:4,halfColorMode:'color',halfAngle:15,halfContrast:60,halfSpread:0,halfShape:'circle',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false}
-        }
-    },
+
+    // ── DIGITAL ──
     led_matrix: {
-        name:'LED Matrix', category:'digital',
-        desc:'LED screen display grid',
+        name:'LED Wall', category:'digital',
+        desc:'Giant LED display grid',
         effects:{
-            led:{ledCellSize:6,ledGap:2,ledGlow:50,ledBrightness:110,ledShape:'circle'},
-            bloom:{bloomIntensity:30,bloomRadius:40,bloomThreshold:40,bloomSpread:60,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false}
+            led:{ledCellSize:7,ledGap:3,ledGlow:65,ledBrightness:120,ledShape:'circle'},
+            bloom:{bloomIntensity:45,bloomRadius:50,bloomThreshold:30,bloomSpread:70,bloomBlendMode:'additive',bloomExposure:110,bloomAnamorphic:false}
         }
     },
     msx_ascii: {
-        name:'MSX ASCII', category:'digital',
-        desc:'Green phosphor ASCII terminal',
+        name:'Terminal', category:'digital',
+        desc:'Green phosphor ASCII console',
         effects:{
-            ascii:{asciiCellSize:8,asciiColorMode:'mono',asciiCharSet:'classic',asciiInvert:false},
-            crt:{crtScanWeight:2,crtCurvature:20,crtGlow:40,crtChroma:0,crtStatic:15,crtPhosphor:'slot'},
-            noise:{noiseIntensity:8,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
-        }
-    },
-    psychedelic: {
-        name:'Psychedelic', category:'creative',
-        desc:'Colorful warped visuals',
-        effects:{
-            chroma:{chromaOffset:12,chromaMode:'radial'},
-            wave:{waveAmp:15,waveFreq:3,waveSpeed:2,waveMode:'horizontal'},
-            bloom:{bloomIntensity:50,bloomRadius:60,bloomThreshold:35,bloomSpread:70,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false}
-        }
-    },
-    dreamy: {
-        name:'Dreamy', category:'creative',
-        desc:'Soft ethereal glow',
-        effects:{
-            bloom:{bloomIntensity:55,bloomRadius:70,bloomThreshold:30,bloomSpread:80,bloomBlendMode:'screen',bloomExposure:110,bloomAnamorphic:false},
-            blursharp:{blursharpAmount:-20},
-            vignette:{vigIntensity:35,vigRadius:75,vigColor:'#0a0015'}
-        }
-    },
-    night_vision: {
-        name:'Night Vision', category:'creative',
-        desc:'Military night-vision green',
-        effects:{
-            thermal:{thermalIntensity:90,thermalPalette:'night'},
-            noise:{noiseIntensity:30,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
-            scanlines:{scanIntensity:25,scanCount:400,scanVertical:false},
-            vignette:{vigIntensity:65,vigRadius:45,vigColor:'#000000'}
-        }
-    },
-    orb: {
-        name:'ORB', category:'creative',
-        desc:'Radial bloom orb effect',
-        effects:{
-            radblur:{radblurIntensity:45},
-            bloom:{bloomIntensity:60,bloomRadius:80,bloomThreshold:25,bloomSpread:90,bloomBlendMode:'additive',bloomExposure:120,bloomAnamorphic:false},
-            duotone:{duoShadow:'#0a1a0a',duoHighlight:'#44ff88',duoIntensity:70}
-        }
-    },
-    glitch_art: {
-        name:'Glitch Art', category:'glitch',
-        desc:'Digital corruption aesthetic',
-        effects:{
-            glitch:{glitchIntensity:50,glitchFreq:30,glitchMode:'shift',glitchChannelShift:70,glitchBlockSize:40,glitchSeed:0,glitchSpeed:60},
-            rgbshift:{rgbShiftRX:8,rgbShiftRY:2,rgbShiftBX:-6,rgbShiftBY:-2,rgbShiftIntensity:80},
-            noise:{noiseIntensity:15,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'}
-        }
-    },
-    type_distress: {
-        name:'Type Distress', category:'glitch',
-        desc:'Damaged printed type texture',
-        effects:{
-            threshold:{thresholdLevel:120,thresholdInvert:false},
-            noise:{noiseIntensity:35,noiseScale:2,noiseColorMode:'mono',noiseAlgo:'random'},
-            emboss:{embossAngle:135,embossStrength:30,embossColor:false}
-        }
-    },
-    xerox_copy: {
-        name:'Xerox Copy', category:'glitch',
-        desc:'Photocopier degradation',
-        effects:{
-            xerox:{xeroxContrast:70,xeroxNoise:50,xeroxDarkness:55},
-            paperscan:{paperscanIntensity:30,paperscanFiber:2,paperscanWarmth:10}
-        }
-    },
-    emboss_dirt: {
-        name:'Emboss Dirt', category:'glitch',
-        desc:'Textured emboss with grit',
-        effects:{
-            emboss:{embossAngle:135,embossStrength:60,embossColor:true},
-            grunge:{grungeTint:'#886644',grungePosterize:4,grungeGrain:60},
+            ascii:{asciiCellSize:7,asciiColorMode:'mono',asciiCharSet:'classic',asciiInvert:false},
+            crt:{crtScanWeight:3,crtCurvature:30,crtGlow:55,crtChroma:0,crtStatic:20,crtPhosphor:'slot'},
             noise:{noiseIntensity:12,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
         }
     },
-    static_grain: {
-        name:'Static Grain', category:'glitch',
-        desc:'Heavy film grain static',
+    halftone_print: {
+        name:'Halftone', category:'digital',
+        desc:'CMYK newspaper print',
         effects:{
-            noise:{noiseIntensity:40,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
-            grain:{grainIntensity:50,grainSize:25,grainColorMode:'mono'}
+            halftone:{halfSpacing:5,halfColorMode:'color',halfAngle:22,halfContrast:80,halfSpread:5,halfShape:'circle',halfInkColor:'#000000',halfPaperColor:'#f5f0e8',halfInverted:false},
+            levels:{levelsInBlack:10,levelsInWhite:240,levelsGamma:0.9,levelsOutBlack:0,levelsOutWhite:255}
         }
     },
-    soft_bleed: {
-        name:'Soft Bleed Cracks', category:'creative',
-        desc:'Ink bleeding on cracked paper',
+    pixel_art: {
+        name:'Pixel Art', category:'digital',
+        desc:'Low-res chunky pixels',
         effects:{
-            blursharp:{blursharpAmount:-25},
-            paperscan:{paperscanIntensity:60,paperscanFiber:5,paperscanWarmth:20},
-            grunge:{grungeTint:'#997766',grungePosterize:5,grungeGrain:40}
+            pixel:{pixelSize:8,pixelMode:'square'},
+            bricon:{briValue:0,conValue:125,satValue:130},
+            levels:{levelsInBlack:10,levelsInWhite:245,levelsGamma:1.0,levelsOutBlack:0,levelsOutWhite:255}
+        }
+    },
+    dither_1bit: {
+        name:'1-Bit Dither', category:'digital',
+        desc:'Stark black & white Bayer dither',
+        effects:{
+            dither:{ditherColorMode:'bw',ditherAlgorithm:'bayer4',ditherPalette:'bw',ditherColorCount:2,ditherPixelation:3,ditherStrength:100},
+            levels:{levelsInBlack:20,levelsInWhite:235,levelsGamma:0.85,levelsOutBlack:0,levelsOutWhite:255}
         }
     },
     rgb_hatch: {
         name:'RGB Hatch', category:'digital',
-        desc:'RGB channel crosshatch pattern',
+        desc:'Crosshatched color separation',
         effects:{
-            rgbshift:{rgbShiftRX:4,rgbShiftRY:0,rgbShiftBX:-4,rgbShiftBY:0,rgbShiftIntensity:60},
-            halftone:{halfSpacing:5,halfColorMode:'color',halfAngle:45,halfContrast:70,halfSpread:10,halfShape:'line',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false}
+            rgbshift:{rgbShiftRX:5,rgbShiftRY:0,rgbShiftBX:-5,rgbShiftBY:0,rgbShiftIntensity:75},
+            halftone:{halfSpacing:4,halfColorMode:'color',halfAngle:45,halfContrast:85,halfSpread:8,halfShape:'line',halfInkColor:'#000000',halfPaperColor:'#ffffff',halfInverted:false}
         }
     },
-    print_stamp: {
-        name:'Print Stamp', category:'film',
-        desc:'Rubber stamp print texture',
+
+    // ── CREATIVE ──
+    thermal_cam: {
+        name:'Thermal Cam', category:'creative',
+        desc:'Infrared heat vision',
         effects:{
-            printstamp:{printstampDotSize:5,printstampContrast:70,printstampGrain:50}
+            thermal:{thermalIntensity:100,thermalPalette:'iron'},
+            bloom:{bloomIntensity:25,bloomRadius:35,bloomThreshold:45,bloomSpread:50,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
+            vignette:{vigIntensity:40,vigRadius:55,vigColor:'#000000'}
         }
     },
-    grunge_poster: {
-        name:'Grunge', category:'glitch',
-        desc:'Dirty textured grunge look',
+    night_vision: {
+        name:'Night Vision', category:'creative',
+        desc:'Military green phosphor',
         effects:{
-            grunge:{grungeTint:'#cc6677',grungePosterize:3,grungeGrain:60},
-            vignette:{vigIntensity:40,vigRadius:55,vigColor:'#1a0a0a'}
+            thermal:{thermalIntensity:95,thermalPalette:'night'},
+            noise:{noiseIntensity:40,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'},
+            scanlines:{scanIntensity:30,scanCount:450,scanVertical:false},
+            vignette:{vigIntensity:75,vigRadius:35,vigColor:'#000000'},
+            grain:{grainIntensity:35,grainSize:8,grainColorMode:'mono'}
+        }
+    },
+    neon_glow: {
+        name:'Neon Glow', category:'creative',
+        desc:'Electric overblown bloom',
+        effects:{
+            bloom:{bloomIntensity:85,bloomRadius:75,bloomThreshold:20,bloomSpread:90,bloomBlendMode:'additive',bloomExposure:130,bloomAnamorphic:false},
+            bricon:{briValue:5,conValue:140,satValue:130},
+            vignette:{vigIntensity:60,vigRadius:45,vigColor:'#000000'}
+        }
+    },
+    dreamy: {
+        name:'Dreamy', category:'creative',
+        desc:'Heavenly soft glow haze',
+        effects:{
+            bloom:{bloomIntensity:75,bloomRadius:80,bloomThreshold:25,bloomSpread:90,bloomBlendMode:'screen',bloomExposure:120,bloomAnamorphic:false},
+            blursharp:{blursharpAmount:-25},
+            exposure:{exposureEV:0.4},
+            colortemp:{colortempValue:15},
+            vignette:{vigIntensity:35,vigRadius:60,vigColor:'#1a0a20'}
+        }
+    },
+    psychedelic: {
+        name:'Psychedelic', category:'creative',
+        desc:'Acid-trip color warp',
+        effects:{
+            chroma:{chromaOffset:18,chromaMode:'radial'},
+            wave:{waveAmp:25,waveFreq:4,waveSpeed:3,waveMode:'circular'},
+            bloom:{bloomIntensity:55,bloomRadius:65,bloomThreshold:30,bloomSpread:75,bloomBlendMode:'additive',bloomExposure:115,bloomAnamorphic:false},
+            bricon:{briValue:0,conValue:130,satValue:160}
+        }
+    },
+    cross_process: {
+        name:'Cross Process', category:'creative',
+        desc:'Wrong chemicals, wild colors',
+        effects:{
+            colorbal:{colorbalShadowR:-30,colorbalShadowG:25,colorbalShadowB:45,colorbalMidR:15,colorbalMidG:-10,colorbalMidB:-20,colorbalHiR:40,colorbalHiG:20,colorbalHiB:-30},
+            bricon:{briValue:5,conValue:135,satValue:125},
+            levels:{levelsInBlack:5,levelsInWhite:245,levelsGamma:1.1,levelsOutBlack:5,levelsOutWhite:250},
+            vignette:{vigIntensity:45,vigRadius:55,vigColor:'#050a00'}
+        }
+    },
+    orb: {
+        name:'ORB', category:'creative',
+        desc:'Radial blur + green glow',
+        effects:{
+            radblur:{radblurIntensity:55},
+            bloom:{bloomIntensity:70,bloomRadius:85,bloomThreshold:20,bloomSpread:95,bloomBlendMode:'additive',bloomExposure:125,bloomAnamorphic:false},
+            duotone:{duoShadow:'#0a1a0a',duoHighlight:'#33ff77',duoIntensity:80}
+        }
+    },
+    underwater: {
+        name:'Underwater', category:'creative',
+        desc:'Deep ocean blue-green murk',
+        effects:{
+            colorbal:{colorbalShadowR:-35,colorbalShadowG:10,colorbalShadowB:50,colorbalMidR:-20,colorbalMidG:15,colorbalMidB:30,colorbalHiR:-10,colorbalHiG:20,colorbalHiB:25},
+            bloom:{bloomIntensity:40,bloomRadius:60,bloomThreshold:35,bloomSpread:70,bloomBlendMode:'additive',bloomExposure:95,bloomAnamorphic:false},
+            wave:{waveAmp:8,waveFreq:2,waveSpeed:1,waveMode:'horizontal'},
+            vignette:{vigIntensity:65,vigRadius:40,vigColor:'#000a15'}
+        }
+    },
+    fisheye_warp: {
+        name:'Fisheye', category:'creative',
+        desc:'Wide-angle lens bulge',
+        effects:{
+            curve:{curveIntensity:70,curveDirection:'fisheye',curveFringe:50},
+            bloom:{bloomIntensity:15,bloomRadius:25,bloomThreshold:55,bloomSpread:35,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false},
+            vignette:{vigIntensity:60,vigRadius:40,vigColor:'#000000'}
+        }
+    },
+
+    // ── GLITCH ──
+    glitch_art: {
+        name:'Glitch Art', category:'glitch',
+        desc:'Heavy digital corruption',
+        effects:{
+            glitch:{glitchIntensity:65,glitchFreq:45,glitchMode:'shift',glitchChannelShift:85,glitchBlockSize:50,glitchSeed:0,glitchSpeed:70},
+            rgbshift:{rgbShiftRX:10,rgbShiftRY:3,rgbShiftBX:-8,rgbShiftBY:-2,rgbShiftIntensity:90},
+            noise:{noiseIntensity:20,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'}
+        }
+    },
+    data_corrupt: {
+        name:'Data Corrupt', category:'glitch',
+        desc:'Destroyed file blocks',
+        effects:{
+            glitch:{glitchIntensity:80,glitchFreq:50,glitchMode:'corrupt',glitchChannelShift:90,glitchBlockSize:65,glitchSeed:0,glitchSpeed:50},
+            noise:{noiseIntensity:30,noiseScale:1,noiseColorMode:'color',noiseAlgo:'random'},
+            bricon:{briValue:0,conValue:130,satValue:110}
+        }
+    },
+    pixel_drift: {
+        name:'Pixel Drift', category:'glitch',
+        desc:'Melting downward pixel flow',
+        effects:{
+            glitch:{glitchIntensity:70,glitchFreq:60,glitchMode:'drift',glitchChannelShift:65,glitchBlockSize:40,glitchSeed:0,glitchSpeed:40},
+            bloom:{bloomIntensity:20,bloomRadius:30,bloomThreshold:50,bloomSpread:40,bloomBlendMode:'additive',bloomExposure:100,bloomAnamorphic:false}
+        }
+    },
+    tv_static: {
+        name:'TV Static', category:'glitch',
+        desc:'Dead channel snow',
+        effects:{
+            glitch:{glitchIntensity:75,glitchFreq:70,glitchMode:'static',glitchChannelShift:50,glitchBlockSize:55,glitchSeed:0,glitchSpeed:80},
+            scanlines:{scanIntensity:25,scanCount:350,scanVertical:false},
+            vignette:{vigIntensity:50,vigRadius:50,vigColor:'#000000'}
+        }
+    },
+    slice_n_dice: {
+        name:'Slice & Dice', category:'glitch',
+        desc:'Sliced strips with gaps',
+        effects:{
+            glitch:{glitchIntensity:60,glitchFreq:55,glitchMode:'slice',glitchChannelShift:75,glitchBlockSize:45,glitchSeed:0,glitchSpeed:60},
+            rgbshift:{rgbShiftRX:6,rgbShiftRY:0,rgbShiftBX:-6,rgbShiftBY:0,rgbShiftIntensity:70},
+            bricon:{briValue:0,conValue:115,satValue:90}
+        }
+    },
+    xerox_copy: {
+        name:'Xerox Copy', category:'glitch',
+        desc:'4th-gen photocopy',
+        effects:{
+            xerox:{xeroxContrast:80,xeroxNoise:65,xeroxDarkness:65},
+            paperscan:{paperscanIntensity:45,paperscanFiber:4,paperscanWarmth:15},
+            grain:{grainIntensity:30,grainSize:16,grainColorMode:'mono'}
+        }
+    },
+    emboss_dirt: {
+        name:'Emboss Dirt', category:'glitch',
+        desc:'Textured relief with grit',
+        effects:{
+            emboss:{embossAngle:135,embossStrength:75,embossColor:true},
+            grunge:{grungeTint:'#886644',grungePosterize:3,grungeGrain:70},
+            noise:{noiseIntensity:18,noiseScale:1,noiseColorMode:'mono',noiseAlgo:'random'}
         }
     }
 };
@@ -923,10 +1026,11 @@ const FX_UI_CONFIG = {
         {type:'slider',sid:'slider-rgbshift-by',vid:'val-rgbshift-by',label:'Blue Y',min:-25,max:25,step:1,setter:v=>rgbShiftBY=v},
         {type:'slider',sid:'slider-rgbshift-intensity',vid:'val-rgbshift-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>rgbShiftIntensity=v}
     ]},
-    curve: { label:'Curve', controls:[
+    curve: { label:'Lens Curve', controls:[
         {type:'slider',sid:'slider-curve-intensity',vid:'val-curve-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>curveIntensity=v},
-        {type:'selector',cid:'curve-dir-buttons',label:'Direction',setter:v=>curveDirection=v,
-         opts:[{v:'barrel',l:'BARREL'},{v:'pinch',l:'PINCH'}]}
+        {type:'slider',sid:'slider-curve-fringe',vid:'val-curve-fringe',label:'Chromatic Fringe',min:0,max:100,step:1,setter:v=>curveFringe=v},
+        {type:'selector',cid:'curve-dir-buttons',label:'Mode',setter:v=>curveDirection=v,
+         opts:[{v:'barrel',l:'BARREL'},{v:'pinch',l:'PINCH'},{v:'fisheye',l:'FISH'},{v:'squeeze',l:'SQUEEZE'},{v:'mustache',l:'MSTCH'}]}
     ]},
     wave: { label:'Wave', controls:[
         {type:'slider',sid:'slider-wave-amp',vid:'val-wave-amp',label:'Amplitude',min:1,max:100,step:1,setter:v=>waveAmp=v},
@@ -1042,7 +1146,7 @@ const FX_UI_CONFIG = {
         {type:'slider',sid:'slider-glitch-seed',vid:'val-glitch-seed',label:'Seed',min:0,max:999,step:1,setter:v=>glitchSeed=v},
         {type:'slider',sid:'slider-glitch-speed',vid:'val-glitch-speed',label:'Speed',min:0,max:100,step:1,setter:v=>glitchSpeed=v},
         {type:'selector',cid:'glitch-mode-buttons',label:'Style',setter:v=>glitchMode=v,
-         opts:[{v:'shift',l:'SHIFT'},{v:'tear',l:'TEAR'},{v:'corrupt',l:'CORRUPT'}]}
+         opts:[{v:'shift',l:'SHIFT'},{v:'tear',l:'TEAR'},{v:'corrupt',l:'CORRUPT'},{v:'vhs',l:'VHS'},{v:'slice',l:'SLICE'},{v:'drift',l:'DRIFT'},{v:'static',l:'STATIC'}]}
     ]},
     noise: { label:'Noise', controls:[
         {type:'slider',sid:'slider-noise-intensity',vid:'val-noise-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>noiseIntensity=v},
@@ -1690,12 +1794,12 @@ function draw() {
         }
 
         // VIDEO mode: apply effects to video only (before blobs)
-        let skipGlobalFx = splitZoomEnabled && splitDualFx && splitLeftEffect && splitRightEffect && masterFxEnabled;
-        if (!fxLayerAll && !skipGlobalFx) {
-            try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
-        }
         if (!fxLayerAll) {
-            try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+            _applySplitSideFx(() => {
+                try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
+                try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+                processShaderFX();
+            });
         }
 
         let timeInterval = map(paramValues[5], 0, 100, 0, 1000);
@@ -1818,7 +1922,7 @@ function draw() {
                     rectMode(CORNER);
                     rect(ax, ay, aW, aH);
 
-                    // Draw ASCII with green glow
+                    // Draw ASCII with green phosphor look (no shadowBlur for perf)
                     drawingContext.save();
                     drawingContext.beginPath();
                     drawingContext.rect(ax, ay, aW, aH);
@@ -1828,20 +1932,19 @@ function draw() {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     let rowH = cellSz * 1.6;
+                    let lastFill = '';
                     for (let r = 0; r < rows; r++) {
                         for (let c = 0; c < cols; c++) {
                             let si = (r * cols + c) * 4;
                             let lum = (0.299*sData[si] + 0.587*sData[si+1] + 0.114*sData[si+2]) / 255;
                             let ci = Math.floor(lum * (_chars.length - 1));
-                            if (ci === 0) continue; // skip spaces for perf
+                            if (ci === 0) continue;
                             let g = Math.round(60 + lum * 195);
-                            ctx.shadowColor = 'rgba(0,' + Math.round(g * 0.8) + ',0,0.5)';
-                            ctx.shadowBlur = lum * 4;
-                            ctx.fillStyle = 'rgb(0,' + g + ',' + Math.round(lum * 30) + ')';
+                            let f = 'rgb(0,' + g + ',' + Math.round(lum * 30) + ')';
+                            if (f !== lastFill) { ctx.fillStyle = f; lastFill = f; }
                             ctx.fillText(_chars[ci], ax + c * cellSz + cellSz/2, ay + r * rowH + rowH/2);
                         }
                     }
-                    ctx.shadowBlur = 0;
                     drawingContext.restore();
                     pop();
                 }
@@ -1870,11 +1973,12 @@ function draw() {
         drawingContext.restore(); // end clip
 
         // ALL mode: apply effects to everything including blobs
-        if (fxLayerAll && !skipGlobalFx) {
-            try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
-        }
         if (fxLayerAll) {
-            try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+            _applySplitSideFx(() => {
+                try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
+                try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+                processShaderFX();
+            });
         }
 
         // Update timeline playhead
@@ -1889,6 +1993,8 @@ function draw() {
         rect(0, 0, width, height);
         pop();
     }
+
+
 
     cursor();
     renderMiniSpectrum();
@@ -1977,6 +2083,39 @@ function draw() {
         pop();
     }
 
+    // ── Split side FX: clip effects to left/right side when split view is active
+    function _applySplitSideFx(applyFn) {
+        if (!splitZoomEnabled || splitFxSide === 'both') {
+            applyFn();
+            return;
+        }
+        // Save clean canvas before FX
+        let cvs = drawingContext.canvas;
+        if (!_splitBuf || _splitBuf.width !== cvs.width || _splitBuf.height !== cvs.height) {
+            _splitBuf = document.createElement('canvas');
+            _splitBuf.width = cvs.width;
+            _splitBuf.height = cvs.height;
+        }
+        _splitBuf.getContext('2d').drawImage(cvs, 0, 0);
+
+        // Apply effects to full canvas
+        applyFn();
+
+        // Restore the non-FX side from buffer
+        let pd = cvs.width / width;
+        let splitX = Math.round(width * splitPosition / 100);
+        let splitPx = Math.round(splitX * pd);
+        if (splitFxSide === 'right') {
+            // FX on right only — restore left from clean buffer
+            let leftData = _splitBuf.getContext('2d').getImageData(0, 0, splitPx, cvs.height);
+            drawingContext.putImageData(leftData, 0, 0);
+        } else {
+            // FX on left only — restore right from clean buffer
+            let rightData = _splitBuf.getContext('2d').getImageData(splitPx, 0, cvs.width - splitPx, cvs.height);
+            drawingContext.putImageData(rightData, splitPx, 0);
+        }
+    }
+
     // ── Split view: configurable position, mirror, dual FX
     function applySplitClipShape(ctx, x, y, w, h, shape) {
         ctx.beginPath();
@@ -2018,72 +2157,38 @@ function draw() {
         let zoomSideX = splitMirrorFlip ? 0 : splitX;
         let zoomSideW = splitMirrorFlip ? splitX : rightW;
 
-        if (splitDualFx && splitLeftEffect && splitRightEffect && masterFxEnabled) {
-            // ── DUAL FX MODE: different effect per side ──
-            // Draw zoomed content on zoom side
-            drawingContext.save();
-            applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
-            image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
-            drawingContext.restore();
+        // ── Split view: draw zoomed side + optional per-side FX ──
+        drawingContext.save();
+        applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
+        image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
 
-            // Canvas now has correct content on both sides
-            // Save full canvas to offscreen buffer
-            let cvs = drawingContext.canvas;
-            if (!_splitBuf || _splitBuf.width !== cvs.width || _splitBuf.height !== cvs.height) {
-                _splitBuf = document.createElement('canvas');
-                _splitBuf.width = cvs.width;
-                _splitBuf.height = cvs.height;
-            }
-            _splitBuf.getContext('2d').drawImage(cvs, 0, 0);
-
-            // Apply left effect to full canvas, save left half
-            try { applySingleEffect(splitLeftEffect); } catch(e) {}
-            let pd = cvs.width / width;
-            let splitPx = Math.round(splitX * pd);
-            let leftData = drawingContext.getImageData(0, 0, splitPx, cvs.height);
-
-            // Restore full canvas from buffer
-            drawingContext.drawImage(_splitBuf, 0, 0);
-
-            // Apply right effect to full canvas
-            try { applySingleEffect(splitRightEffect); } catch(e) {}
-
-            // Restore left half with left effect
-            drawingContext.putImageData(leftData, 0, 0);
-        } else {
-            // ── Normal split view (with configurable position/mirror) ──
-            drawingContext.save();
-            applySplitClipShape(drawingContext, zoomSideX, 0, zoomSideW, height, splitShape);
-            image(videoEl, zoomSideX, 0, zoomSideW, height, cropX, cropY, cropW, cropH);
-
-            // Apply effects to zoom side
-            if (splitFxEnabled && masterFxEnabled && activeEffects.size > 0) {
-                try { applyActiveEffects(); } catch(e) {}
-            }
-
-            // Zoom viz blobs on zoom side
-            if (splitVizZoom && trackedPoints.length > 0) {
-                let stbc = color(trackBoxColor);
-                for (let p of trackedPoints) {
-                    let pNormX = (p.posicao.x - videoX) / videoW;
-                    let pNormY = (p.posicao.y - videoY) / videoH;
-                    let spx = zoomSideX + (pNormX - normCx + 0.5 / splitZoomLevel) * zoomSideW * splitZoomLevel;
-                    let spy = (pNormY - normCy + 0.5 / splitZoomLevel) * height * splitZoomLevel;
-                    if (spx < zoomSideX || spx > zoomSideX + zoomSideW || spy < 0 || spy > height) continue;
-                    let pw = p.width * splitZoomLevel * 0.5;
-                    let ph = p.height * splitZoomLevel * 0.5;
-                    let srcPx = constrain(pNormX * srcVW - pw / (splitZoomLevel * 2), 0, srcVW - 1);
-                    let srcPy = constrain(pNormY * srcVH - ph / (splitZoomLevel * 2), 0, srcVH - 1);
-                    let srcPw = Math.min(pw / splitZoomLevel, srcVW - srcPx);
-                    let srcPh = Math.min(ph / splitZoomLevel, srcVH - srcPy);
-                    image(videoEl, spx - pw/2, spy - ph/2, pw, ph, srcPx, srcPy, srcPw, srcPh);
-                    noFill(); stroke(red(stbc), green(stbc), blue(stbc), 80);
-                    strokeWeight(trackBoxWeight * 0.67); rectMode(CENTER);
-                    rect(spx, spy, pw, ph);
-                }
-            }
-            drawingContext.restore();
+        // Apply effects to zoom side
+        if (splitFxEnabled && masterFxEnabled && activeEffects.size > 0) {
+            try { applyActiveEffects(); } catch(e) {}
         }
+
+        // Zoom viz blobs on zoom side
+        if (splitVizZoom && trackedPoints.length > 0) {
+            let stbc = color(trackBoxColor);
+            for (let p of trackedPoints) {
+                let pNormX = (p.posicao.x - videoX) / videoW;
+                let pNormY = (p.posicao.y - videoY) / videoH;
+                let spx = zoomSideX + (pNormX - normCx + 0.5 / splitZoomLevel) * zoomSideW * splitZoomLevel;
+                let spy = (pNormY - normCy + 0.5 / splitZoomLevel) * height * splitZoomLevel;
+                if (spx < zoomSideX || spx > zoomSideX + zoomSideW || spy < 0 || spy > height) continue;
+                let pw = p.width * splitZoomLevel * 0.5;
+                let ph = p.height * splitZoomLevel * 0.5;
+                let srcPx = constrain(pNormX * srcVW - pw / (splitZoomLevel * 2), 0, srcVW - 1);
+                let srcPy = constrain(pNormY * srcVH - ph / (splitZoomLevel * 2), 0, srcVH - 1);
+                let srcPw = Math.min(pw / splitZoomLevel, srcVW - srcPx);
+                let srcPh = Math.min(ph / splitZoomLevel, srcVH - srcPy);
+                image(videoEl, spx - pw/2, spy - ph/2, pw, ph, srcPx, srcPy, srcPw, srcPh);
+                noFill(); stroke(red(stbc), green(stbc), blue(stbc), 80);
+                strokeWeight(trackBoxWeight * 0.67); rectMode(CENTER);
+                rect(spx, spy, pw, ph);
+            }
+        }
+        drawingContext.restore();
 
         // Divider line (highlight on hover/drag)
         let divHover = _splitDrag || (Math.abs(mouseX - splitX) < 8);
@@ -2106,13 +2211,13 @@ function draw() {
         noStroke(); fill(255, 150); textSize(10);
         textAlign(LEFT, TOP);
         let leftLabel = splitMirrorFlip ? splitZoomLevel.toFixed(1) + 'x' : 'Normal';
-        if (splitDualFx && splitLeftEffect) leftLabel = splitLeftEffect;
+        let hasFx = masterFxEnabled && activeEffects.size > 0;
+        if (hasFx && (splitFxSide === 'left' || splitFxSide === 'both')) leftLabel += ' + FX';
         text(leftLabel, 8, 8);
         textAlign(RIGHT, TOP);
         let rightLabel = splitMirrorFlip ? 'Normal' : splitZoomLevel.toFixed(1) + 'x';
-        if (splitDualFx && splitRightEffect) rightLabel = splitRightEffect;
-        else if (!splitDualFx && splitFxEnabled && activeEffects.size > 0) rightLabel += ' + FX';
-        if (!splitDualFx && splitVizZoom) rightLabel += ' + ZOOM';
+        if (hasFx && (splitFxSide === 'right' || splitFxSide === 'both')) rightLabel += ' + FX';
+        if (splitVizZoom) rightLabel += ' + ZOOM';
         text(rightLabel, width - 8, 8);
         pop();
     }
@@ -2152,9 +2257,6 @@ function draw() {
 
     // Update zoom UI each frame (for smooth transitions)
     if (zoomSmooth && (Math.abs(vidZoom - zoomTargetLevel) > 0.002)) updateZoomUI();
-
-    // GPU shader effects pipeline (Phase 0 — passthrough proof of concept)
-    processShaderFX();
 }
 
 // ── CORE UI LISTENERS ─────────────────────
@@ -2604,6 +2706,8 @@ function setupCoreUIListeners() {
             document.querySelectorAll('#zoom-split-buttons .selector-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             document.getElementById('split-zoom-group').style.display = splitZoomEnabled ? '' : 'none';
+            let sideRow = document.getElementById('fx-split-side-row');
+            if (sideRow) sideRow.style.display = splitZoomEnabled ? '' : 'none';
         });
     });
     // Split zoom level
@@ -2638,31 +2742,6 @@ function setupCoreUIListeners() {
             e.target.classList.add('active');
         });
     });
-    // Split Dual FX toggle
-    document.querySelectorAll('#split-dualfx-buttons .selector-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            splitDualFx = (e.target.dataset.value === 'on');
-            document.querySelectorAll('#split-dualfx-buttons .selector-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            document.getElementById('split-dualfx-group').style.display = splitDualFx ? '' : 'none';
-        });
-    });
-    // Populate dual FX dropdowns with effect names
-    const fxNames = Object.keys(FX_CATEGORIES);
-    ['split-left-fx', 'split-right-fx'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        fxNames.forEach(name => {
-            let opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = FX_UI_CONFIG[name] ? FX_UI_CONFIG[name].label : name;
-            sel.appendChild(opt);
-        });
-    });
-    const splitLeftSel = document.getElementById('split-left-fx');
-    const splitRightSel = document.getElementById('split-right-fx');
-    if (splitLeftSel) splitLeftSel.addEventListener('change', (e) => { splitLeftEffect = e.target.value; });
-    if (splitRightSel) splitRightSel.addEventListener('change', (e) => { splitRightEffect = e.target.value; });
     // Split Zoom Viz toggle
     document.querySelectorAll('#split-viz-buttons .selector-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -2810,6 +2889,21 @@ function setupCoreUIListeners() {
     document.getElementById('help-overlay').addEventListener('click', (e) => {
         if (e.target.id === 'help-overlay') toggleHelp();
     });
+
+    // Hints toggle
+    const hintsBtn = document.getElementById('hints-btn');
+    if (hintsBtn) {
+        const hintsOff = localStorage.getItem('blobfx-hints') === 'off';
+        if (hintsOff) {
+            document.body.classList.add('hints-off');
+            hintsBtn.classList.remove('active');
+        }
+        hintsBtn.addEventListener('click', () => {
+            const isOff = document.body.classList.toggle('hints-off');
+            hintsBtn.classList.toggle('active', !isOff);
+            localStorage.setItem('blobfx-hints', isOff ? 'off' : 'on');
+        });
+    }
 
     // Accessibility: auto-label all range sliders from nearest label text
     document.querySelectorAll('input[type="range"]').forEach(slider => {
@@ -3764,6 +3858,30 @@ function mousePressed() {
                 runMaskSegmentation(mouseX, mouseY, modType);
             }
             return false;
+        }
+    }
+    // Click-to-track: sample color from canvas and switch to CUSTOM mode
+    if (mouseButton === LEFT && currentMode !== 14 && currentMode > 0 && videoLoaded) {
+        if (mouseX >= videoX && mouseX <= videoX + videoW && mouseY >= videoY && mouseY <= videoY + videoH) {
+            // Don't pick color when clicking the split divider
+            if (splitZoomEnabled) {
+                let splitX = Math.round(width * splitPosition / 100);
+                if (Math.abs(mouseX - splitX) < 10) return;
+            }
+            let c = get(Math.round(mouseX), Math.round(mouseY));
+            let h = hue(c);
+            customHue = h;
+            _userCustomHue = h;
+            // Update the color picker UI
+            let r = red(c), g = green(c), b = blue(c);
+            let hex = '#' + [r,g,b].map(v => Math.round(v).toString(16).padStart(2,'0')).join('');
+            let picker = document.getElementById('custom-color-picker');
+            if (picker) picker.value = hex;
+            // Switch to CUSTOM mode
+            currentMode = 5;
+            _userMode = 5;
+            document.getElementById('custom-color-group').style.display = '';
+            updateButtonStates();
         }
     }
 }

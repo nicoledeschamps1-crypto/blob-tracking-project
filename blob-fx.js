@@ -179,11 +179,13 @@ function applyDithering() {
         pal = sampled;
     }
 
+    // Redmean perceptual color distance (much better than raw Euclidean)
     function nearestPalColor(r, g, b) {
         let minD = Infinity, best = pal[0];
         for (let c of pal) {
             let dr = r-c[0], dg = g-c[1], db = b-c[2];
-            let dist = dr*dr + dg*dg + db*db;
+            let rMean = (r + c[0]) / 2;
+            let dist = (2 + rMean/256) * dr*dr + 4 * dg*dg + (2 + (255-rMean)/256) * db*db;
             if (dist < minD) { minD = dist; best = c; }
         }
         return best;
@@ -404,11 +406,26 @@ function applyASCII() {
     let totalW = width * d;
     let cellD = asciiCellSize * d;
     loadPixels();
-    let cells = [];
+
     let sx = Math.floor(videoX * d);
     let sy = Math.floor(videoY * d);
     let ex = Math.floor((videoX + videoW) * d);
     let ey = Math.floor((videoY + videoH) * d);
+
+    // Black background
+    let ctx = drawingContext;
+    ctx.save();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(videoX, videoY, videoW, videoH);
+
+    // Set up font once
+    let fontSize = asciiCellSize * 1.2;
+    ctx.font = fontSize + 'px Courier New';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    // Mono modes: batch all cells with same color function to minimize fillStyle changes
+    let lastFill = '';
     for (let cy = sy; cy < ey; cy += cellD) {
         for (let cx = sx; cx < ex; cx += cellD) {
             let mx = Math.min(cx + Math.floor(cellD / 2), totalW - 1);
@@ -416,34 +433,31 @@ function applyASCII() {
             let idx = (mx + my * totalW) * 4;
             let r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
             let bri = 0.299 * r + 0.587 * g + 0.114 * b;
-            cells.push({ x: cx / d, y: cy / d, r, g, b, bri });
+            let ci = Math.floor(bri / 255 * (chars.length - 0.01));
+            ci = Math.max(0, Math.min(ci, chars.length - 1));
+            let ch = chars[ci];
+
+            let fill;
+            if (asciiColorMode === 'color') {
+                fill = 'rgb(' + r + ',' + g + ',' + b + ')';
+            } else if (asciiColorMode === 'green') {
+                let v = Math.round(bri);
+                fill = 'rgb(0,' + v + ',0)';
+            } else if (asciiColorMode === 'amber') {
+                let v = Math.round(bri);
+                fill = 'rgb(' + v + ',' + Math.round(v * 0.75) + ',0)';
+            } else if (asciiColorMode === 'cyan') {
+                let v = Math.round(bri);
+                fill = 'rgb(0,' + v + ',' + v + ')';
+            } else {
+                let v = Math.round(bri);
+                fill = 'rgb(' + v + ',' + v + ',' + v + ')';
+            }
+            if (fill !== lastFill) { ctx.fillStyle = fill; lastFill = fill; }
+            ctx.fillText(ch, cx / d, cy / d);
         }
     }
-    push();
-    noStroke();
-    fill(0);
-    rectMode(CORNER);
-    rect(videoX, videoY, videoW, videoH);
-    textFont('Courier New');
-    textSize(asciiCellSize * 1.2);
-    textAlign(LEFT, TOP);
-    for (let cell of cells) {
-        let ci = Math.floor(cell.bri / 255 * (chars.length - 0.01));
-        ci = Math.max(0, Math.min(ci, chars.length - 1));
-        if (asciiColorMode === 'color') {
-            fill(cell.r, cell.g, cell.b);
-        } else if (asciiColorMode === 'green') {
-            fill(0, cell.bri, 0);
-        } else if (asciiColorMode === 'amber') {
-            fill(cell.bri, cell.bri * 0.75, 0);
-        } else if (asciiColorMode === 'cyan') {
-            fill(0, cell.bri, cell.bri);
-        } else {
-            fill(cell.bri);
-        }
-        text(chars[ci], cell.x, cell.y);
-    }
-    pop();
+    ctx.restore();
 }
 
 function applyChromatic() {
@@ -636,12 +650,18 @@ function applyGrain() {
     let amp = intensity * 80;
     for (let y = sy; y < ey; y += sz) {
         for (let x = sx; x < ex; x += sz) {
-            let noise = (Math.random() - 0.5) * amp;
+            // Luminance-dependent grain: strongest in midtones
+            let idx0 = (x + y * totalW) * 4;
+            let lum = (0.2126 * pixels[idx0] + 0.7152 * pixels[idx0+1] + 0.0722 * pixels[idx0+2]) / 255;
+            let grainMask = 1.0 - Math.abs(lum - 0.5) * 2.0;
+            grainMask = 0.3 + grainMask * 0.7; // never fully zero
+            let localAmp = amp * grainMask;
+            let noise = (Math.random() - 0.5) * localAmp;
             let nr = 0, ng = 0, nb = 0;
             if (grainColorMode === 'color') {
-                nr = (Math.random() - 0.5) * amp;
-                ng = (Math.random() - 0.5) * amp;
-                nb = (Math.random() - 0.5) * amp;
+                nr = (Math.random() - 0.5) * localAmp;
+                ng = (Math.random() - 0.5) * localAmp;
+                nb = (Math.random() - 0.5) * localAmp;
             } else {
                 nr = ng = nb = noise;
             }
@@ -1079,8 +1099,146 @@ function applyGlitch() {
                 pixels[idx+2] = Math.min(255, pixels[idx+2] + 50);
             }
         }
+    } else if (glitchMode === 'slice') {
+        // SLICE: image cut into horizontal slices that shift independently
+        let numSlices = Math.floor(freq * 25) + 3;
+        let sliceH = Math.max(2, Math.floor((ey - sy) / numSlices));
+        for (let s = 0; s < numSlices; s++) {
+            let slY = sy + s * sliceH;
+            if (slY >= ey) break;
+            let shift = Math.round((rng() - 0.5) * maxShift * 3 * (rng() > 0.5 ? 1 : 0.3));
+            let endY = Math.min(ey, slY + sliceH);
+            // Occasional gap (skip rendering = black line)
+            if (rng() > 0.92 && intensity > 0.3) {
+                for (let y = slY; y < endY; y++) {
+                    for (let x = sx; x < ex; x++) {
+                        let idx = (x + y * totalW) * 4;
+                        pixels[idx] = 0; pixels[idx+1] = 0; pixels[idx+2] = 0;
+                    }
+                }
+                continue;
+            }
+            for (let y = slY; y < endY; y++) {
+                for (let x = sx; x < ex; x++) {
+                    let srcX = Math.max(sx, Math.min(ex - 1, x + shift));
+                    let dstIdx = (x + y * totalW) * 4;
+                    let srcIdx = (srcX + y * totalW) * 4;
+                    pixels[dstIdx] = original[srcIdx];
+                    pixels[dstIdx+1] = original[srcIdx+1];
+                    pixels[dstIdx+2] = original[srcIdx+2];
+                }
+            }
+        }
+        // RGB split on random slices
+        if (chShift > 0.2) {
+            let splitSlices = Math.floor(rng() * numSlices * 0.4) + 1;
+            for (let s = 0; s < splitSlices; s++) {
+                let slY = sy + Math.floor(rng() * (ey - sy));
+                let slH = Math.min(ey, slY + Math.floor(rng() * sliceH * 0.5) + 2);
+                let rgbOff = Math.round((rng() - 0.5) * maxShift);
+                for (let y = slY; y < slH; y++) {
+                    for (let x = sx; x < ex; x++) {
+                        let idx = (x + y * totalW) * 4;
+                        let rSrc = Math.max(sx, Math.min(ex - 1, x + rgbOff));
+                        pixels[idx] = pixels[(rSrc + y * totalW) * 4];
+                    }
+                }
+            }
+        }
+    } else if (glitchMode === 'drift') {
+        // DRIFT: pixels melt/slide downward with varying speeds
+        let driftMap = new Float32Array(ex - sx);
+        for (let x = 0; x < ex - sx; x++) {
+            // Column-based drift amount using noise-like pattern
+            let col = x + sx;
+            let h = rng();
+            driftMap[x] = h < freq ? (rng() * intensity * 60 * d) : 0;
+        }
+        // Smooth drift map for organic look
+        for (let pass = 0; pass < 2; pass++) {
+            let prev = driftMap[0];
+            for (let x = 1; x < driftMap.length - 1; x++) {
+                let next = driftMap[x + 1];
+                let cur = driftMap[x];
+                driftMap[x] = prev * 0.25 + cur * 0.5 + next * 0.25;
+                prev = cur;
+            }
+        }
+        for (let x = sx; x < ex; x++) {
+            let drift = Math.round(driftMap[x - sx]);
+            if (drift === 0) continue;
+            for (let y = ey - 1; y >= sy; y--) {
+                let srcY = y - drift;
+                let dstIdx = (x + y * totalW) * 4;
+                if (srcY >= sy && srcY < ey) {
+                    let srcIdx = (x + srcY * totalW) * 4;
+                    pixels[dstIdx] = original[srcIdx];
+                    pixels[dstIdx+1] = original[srcIdx+1];
+                    pixels[dstIdx+2] = original[srcIdx+2];
+                } else {
+                    // Smear top pixel
+                    let clampY = Math.max(sy, Math.min(ey - 1, srcY));
+                    let clampIdx = (x + clampY * totalW) * 4;
+                    pixels[dstIdx] = original[clampIdx];
+                    pixels[dstIdx+1] = original[clampIdx+1];
+                    pixels[dstIdx+2] = original[clampIdx+2];
+                }
+            }
+        }
+        // Channel split on drifted areas
+        if (chShift > 0.2) {
+            let splitOff = Math.round(maxShift * 0.5);
+            for (let y = sy; y < ey; y++) {
+                for (let x = sx; x < ex; x++) {
+                    if (driftMap[x - sx] > 2) {
+                        let idx = (x + y * totalW) * 4;
+                        let rX = Math.max(sx, Math.min(ex - 1, x + splitOff));
+                        pixels[idx] = pixels[(rX + y * totalW) * 4];
+                    }
+                }
+            }
+        }
+    } else if (glitchMode === 'static') {
+        // STATIC: TV static noise with scanline interference
+        let staticAmount = intensity * 0.8;
+        let bandH = Math.floor(rng() * 40 * d * blkSz) + 10;
+        let bandY = sy + Math.floor(rng() * Math.max(1, ey - sy - bandH));
+        for (let y = sy; y < ey; y++) {
+            let inBand = (y >= bandY && y < bandY + bandH);
+            let rowNoise = inBand ? staticAmount : staticAmount * 0.15;
+            if (rng() > freq && !inBand) continue;
+            // Scanline displacement
+            let scanShift = inBand ? Math.round((rng() - 0.5) * maxShift * 1.5) : 0;
+            for (let x = sx; x < ex; x++) {
+                let idx = (x + y * totalW) * 4;
+                let srcX = Math.max(sx, Math.min(ex - 1, x + scanShift));
+                let srcIdx = (srcX + y * totalW) * 4;
+                if (rng() < rowNoise) {
+                    // Snow pixel
+                    let v = Math.floor(rng() * 256);
+                    pixels[idx] = v; pixels[idx+1] = v; pixels[idx+2] = v;
+                } else {
+                    pixels[idx] = original[srcIdx];
+                    pixels[idx+1] = original[srcIdx+1];
+                    pixels[idx+2] = original[srcIdx+2];
+                }
+            }
+        }
+        // Rolling bar artifact
+        if (intensity > 0.3) {
+            let barY = sy + Math.floor((applyGlitch._frame * 3 * d) % (ey - sy));
+            let barH = Math.floor(6 * d);
+            for (let dy = 0; dy < barH && (barY + dy) < ey; dy++) {
+                for (let x = sx; x < ex; x++) {
+                    let idx = (x + (barY + dy) * totalW) * 4;
+                    pixels[idx]   = Math.min(255, pixels[idx] + 40);
+                    pixels[idx+1] = Math.min(255, pixels[idx+1] + 40);
+                    pixels[idx+2] = Math.min(255, pixels[idx+2] + 40);
+                }
+            }
+        }
     } else {
-        // SHIFT
+        // SHIFT (original)
         for (let y = sy; y < ey; y++) {
             if (rng() > freq) continue;
             let blockH = Math.floor(rng() * 8 * d * blkSz) + 1;
@@ -1217,8 +1375,7 @@ function applyNoise() {
 }
 
 function applyCurve() {
-    let sign = (curveDirection === 'pincushion') ? -1 : 1;
-    let intensity = sign * curveIntensity / 100 * 0.5;
+    let k = curveIntensity / 100;
     let d = pixelDensity();
     let totalW = width * d;
     let sx = Math.floor(videoX * d);
@@ -1235,30 +1392,78 @@ function applyCurve() {
         let end = (ex + y * totalW) * 4;
         original.set(pixels.subarray(start, end), start);
     }
+    let mode = curveDirection;
+    let fringe = curveFringe / 100;
+
+    // Distort function: returns [srcNx, srcNy] from normalized coords
+    function distortPt(nx, ny, kMul) {
+        let km = k * kMul;
+        let r2 = nx * nx + ny * ny;
+        if (mode === 'barrel') {
+            let f = 1 + km * r2;
+            return [nx * f, ny * f];
+        } else if (mode === 'pinch') {
+            let f = 1 - km * r2;
+            return [nx * f, ny * f];
+        } else if (mode === 'fisheye') {
+            let f = 1 + km * r2 + km * 0.5 * r2 * r2;
+            return [nx * f, ny * f];
+        } else if (mode === 'squeeze') {
+            let fx = 1 + km * nx * nx;
+            let fy = 1 - km * 0.5 * ny * ny;
+            return [nx * fx, ny * fy];
+        } else { // mustache
+            let f = 1 + km * (r2 - 2.5 * r2 * r2);
+            return [nx * f, ny * f];
+        }
+    }
+
+    // Bilinear sample from original buffer
+    function bilinear(orig, srcX, srcY) {
+        let x0 = Math.floor(srcX), y0 = Math.floor(srcY);
+        let fx = srcX - x0, fy = srcY - y0;
+        x0 = Math.max(sx, Math.min(ex - 1, x0));
+        let x1 = Math.min(ex - 1, x0 + 1);
+        y0 = Math.max(sy, Math.min(ey - 1, y0));
+        let y1 = Math.min(ey - 1, y0 + 1);
+        let i00 = (x0 + y0 * totalW) * 4;
+        let i10 = (x1 + y0 * totalW) * 4;
+        let i01 = (x0 + y1 * totalW) * 4;
+        let i11 = (x1 + y1 * totalW) * 4;
+        let w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy);
+        let w01 = (1 - fx) * fy, w11 = fx * fy;
+        return [
+            orig[i00] * w00 + orig[i10] * w10 + orig[i01] * w01 + orig[i11] * w11,
+            orig[i00+1] * w00 + orig[i10+1] * w10 + orig[i01+1] * w01 + orig[i11+1] * w11,
+            orig[i00+2] * w00 + orig[i10+2] * w10 + orig[i01+2] * w01 + orig[i11+2] * w11
+        ];
+    }
+
+    let hasFringe = fringe > 0.01;
+    let fk = fringe * 0.15;
     for (let y = sy; y < ey; y++) {
         for (let x = sx; x < ex; x++) {
             let nx = (x - cx) / hw;
             let ny = (y - cy) / hh;
-            let r2 = nx * nx + ny * ny;
-            let factor = 1 + r2 * intensity;
-            let srcNx = nx * factor;
-            let srcNy = ny * factor;
-            let srcX = Math.round(srcNx * hw + cx);
-            let srcY = Math.round(srcNy * hh + cy);
             let dstIdx = (x + y * totalW) * 4;
-            if (srcX >= sx && srcX < ex && srcY >= sy && srcY < ey) {
-                let srcIdx = (srcX + srcY * totalW) * 4;
-                pixels[dstIdx] = original[srcIdx];
-                pixels[dstIdx+1] = original[srcIdx+1];
-                pixels[dstIdx+2] = original[srcIdx+2];
+
+            if (hasFringe) {
+                // Chromatic fringe: separate R/G/B distortion
+                let [rnx, rny] = distortPt(nx, ny, 1 + fk);
+                let [gnx, gny] = distortPt(nx, ny, 1);
+                let [bnx, bny] = distortPt(nx, ny, 1 - fk);
+                let rSamp = bilinear(original, rnx * hw + cx, rny * hh + cy);
+                let gSamp = bilinear(original, gnx * hw + cx, gny * hh + cy);
+                let bSamp = bilinear(original, bnx * hw + cx, bny * hh + cy);
+                pixels[dstIdx]   = Math.round(rSamp[0]);
+                pixels[dstIdx+1] = Math.round(gSamp[1]);
+                pixels[dstIdx+2] = Math.round(bSamp[2]);
             } else {
-                // Clamp to nearest edge pixel instead of black fill
-                let clampX = Math.max(sx, Math.min(ex - 1, srcX));
-                let clampY = Math.max(sy, Math.min(ey - 1, srcY));
-                let clampIdx = (clampX + clampY * totalW) * 4;
-                pixels[dstIdx] = original[clampIdx];
-                pixels[dstIdx+1] = original[clampIdx+1];
-                pixels[dstIdx+2] = original[clampIdx+2];
+                let [snx, sny] = distortPt(nx, ny, 1);
+                let samp = bilinear(original, snx * hw + cx, sny * hh + cy);
+                pixels[dstIdx]   = Math.round(samp[0]);
+                pixels[dstIdx+1] = Math.round(samp[1]);
+                pixels[dstIdx+2] = Math.round(samp[2]);
             }
         }
     }
@@ -1439,11 +1644,11 @@ function hexToRGBArray(hex) {
 
 function applyThermal() {
     const thermalPalettes = {
-        default: [[0,0,128],[0,0,255],[0,128,255],[0,255,255],[0,255,128],[0,255,0],[128,255,0],[255,255,0],[255,128,0],[255,0,0],[255,255,255]],
-        iron: [[0,0,0],[0,0,100],[80,0,120],[160,0,80],[200,50,0],[255,100,0],[255,200,50],[255,255,150],[255,255,255]],
-        rainbow: [[0,0,128],[0,0,255],[0,255,255],[0,255,0],[255,255,0],[255,128,0],[255,0,0],[255,0,128]],
-        arctic: [[0,20,60],[0,60,120],[40,120,180],[100,180,220],[180,220,240],[220,240,255],[255,255,255]],
-        night: [[0,0,0],[0,20,0],[0,50,10],[0,90,20],[10,140,30],[30,200,50],[80,255,80],[180,255,180]]
+        default: [[0,0,32],[0,0,80],[16,0,128],[48,0,160],[80,0,180],[128,0,160],[160,0,100],[192,32,0],[220,80,0],[240,140,0],[255,200,0],[255,240,60],[255,255,160],[255,255,255]],
+        iron: [[0,0,0],[10,0,30],[40,0,80],[80,0,120],[120,0,140],[160,20,80],[200,60,20],[230,120,0],[250,180,20],[255,230,80],[255,255,180],[255,255,255]],
+        rainbow: [[0,0,128],[0,0,200],[0,80,255],[0,180,220],[0,220,120],[80,255,0],[200,255,0],[255,180,0],[255,80,0],[255,0,128]],
+        arctic: [[0,20,60],[0,40,100],[0,80,150],[30,120,180],[80,170,210],[130,200,230],[180,220,240],[220,240,255],[255,255,255]],
+        night: [[0,0,0],[0,10,0],[0,30,6],[0,60,15],[0,100,25],[6,140,35],[15,180,60],[40,220,100],[80,255,130],[180,255,180]]
     };
     let heatmap = thermalPalettes[thermalPalette] || thermalPalettes.default;
     let intensity = thermalIntensity / 100;
@@ -1513,10 +1718,12 @@ function applyDuotone() {
     for (let y = sy; y < ey; y++) {
         for (let x = sx; x < ex; x++) {
             let idx = (x + y * totalW) * 4;
-            let lum = (0.299*pixels[idx] + 0.587*pixels[idx+1] + 0.114*pixels[idx+2]) / 255;
-            let mr = s[0]*(1-lum) + h[0]*lum;
-            let mg = s[1]*(1-lum) + h[1]*lum;
-            let mb = s[2]*(1-lum) + h[2]*lum;
+            let lum = (0.2126*pixels[idx] + 0.7152*pixels[idx+1] + 0.0722*pixels[idx+2]) / 255;
+            // Smoothstep for smoother shadow/highlight transitions
+            let t = lum * lum * (3 - 2 * lum);
+            let mr = s[0]*(1-t) + h[0]*t;
+            let mg = s[1]*(1-t) + h[1]*t;
+            let mb = s[2]*(1-t) + h[2]*t;
             pixels[idx]   = Math.round(pixels[idx]*(1-intensity) + mr*intensity);
             pixels[idx+1] = Math.round(pixels[idx+1]*(1-intensity) + mg*intensity);
             pixels[idx+2] = Math.round(pixels[idx+2]*(1-intensity) + mb*intensity);
@@ -1702,62 +1909,38 @@ function applyCRT() {
         drawingContext.fillRect(videoX, y, videoW, Math.max(1, scanWeight * 0.5));
     }
 
-    // Phosphor patterns
+    // Phosphor patterns — applied directly to pixel buffer for performance
     if (crtPhosphor !== 'none') {
-        drawingContext.globalCompositeOperation = 'multiply';
-        drawingContext.globalAlpha = 0.15;
-        if (crtPhosphor === 'slot') {
-            // Slot mask: RGB vertical stripes in offset rows
-            let cellW = 3, cellH = 4;
-            for (let py = videoY; py < videoY + videoH; py += cellH) {
-                let rowOff = (Math.floor((py - videoY) / cellH) % 2) * 1;
-                for (let px = videoX + rowOff; px < videoX + videoW; px += cellW) {
-                    drawingContext.fillStyle = 'rgb(255,0,0)';
-                    drawingContext.fillRect(px, py, 1, cellH);
-                    drawingContext.fillStyle = 'rgb(0,255,0)';
-                    drawingContext.fillRect(px+1, py, 1, cellH);
-                    drawingContext.fillStyle = 'rgb(0,0,255)';
-                    drawingContext.fillRect(px+2, py, 1, cellH);
+        let phStr = crtGlow / 100;
+        let cellW = 3;
+        for (let y = sy; y < ey; y++) {
+            for (let x = sx; x < ex; x++) {
+                let idx = (x + y * totalW) * 4;
+                let localX = (x - sx) % cellW;
+                let pR = 1.0, pG = 1.0, pB = 1.0;
+                if (crtPhosphor === 'shadow') {
+                    // Shadow mask: RGB dots with slight bleed
+                    if (localX === 0)      { pR = 1.0; pG = 0.15; pB = 0.15; }
+                    else if (localX === 1)  { pR = 0.15; pG = 1.0; pB = 0.15; }
+                    else                    { pR = 0.15; pG = 0.15; pB = 1.0; }
+                } else if (crtPhosphor === 'aperture' || crtPhosphor === 'grille') {
+                    // Aperture grille: vertical stripes
+                    if (localX === 0)      { pR = 1.0; pG = 0.1; pB = 0.1; }
+                    else if (localX === 1)  { pR = 0.1; pG = 1.0; pB = 0.1; }
+                    else                    { pR = 0.1; pG = 0.1; pB = 1.0; }
+                } else if (crtPhosphor === 'slot') {
+                    // Slot mask with row offset
+                    let rowOff = (Math.floor((y - sy) / 4) % 2);
+                    let lx = ((x - sx) + rowOff) % cellW;
+                    if (lx === 0)      { pR = 1.0; pG = 0.12; pB = 0.12; }
+                    else if (lx === 1)  { pR = 0.12; pG = 1.0; pB = 0.12; }
+                    else                { pR = 0.12; pG = 0.12; pB = 1.0; }
                 }
-            }
-        } else if (crtPhosphor === 'grille') {
-            // Aperture grille: vertical RGB stripes
-            for (let px = videoX; px < videoX + videoW; px += 3) {
-                drawingContext.fillStyle = 'rgb(255,0,0)';
-                drawingContext.fillRect(px, videoY, 1, videoH);
-                drawingContext.fillStyle = 'rgb(0,255,0)';
-                drawingContext.fillRect(px+1, videoY, 1, videoH);
-                drawingContext.fillStyle = 'rgb(0,0,255)';
-                drawingContext.fillRect(px+2, videoY, 1, videoH);
-            }
-        } else if (crtPhosphor === 'shadow') {
-            // Shadow mask: triangular pattern of RGB dots
-            let dotSz = 2;
-            for (let py = videoY; py < videoY + videoH; py += dotSz * 2) {
-                for (let px = videoX; px < videoX + videoW; px += dotSz * 3) {
-                    let off = (Math.floor((py - videoY) / (dotSz*2)) % 2) * dotSz;
-                    drawingContext.fillStyle = 'rgb(255,0,0)';
-                    drawingContext.fillRect(px+off, py, dotSz, dotSz);
-                    drawingContext.fillStyle = 'rgb(0,255,0)';
-                    drawingContext.fillRect(px+off+dotSz, py, dotSz, dotSz);
-                    drawingContext.fillStyle = 'rgb(0,0,255)';
-                    drawingContext.fillRect(px+off+dotSz*2, py, dotSz, dotSz);
-                }
+                pixels[idx]   = Math.round(pixels[idx]   * (1 - phStr + phStr * pR));
+                pixels[idx+1] = Math.round(pixels[idx+1] * (1 - phStr + phStr * pG));
+                pixels[idx+2] = Math.round(pixels[idx+2] * (1 - phStr + phStr * pB));
             }
         }
-        drawingContext.globalCompositeOperation = 'source-over';
-        drawingContext.globalAlpha = 1;
-    }
-
-    // Phosphor glow (subtle RGB sub-pixel simulation)
-    if (crtGlow > 20) {
-        drawingContext.globalCompositeOperation = 'lighter';
-        drawingContext.globalAlpha = (crtGlow / 100) * 0.08;
-        drawingContext.filter = `blur(${Math.round(crtGlow/30)}px)`;
-        drawingContext.drawImage(drawingContext.canvas, videoX, videoY, videoW, videoH, videoX, videoY, videoW, videoH);
-        drawingContext.filter = 'none';
-        drawingContext.globalCompositeOperation = 'source-over';
-        drawingContext.globalAlpha = 1;
     }
 
     // Barrel curvature vignette
@@ -1885,11 +2068,76 @@ function syncFxControlsForEffect(effectName) {
 }
 
 // ---------------------------------------------------------------------------
+// FX_HINTS — inline helper text for each effect (shown in FX card grid)
+// ---------------------------------------------------------------------------
+const FX_HINTS = {
+    // Color
+    sepia:'Warm brown vintage photo tone',
+    tint:'Applies a single-color wash over the image',
+    palette:'Remaps colors to a limited color palette',
+    bricon:'Adjusts brightness and contrast',
+    thermal:'Infrared heat-camera look',
+    gradmap:'Maps brightness values to a color gradient',
+    duotone:'Two-color tone mapping (shadows + highlights)',
+    threshold:'Crushes image to pure black and white',
+    exposure:'Simulates camera exposure compensation',
+    colortemp:'Shifts white balance warmer or cooler',
+    rgbgain:'Per-channel red, green, blue level adjustment',
+    levels:'Input/output level curves like Photoshop Levels',
+    colorbal:'Shifts color balance in shadows, midtones, highlights',
+    colmatrix:'Cross-channel color mixing matrix',
+    // Distortion
+    chroma:'Splits RGB channels with offset — lens chromatic aberration',
+    rgbshift:'Offsets red, green, blue channels independently',
+    curve:'Barrel/pincushion lens distortion',
+    wave:'Animated sine-wave warping',
+    jitter:'Random per-frame position noise',
+    mblur:'Directional blur simulating camera movement',
+    emboss:'Raised relief texture effect',
+    blursharp:'Gaussian blur or unsharp mask',
+    modulate:'Oscillating parameter modulation',
+    ripple:'Concentric circular wave distortion',
+    swirl:'Spiral twist distortion from center',
+    reedglass:'Vertical ribbed glass refraction',
+    polar2rect:'Converts polar to rectangular coordinates',
+    rect2polar:'Converts rectangular to polar coordinates',
+    radblur:'Blur radiating from center',
+    zoomblur:'Blur simulating a fast zoom',
+    circblur:'Circular/rotational motion blur',
+    elgrid:'Deformable mesh distortion',
+    // Pattern
+    bloom:'Soft glow around bright areas — cinematic highlight bleed',
+    dither:'Adds noise pattern to reduce color banding',
+    atkinson:'Classic Macintosh-style dithering algorithm',
+    halftone:'Newspaper dot-screen printing effect',
+    pxsort:'Glitch art — sorts pixel rows/columns by brightness',
+    pixel:'Reduces resolution to chunky blocks',
+    led:'Simulates an LED display panel',
+    printstamp:'Letterpress/rubber stamp texture effect',
+    y2kblue:'Early 2000s blue-tinted digital aesthetic',
+    // Overlay
+    ascii:'Full-frame ASCII character art conversion',
+    glitch:'Random digital corruption artifacts',
+    noise:'Film grain / static noise overlay',
+    grain:'Organic photographic film grain texture',
+    dots:'Dot pattern overlay',
+    grid:'Grid line overlay',
+    scanlines:'Horizontal CRT TV scanlines',
+    vignette:'Darkened edges — vintage camera look',
+    crt:'Full CRT television simulation',
+    ntsc:'Analog NTSC video signal artifacts',
+    stripe:'Repeating stripe pattern overlay',
+    paperscan:'Photocopier / scanner texture',
+    xerox:'High-contrast photocopy effect',
+    grunge:'Dirty, worn texture overlay'
+};
+
+// ---------------------------------------------------------------------------
 // buildFxPanel() — JS-generate the Effecto-style FX panel
 // ---------------------------------------------------------------------------
 function buildFxPanel() {
     const cats = ['color','distortion','pattern','overlay','camera'];
-    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Camera'};
+    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Cam'};
     const camColor = '#00B894';
 
     // ── TAB BAR ──
@@ -1916,6 +2164,7 @@ function buildFxPanel() {
         card.dataset.cat = FX_CATEGORIES[effectName];
         card.style.setProperty('--cat-color', FX_CAT_COLORS[FX_CATEGORIES[effectName]]);
         card.textContent = cfg.label;
+        if (FX_HINTS[effectName]) card.title = FX_HINTS[effectName];
         // Favorite star
         let star = document.createElement('span');
         star.className = 'fx-fav' + (fxFavorites.includes(effectName) ? ' starred' : '');
@@ -1965,12 +2214,47 @@ function buildFxPanel() {
     nameLabel.style.cssText = 'flex:1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text)';
     selRow.append(nameLabel, onBtn, dragH);
 
+    // ── Split side toggle (visible only when split view is on) ──
+    let splitSideRow = document.createElement('div');
+    splitSideRow.id = 'fx-split-side-row';
+    splitSideRow.style.cssText = 'display:none;margin:4px 0 2px;';
+    let splitSideLabel = document.createElement('span');
+    splitSideLabel.style.cssText = 'font-size:9px;font-weight:600;color:var(--text-muted,#888);margin-right:6px;';
+    splitSideLabel.textContent = 'Apply to';
+    splitSideRow.appendChild(splitSideLabel);
+    let splitSideBtns = document.createElement('div');
+    splitSideBtns.className = 'selector-row';
+    splitSideBtns.id = 'fx-split-side-buttons';
+    ['left','right','both'].forEach(val => {
+        let btn = document.createElement('button');
+        btn.className = 'selector-btn' + (val === 'both' ? ' active' : '');
+        btn.dataset.value = val;
+        btn.textContent = val.toUpperCase();
+        btn.addEventListener('click', () => {
+            splitFxSide = val;
+            splitSideBtns.querySelectorAll('.selector-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+        splitSideBtns.appendChild(btn);
+    });
+    splitSideRow.appendChild(splitSideBtns);
+    selRow.after(splitSideRow);
+
     // ── PARAM GROUPS (generate all, show one at a time) ──
     let container = document.getElementById('fx-params-container');
     for (let [effectName, cfg] of Object.entries(FX_UI_CONFIG)) {
         let group = document.createElement('div');
         group.className = 'fx-param-group';
         group.id = 'fx-params-' + effectName;
+
+        // Inline hint text
+        if (FX_HINTS[effectName]) {
+            let hint = document.createElement('span');
+            hint.className = 'hint-text';
+            hint.textContent = FX_HINTS[effectName];
+            hint.style.marginBottom = '4px';
+            group.appendChild(hint);
+        }
 
         // Header with randomize/reset
         if (cfg.hasRandomize) {
@@ -2111,10 +2395,29 @@ function buildFxPanel() {
     }
 }
 
+const FX_TAB_DESCS = {
+    color: 'Color grading and tonal adjustments',
+    distortion: 'Geometric warping and displacement effects',
+    pattern: 'Stylized rendering and pixel manipulation',
+    overlay: 'Texture layers and screen effects stacked on top',
+    camera: 'Virtual camera movement and framing'
+};
+
 function switchFxCategory(cat) {
     currentFxCat = cat;
     // Update tab active state
     document.querySelectorAll('.fx-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
+
+    // Update FX tab description
+    let descEl = document.getElementById('fx-tab-desc');
+    if (!descEl) {
+        descEl = document.createElement('span');
+        descEl.id = 'fx-tab-desc';
+        descEl.className = 'tab-desc';
+        const tabBar = document.getElementById('fx-cat-tabs');
+        if (tabBar) tabBar.after(descEl);
+    }
+    descEl.textContent = FX_TAB_DESCS[cat] || '';
 
     // Camera tab: show camera panel, hide only effect/preset content
     const cameraPanel = document.getElementById('fx-camera-panel');
