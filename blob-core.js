@@ -1900,6 +1900,9 @@ function draw() {
             });
         }
 
+        // Video overlay (after effects, before blob tracking)
+        if (typeof drawOverlay === 'function') drawOverlay();
+
         let timeInterval = map(paramValues[5], 0, 100, 0, 1000);
         if (millis() - lastTrackTime >= timeInterval) {
             trackPoints();
@@ -2460,7 +2463,7 @@ function setupCoreUIListeners() {
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
             if (currentMode < 15 || currentMode > 17) { faceLandmarkCache = null; smoothedLandmarks = null; }
-            if (currentMode === 14 && window.initSegmenterLazy) window.initSegmenterLazy();
+            if (currentMode === 14) { enterMaskSelecting(); if (window.initSegmenterLazy) window.initSegmenterLazy(); }
             if (currentMode >= 15 && currentMode <= 17 && window.initFaceLandmarkerLazy) window.initFaceLandmarkerLazy();
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
             updateButtonStates();
@@ -3376,6 +3379,7 @@ function togglePlay() {
                  });
              }
              syncPlayIcon(true);
+             if (typeof syncOverlayPlayback === 'function') syncOverlayPlayback(true);
              if (audioElement && audioLoaded) {
                  let audioTime = getAudioTimeForVideo(videoEl.time());
                  if (audioTime >= 0) {
@@ -3387,6 +3391,7 @@ function togglePlay() {
         } else {
              videoEl.elt.pause();
              syncPlayIcon(false);
+             if (typeof syncOverlayPlayback === 'function') syncOverlayPlayback(false);
              if (audioElement && audioLoaded) { audioElement.pause(); audioPlaying = false; }
         }
     }

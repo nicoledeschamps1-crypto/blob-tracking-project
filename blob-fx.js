@@ -2183,9 +2183,10 @@ const FX_HINTS = {
 // buildFxPanel() — JS-generate the Effecto-style FX panel
 // ---------------------------------------------------------------------------
 function buildFxPanel() {
-    const cats = ['color','distortion','pattern','overlay','camera'];
-    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Cam'};
+    const cats = ['color','distortion','pattern','overlay','camera','video'];
+    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Cam',video:'Video'};
     const camColor = '#00B894';
+    const videoTabColor = '#E17055';
 
     // ── TAB BAR ──
     let tabBar = document.getElementById('fx-cat-tabs');
@@ -2194,7 +2195,7 @@ function buildFxPanel() {
         let btn = document.createElement('button');
         btn.className = 'fx-tab' + (cat === currentFxCat ? ' active' : '');
         btn.dataset.cat = cat;
-        btn.style.setProperty('--tab-color', cat === 'camera' ? camColor : FX_CAT_COLORS[cat]);
+        btn.style.setProperty('--tab-color', cat === 'camera' ? camColor : cat === 'video' ? videoTabColor : FX_CAT_COLORS[cat]);
         btn.innerHTML = `<span class="tab-dot"></span>${catLabels[cat]}<span class="tab-count"></span>`;
         btn.addEventListener('click', () => switchFxCategory(cat));
         tabBar.appendChild(btn);
@@ -2466,20 +2467,27 @@ function switchFxCategory(cat) {
     }
     descEl.textContent = FX_TAB_DESCS[cat] || '';
 
-    // Camera tab: show camera panel, hide only effect/preset content
+    // Camera / Video tabs: show their panel, hide effect/preset content
     const cameraPanel = document.getElementById('fx-camera-panel');
+    const overlayPanel = document.getElementById('fx-overlay-panel');
     const fxEffectsView = document.getElementById('fx-effects-view');
     const fxPresetsView = document.getElementById('fx-presets-view');
     const fxViewSwitcher = document.getElementById('fx-view-switcher');
     const isCamera = cat === 'camera';
-    // Always toggle camera panel
+    const isVideo = cat === 'video';
+    // Always toggle camera/overlay panels
     if (cameraPanel) cameraPanel.style.display = isCamera ? '' : 'none';
-    if (isCamera) {
+    if (overlayPanel) overlayPanel.style.display = isVideo ? '' : 'none';
+    if (isVideo && typeof buildOverlayPanel === 'function' && !overlayPanel._built) {
+        buildOverlayPanel();
+        overlayPanel._built = true;
+    }
+    if (isCamera || isVideo) {
         if (fxEffectsView) fxEffectsView.style.display = 'none';
         if (fxPresetsView) fxPresetsView.style.display = 'none';
         return;
     }
-    // Non-camera tab: restore FX content
+    // Non-camera/video tab: restore FX content
     if (fxViewSwitcher) fxViewSwitcher.style.display = '';
     const activeView = document.querySelector('.fx-view-btn.active');
     const viewMode = activeView ? activeView.dataset.view : 'effects';
@@ -2883,9 +2891,11 @@ function switchFxView(view) {
     let presetsView = document.getElementById('fx-presets-view');
     let cameraPanel = document.getElementById('fx-camera-panel');
     if (!effectsView || !presetsView) return;
-    // If on camera tab, switch back to the last FX category
-    if (currentFxCat === 'camera') {
+    // If on camera or video tab, switch back to the last FX category
+    let overlayPanelV = document.getElementById('fx-overlay-panel');
+    if (currentFxCat === 'camera' || currentFxCat === 'video') {
         if (cameraPanel) cameraPanel.style.display = 'none';
+        if (overlayPanelV) overlayPanelV.style.display = 'none';
         currentFxCat = 'color';
         document.querySelectorAll('.fx-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === 'color'));
         document.querySelectorAll('#fx-card-grid .fx-card').forEach(card => {
