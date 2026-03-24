@@ -70,6 +70,10 @@ const EFFECT_TYPES = {
 // ---------------------------------------------------------------------------
 // applyActiveEffects() — batched pixel pipeline using EFFECT_TYPES
 // ---------------------------------------------------------------------------
+function _fxActive(name) {
+    return activeEffects.has(name) && !hiddenEffects.has(name);
+}
+
 function applyActiveEffects() {
     if (!masterFxEnabled || activeEffects.size === 0) return;
 
@@ -90,78 +94,78 @@ function applyActiveEffects() {
         }
     }
 
-    let hasPixel = EFFECT_TYPES.pixel.some(e => activeEffects.has(e));
-    let hasHybrid = EFFECT_TYPES.hybrid.some(e => activeEffects.has(e));
+    let hasPixel = EFFECT_TYPES.pixel.some(e => _fxActive(e));
+    let hasHybrid = EFFECT_TYPES.hybrid.some(e => _fxActive(e));
 
     // Single loadPixels() for all pixel-manipulating effects
     if (hasPixel || hasHybrid) loadPixels();
 
     // Color tier
-    if (activeEffects.has('sepia')) applySepia();
-    if (activeEffects.has('tint')) applyTint();
-    if (activeEffects.has('palette')) applyPalette();
-    if (activeEffects.has('gradmap')) applyGradientMap();
-    if (activeEffects.has('duotone')) applyDuotone();
-    if (activeEffects.has('thermal')) applyThermal();
-    if (activeEffects.has('bricon')) applyBriCon();
-    if (activeEffects.has('threshold')) applyThreshold();
-    if (activeEffects.has('exposure')) applyExposure();
-    if (activeEffects.has('colortemp')) applyColorTemp();
-    if (activeEffects.has('rgbgain')) applyRGBGain();
-    if (activeEffects.has('levels')) applyLevels();
-    if (activeEffects.has('colorbal')) applyColorBalance();
-    if (activeEffects.has('colmatrix')) applyColorMatrix();
+    if (_fxActive('sepia')) applySepia();
+    if (_fxActive('tint')) applyTint();
+    if (_fxActive('palette')) applyPalette();
+    if (_fxActive('gradmap')) applyGradientMap();
+    if (_fxActive('duotone')) applyDuotone();
+    if (_fxActive('thermal')) applyThermal();
+    if (_fxActive('bricon')) applyBriCon();
+    if (_fxActive('threshold')) applyThreshold();
+    if (_fxActive('exposure')) applyExposure();
+    if (_fxActive('colortemp')) applyColorTemp();
+    if (_fxActive('rgbgain')) applyRGBGain();
+    if (_fxActive('levels')) applyLevels();
+    if (_fxActive('colorbal')) applyColorBalance();
+    if (_fxActive('colmatrix')) applyColorMatrix();
     // Distortion tier
-    if (activeEffects.has('emboss')) applyEmboss();
-    if (activeEffects.has('chroma')) applyChromatic();
-    if (activeEffects.has('rgbshift')) applyRGBShift();
-    if (activeEffects.has('curve')) applyCurve();
-    if (activeEffects.has('wave')) applyWave();
-    if (activeEffects.has('jitter')) applyJitter();
-    if (activeEffects.has('mblur')) applyMblur();
-    if (activeEffects.has('blursharp')) applyBlurSharp();
-    if (activeEffects.has('modulate')) applyModulate();
-    if (activeEffects.has('ripple')) applyRipple();
-    if (activeEffects.has('swirl')) applySwirl();
-    if (activeEffects.has('reedglass')) applyReedGlass();
-    if (activeEffects.has('polar2rect')) applyPolar2Rect();
-    if (activeEffects.has('rect2polar')) applyRect2Polar();
-    if (activeEffects.has('radblur')) applyRadialBlur();
-    if (activeEffects.has('zoomblur')) applyZoomBlur();
-    if (activeEffects.has('circblur')) applyCircBlur();
-    if (activeEffects.has('elgrid')) applyElasticGrid();
+    if (_fxActive('emboss')) applyEmboss();
+    if (_fxActive('chroma')) applyChromatic();
+    if (_fxActive('rgbshift')) applyRGBShift();
+    if (_fxActive('curve')) applyCurve();
+    if (_fxActive('wave')) applyWave();
+    if (_fxActive('jitter')) applyJitter();
+    if (_fxActive('mblur')) applyMblur();
+    if (_fxActive('blursharp')) applyBlurSharp();
+    if (_fxActive('modulate')) applyModulate();
+    if (_fxActive('ripple')) applyRipple();
+    if (_fxActive('swirl')) applySwirl();
+    if (_fxActive('reedglass')) applyReedGlass();
+    if (_fxActive('polar2rect')) applyPolar2Rect();
+    if (_fxActive('rect2polar')) applyRect2Polar();
+    if (_fxActive('radblur')) applyRadialBlur();
+    if (_fxActive('zoomblur')) applyZoomBlur();
+    if (_fxActive('circblur')) applyCircBlur();
+    if (_fxActive('elgrid')) applyElasticGrid();
     // Pattern tier
-    if (activeEffects.has('bloom')) applyBloom();
-    if (activeEffects.has('dither')) applyDithering();
-    if (activeEffects.has('atkinson')) applyAtkinson();
-    if (activeEffects.has('pxsort')) applyPixelSort();
-    if (activeEffects.has('pixel')) applyPixelate();
-    if (activeEffects.has('y2kblue')) applyY2KBlue();
+    if (_fxActive('bloom')) applyBloom();
+    if (_fxActive('dither')) applyDithering();
+    if (_fxActive('atkinson')) applyAtkinson();
+    if (_fxActive('pxsort')) applyPixelSort();
+    if (_fxActive('pixel')) applyPixelate();
+    if (_fxActive('y2kblue')) applyY2KBlue();
     // Overlay tier (pixel)
-    if (activeEffects.has('glitch')) applyGlitch();
-    if (activeEffects.has('noise')) applyNoise();
-    if (activeEffects.has('grain')) applyGrain();
-    if (activeEffects.has('crt')) applyCRT();
-    if (activeEffects.has('ntsc')) applyNTSC();
-    if (activeEffects.has('paperscan')) applyPaperScan();
-    if (activeEffects.has('xerox')) applyXerox();
-    if (activeEffects.has('grunge')) applyGrunge();
+    if (_fxActive('glitch')) applyGlitch();
+    if (_fxActive('noise')) applyNoise();
+    if (_fxActive('grain')) applyGrain();
+    if (_fxActive('crt')) applyCRT();
+    if (_fxActive('ntsc')) applyNTSC();
+    if (_fxActive('paperscan')) applyPaperScan();
+    if (_fxActive('xerox')) applyXerox();
+    if (_fxActive('grunge')) applyGrunge();
 
     // Commit pixel changes before hybrid/draw effects
     if (hasPixel || hasHybrid) updatePixels();
 
     // Hybrid effects (read pixels then draw shapes)
-    if (activeEffects.has('halftone')) applyHalftone();
-    if (activeEffects.has('ascii')) applyASCII();
-    if (activeEffects.has('dots')) applyDots();
-    if (activeEffects.has('led')) applyLED();
-    if (activeEffects.has('printstamp')) applyPrintStamp();
+    if (_fxActive('halftone')) applyHalftone();
+    if (_fxActive('ascii')) applyASCII();
+    if (_fxActive('dots')) applyDots();
+    if (_fxActive('led')) applyLED();
+    if (_fxActive('printstamp')) applyPrintStamp();
 
     // Draw-only effects (no pixel access needed)
-    if (activeEffects.has('grid')) applyGrid();
-    if (activeEffects.has('scanlines')) applyScanlines();
-    if (activeEffects.has('vignette')) applyVignette();
-    if (activeEffects.has('stripe')) applyStripe();
+    if (_fxActive('grid')) applyGrid();
+    if (_fxActive('scanlines')) applyScanlines();
+    if (_fxActive('vignette')) applyVignette();
+    if (_fxActive('stripe')) applyStripe();
 
     // Restore GPU-handled effects to activeEffects
     for (const name of _gpuHandled) activeEffects.add(name);
@@ -2183,10 +2187,11 @@ const FX_HINTS = {
 // buildFxPanel() — JS-generate the Effecto-style FX panel
 // ---------------------------------------------------------------------------
 function buildFxPanel() {
-    const cats = ['color','distortion','pattern','overlay','camera','video'];
-    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Cam',video:'Video'};
+    const cats = ['color','distortion','pattern','overlay','camera','video','layers'];
+    const catLabels = {color:'Color',distortion:'Distort',pattern:'Pattern',overlay:'Overlay',camera:'Cam',video:'Video',layers:'Layers'};
     const camColor = '#00B894';
     const videoTabColor = '#E17055';
+    const layersTabColor = '#A966FF';
 
     // ── TAB BAR ──
     let tabBar = document.getElementById('fx-cat-tabs');
@@ -2195,11 +2200,24 @@ function buildFxPanel() {
         let btn = document.createElement('button');
         btn.className = 'fx-tab' + (cat === currentFxCat ? ' active' : '');
         btn.dataset.cat = cat;
-        btn.style.setProperty('--tab-color', cat === 'camera' ? camColor : cat === 'video' ? videoTabColor : FX_CAT_COLORS[cat]);
+        btn.style.setProperty('--tab-color', cat === 'camera' ? camColor : cat === 'video' ? videoTabColor : cat === 'layers' ? layersTabColor : FX_CAT_COLORS[cat]);
         btn.innerHTML = `<span class="tab-dot"></span>${catLabels[cat]}<span class="tab-count"></span>`;
         btn.addEventListener('click', () => switchFxCategory(cat));
         tabBar.appendChild(btn);
     });
+
+    // ── TAB SCROLL FADE ──
+    const tabWrap = document.getElementById('fx-tab-bar-wrap');
+    if (tabWrap) {
+        const updateFades = () => {
+            const sl = tabBar.scrollLeft;
+            const maxScroll = tabBar.scrollWidth - tabBar.clientWidth;
+            tabWrap.classList.toggle('fade-left', sl > 4);
+            tabWrap.classList.toggle('fade-right', sl < maxScroll - 4);
+        };
+        tabBar.addEventListener('scroll', updateFades, { passive: true });
+        requestAnimationFrame(updateFades);
+    }
 
     // ── EFFECT CARD GRID ──
     let cardGrid = document.getElementById('fx-card-grid');
@@ -2450,7 +2468,8 @@ const FX_TAB_DESCS = {
     distortion: 'Geometric warping and displacement effects',
     pattern: 'Stylized rendering and pixel manipulation',
     overlay: 'Texture layers and screen effects stacked on top',
-    camera: 'Virtual camera movement and framing'
+    camera: 'Virtual camera movement and framing',
+    layers: 'Toggle visibility and opacity of rendering layers'
 };
 
 function switchFxCategory(cat) {
@@ -2469,22 +2488,29 @@ function switchFxCategory(cat) {
     }
     descEl.textContent = FX_TAB_DESCS[cat] || '';
 
-    // Camera / Video tabs: show their panel, hide effect/preset content
+    // Camera / Video / Layers tabs: show their panel, hide effect/preset content
     const cameraPanel = document.getElementById('fx-camera-panel');
     const overlayPanel = document.getElementById('fx-overlay-panel');
+    const layersPanel = document.getElementById('fx-layers-panel');
     const fxEffectsView = document.getElementById('fx-effects-view');
     const fxPresetsView = document.getElementById('fx-presets-view');
     const fxViewSwitcher = document.getElementById('fx-view-switcher');
     const isCamera = cat === 'camera';
     const isVideo = cat === 'video';
-    // Always toggle camera/overlay panels
+    const isLayers = cat === 'layers';
+    // Always toggle camera/overlay/layers panels
     if (cameraPanel) cameraPanel.style.display = isCamera ? '' : 'none';
     if (overlayPanel) overlayPanel.style.display = isVideo ? '' : 'none';
+    if (layersPanel) layersPanel.style.display = isLayers ? '' : 'none';
     if (isVideo && typeof buildOverlayPanel === 'function' && !overlayPanel._built) {
         buildOverlayPanel();
         overlayPanel._built = true;
     }
-    if (isCamera || isVideo) {
+    if (isLayers && typeof buildLayersPanel === 'function' && !layersPanel._built) {
+        buildLayersPanel();
+        layersPanel._built = true;
+    }
+    if (isCamera || isVideo || isLayers) {
         if (fxEffectsView) fxEffectsView.style.display = 'none';
         if (fxPresetsView) fxPresetsView.style.display = 'none';
         return;
@@ -2918,8 +2944,12 @@ function switchFxView(view) {
 // Post Process list — Effecto-style active effects list with eye toggles
 // ---------------------------------------------------------------------------
 function updatePostProcessList() {
-    let container = document.getElementById('fx-pp-list');
+    // Replaced by Layers panel — rebuild active effects list there instead
+    if (typeof _rebuildActiveEffectsList === 'function') _rebuildActiveEffectsList();
     let wrapper = document.getElementById('fx-postprocess');
+    if (wrapper) wrapper.style.display = 'none';
+    return;
+    let container = document.getElementById('fx-pp-list');
     if (!container || !wrapper) return;
 
     if (activeEffects.size === 0) {
@@ -4259,4 +4289,237 @@ function applyGrunge() {
             pixels[idx+2] = Math.round(tint[2] * lumN);
         }
     }
+}
+
+// ══════════════════════════════════════════
+// LAYERS PANEL
+// ══════════════════════════════════════════
+
+const SCENE_LAYERS = [
+    { id:'blobs',   name:'Blobs',   hint:'Tracking rectangles and visualizations (ZOOM, THERMO, ASCII)', hasOpacity:true,  hasBlend:false },
+    { id:'overlay', name:'Overlay', hint:'Uploaded video or image composited over the scene',            hasOpacity:true,  hasBlend:true  },
+    { id:'mask',    name:'Mask AI', hint:'AI segmentation mask highlight (active in MASK mode)',         hasOpacity:false, hasBlend:false },
+    { id:'bgdim',   name:'Bg Dim',  hint:'Darkens the background behind tracked blobs',                  hasOpacity:true,  hasBlend:false },
+    { id:'video',   name:'Video',   hint:'Base video or webcam feed (always visible)',                   hasOpacity:false, hasBlend:false },
+];
+
+const LAYER_BLEND_MODES = [
+    { name:'Normal',      value:'source-over' },
+    { name:'Multiply',    value:'multiply' },
+    { name:'Screen',      value:'screen' },
+    { name:'Overlay',     value:'overlay' },
+    { name:'Soft Light',  value:'soft-light' },
+    { name:'Hard Light',  value:'hard-light' },
+    { name:'Difference',  value:'difference' },
+    { name:'Exclusion',   value:'exclusion' },
+    { name:'Darken',      value:'darken' },
+    { name:'Lighten',     value:'lighten' },
+    { name:'Color Dodge', value:'color-dodge' },
+    { name:'Color Burn',  value:'color-burn' },
+];
+
+const _eyeSvgOn = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const _eyeSvgOff = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const _settingsSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>';
+
+function buildLayersPanel() {
+    const container = document.getElementById('fx-layers-panel');
+    if (!container) return;
+
+    // -- Active Effects section --
+    let html = '<div class="layers-section">';
+    html += '<div class="layers-header">Active Effects</div>';
+    html += '<span class="hint-text">Effects currently applied to the scene. Click the eye to toggle, settings to adjust.</span>';
+    html += '<div id="layers-fx-list" class="layers-fx-list"></div>';
+    html += '</div>';
+
+    // -- FX Master Opacity --
+    html += '<div class="layer-card" data-layer="effects">';
+    html += '<div class="layer-row"><span class="layer-name">Effects Master</span>';
+    html += '<button class="layer-eye-btn" data-layer="effects" title="Toggle all effects"></button></div>';
+    html += '<span class="hint-text layer-hint">Master opacity for all effects combined</span>';
+    html += '<div class="layer-controls"><input type="range" class="layer-opacity-slider" data-layer="effects" min="0" max="100" step="1" value="100" title="Master FX Opacity"><span class="layer-opacity-val" data-layer="effects">100</span></div>';
+    html += '</div>';
+
+    // -- Scene Layers section --
+    html += '<div class="layers-section">';
+    html += '<div class="layers-header">Scene Layers</div>';
+    html += '<span class="hint-text">Toggle visibility and opacity of each rendering layer.</span>';
+    for (const L of SCENE_LAYERS) {
+        let controlsHtml = '';
+        if (L.hasOpacity || L.hasBlend) {
+            let opHtml = L.hasOpacity
+                ? `<input type="range" class="layer-opacity-slider" data-layer="${L.id}" min="0" max="100" step="1" value="100" title="Opacity"><span class="layer-opacity-val" data-layer="${L.id}">100</span>`
+                : '';
+            let blendHtml = '';
+            if (L.hasBlend) {
+                blendHtml = `<select class="layer-blend-select" data-layer="${L.id}">`;
+                for (const b of LAYER_BLEND_MODES) blendHtml += `<option value="${b.value}">${b.name}</option>`;
+                blendHtml += '</select>';
+            }
+            controlsHtml = `<div class="layer-controls">${opHtml}${blendHtml}</div>`;
+        }
+        html += `<div class="layer-card" data-layer="${L.id}">
+            <div class="layer-row">
+                <span class="layer-name">${L.name}</span>
+                <button class="layer-eye-btn" data-layer="${L.id}" title="Toggle visibility"></button>
+            </div>
+            <span class="hint-text layer-hint">${L.hint}</span>
+            ${controlsHtml}
+        </div>`;
+    }
+    html += '</div>';
+
+    container.innerHTML = html;
+    _wireLayersPanelEvents(container);
+    updateLayerStates();
+
+    // Hide old post-process section
+    let oldPP = document.getElementById('fx-postprocess');
+    if (oldPP) oldPP.style.display = 'none';
+}
+
+function _wireLayersPanelEvents(container) {
+    // Wire scene layer eye toggles
+    container.querySelectorAll('.layer-eye-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.layer;
+            if (id === 'blobs') blobsVisible = !blobsVisible;
+            else if (id === 'overlay') { if (typeof overlayEnabled !== 'undefined') overlayEnabled = !overlayEnabled; }
+            else if (id === 'mask') maskOverlayVisible = !maskOverlayVisible;
+            else if (id === 'effects') masterFxEnabled = !masterFxEnabled;
+            else if (id === 'bgdim') bgDim = bgDim > 0 ? 0 : 50;
+            else if (id === 'video') { /* always visible */ }
+            saveLayerState();
+            updateLayerStates();
+            if (typeof updateButtonStates === 'function') updateButtonStates();
+        });
+    });
+
+    // Wire opacity sliders
+    container.querySelectorAll('.layer-opacity-slider').forEach(sl => {
+        sl.addEventListener('input', () => {
+            const id = sl.dataset.layer;
+            const v = parseInt(sl.value) / 100;
+            if (id === 'blobs') blobsOpacity = v;
+            else if (id === 'overlay') { if (typeof overlayOpacity !== 'undefined') overlayOpacity = v; }
+            else if (id === 'effects') fxMasterOpacity = v;
+            else if (id === 'bgdim') bgDim = parseInt(sl.value);
+            const valEl = container.querySelector('.layer-opacity-val[data-layer="' + id + '"]');
+            if (valEl) valEl.textContent = sl.value;
+            saveLayerState();
+        });
+    });
+
+    // Wire blend mode selects
+    container.querySelectorAll('.layer-blend-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            if (sel.dataset.layer === 'overlay' && typeof overlayBlendMode !== 'undefined') {
+                overlayBlendMode = sel.value;
+            }
+        });
+    });
+}
+
+function _rebuildActiveEffectsList() {
+    const list = document.getElementById('layers-fx-list');
+    if (!list) return;
+
+    if (activeEffects.size === 0) {
+        list.innerHTML = '<span class="hint-text" style="padding:4px 0">No effects active</span>';
+        return;
+    }
+
+    let html = '';
+    activeEffects.forEach(name => {
+        let cfg = FX_UI_CONFIG[name];
+        let label = cfg ? cfg.label : name.toUpperCase();
+        let catColor = FX_CAT_COLORS[FX_CATEGORIES[name]] || '#666';
+        let isHidden = hiddenEffects.has(name);
+        let dimClass = isHidden ? ' layers-fx-hidden' : '';
+        html += `<div class="layers-fx-item${dimClass}" style="--pp-cat-color:${catColor}">
+            <span class="layers-fx-name">${label}</span>
+            <button class="layers-fx-settings" data-effect="${name}" title="Open settings">${_settingsSvg}</button>
+            <button class="layers-fx-eye" data-effect="${name}" title="Toggle effect">${isHidden ? _eyeSvgOff : _eyeSvgOn}</button>
+        </div>`;
+    });
+    list.innerHTML = html;
+
+    // Wire settings buttons — jump to effect in its category tab
+    list.querySelectorAll('.layers-fx-settings').forEach(btn => {
+        btn.addEventListener('click', () => {
+            let eff = btn.dataset.effect;
+            let cat = FX_CATEGORIES[eff];
+            if (cat) switchFxCategory(cat);
+            selectFxEffect(eff);
+        });
+    });
+
+    // Wire eye toggles — toggle hidden (not remove)
+    list.querySelectorAll('.layers-fx-eye').forEach(btn => {
+        btn.addEventListener('click', () => {
+            let eff = btn.dataset.effect;
+            if (hiddenEffects.has(eff)) {
+                hiddenEffects.delete(eff);
+            } else {
+                hiddenEffects.add(eff);
+            }
+            _rebuildActiveEffectsList();
+        });
+    });
+}
+
+function updateLayerStates() {
+    const container = document.getElementById('fx-layers-panel');
+    if (!container || !container._built) return;
+
+    // Rebuild active effects list
+    _rebuildActiveEffectsList();
+
+    // Sync scene layer eye buttons
+    const eyeMap = {
+        'blobs': blobsVisible,
+        'overlay': typeof overlayEnabled !== 'undefined' ? overlayEnabled : true,
+        'mask': maskOverlayVisible,
+        'effects': masterFxEnabled,
+        'bgdim': typeof bgDim !== 'undefined' ? bgDim > 0 : false,
+        'video': true
+    };
+    container.querySelectorAll('.layer-eye-btn').forEach(btn => {
+        const id = btn.dataset.layer;
+        const vis = eyeMap[id];
+        if (vis === undefined) return;
+        btn.classList.toggle('off', !vis);
+        btn.innerHTML = vis ? _eyeSvgOn : _eyeSvgOff;
+        if (id === 'video') { btn.style.opacity = '0.3'; btn.style.cursor = 'default'; }
+        const card = btn.closest('.layer-card');
+        if (card) card.classList.toggle('layer-disabled', !vis && id !== 'video');
+    });
+
+    // Sync opacity sliders + value labels
+    const opMap = {
+        'blobs': Math.round(blobsOpacity * 100),
+        'overlay': typeof overlayOpacity !== 'undefined' ? Math.round(overlayOpacity * 100) : 100,
+        'effects': Math.round(fxMasterOpacity * 100),
+        'bgdim': typeof bgDim !== 'undefined' ? Math.round(bgDim) : 0
+    };
+    container.querySelectorAll('.layer-opacity-slider').forEach(sl => {
+        const v = opMap[sl.dataset.layer];
+        if (v !== undefined && parseInt(sl.value) !== v) sl.value = v;
+    });
+    container.querySelectorAll('.layer-opacity-val').forEach(el => {
+        const v = opMap[el.dataset.layer];
+        if (v !== undefined) el.textContent = v;
+    });
+
+    // Sync blend selects
+    container.querySelectorAll('.layer-blend-select').forEach(sel => {
+        if (sel.dataset.layer === 'overlay' && typeof overlayBlendMode !== 'undefined') {
+            if (sel.value !== overlayBlendMode) sel.value = overlayBlendMode;
+        }
+    });
+
+    // Keep old post-process hidden
+    let oldPP = document.getElementById('fx-postprocess');
+    if (oldPP) oldPP.style.display = 'none';
 }

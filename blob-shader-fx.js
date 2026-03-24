@@ -2103,6 +2103,7 @@ function syncShaderFromCPU() {
     shaderFX.activeEffects.clear();
     if (typeof activeEffects === 'undefined' || !masterFxEnabled) return;
     for (const name of activeEffects) {
+        if (typeof hiddenEffects !== 'undefined' && hiddenEffects.has(name)) continue;
         if (SHADER_EFFECT_REGISTRY[name]) {
             shaderFX.enableEffect(name);
             SHADER_EFFECT_REGISTRY[name].sync();

@@ -171,7 +171,7 @@
             overflow-y: auto;
         }
         #left-panel { left: 24px; }
-        #right-panel { right: 24px; }
+        #right-panel { right: 24px; overflow-x: hidden; }
 
         /* Custom Scrollbar */
         .panel::-webkit-scrollbar {
@@ -877,6 +877,144 @@
             background: #8B45E8;
             border-radius: 2px;
             transition: width 50ms linear;
+        }
+
+        /* ═══ LAYERS PANEL ═══ */
+        #fx-layers-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .layer-card {
+            padding: 6px 8px;
+            border-radius: var(--radius-md);
+            background: rgba(139,69,232,0.04);
+            border: 1px solid rgba(139,69,232,0.1);
+            transition: background 0.15s;
+        }
+        .layer-card:hover { background: rgba(139,69,232,0.08); }
+        .layer-card.layer-disabled { opacity: 0.4; }
+        .layer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .layer-name {
+            font-size: 11px;
+            font-weight: 600;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin: 0 6px;
+        }
+        .layer-eye-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 2px;
+            color: var(--text-muted);
+            width: 22px;
+            height: 22px;
+            font-size: 13px;
+            line-height: 22px;
+            text-align: center;
+            flex-shrink: 0;
+            margin-left: 8px;
+            transition: color 0.15s;
+        }
+        .layer-eye-btn:hover { color: var(--text-main); }
+        .layer-eye-btn.off { color: rgba(255,255,255,0.15); }
+        .layer-hint {
+            display: block;
+            margin-top: 2px;
+        }
+        .layer-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 0 0 0;
+        }
+        .layer-opacity-slider {
+            flex: 1;
+            min-width: 0;
+        }
+        .layer-opacity-val {
+            font-size: 9px;
+            color: var(--text-muted);
+            width: 28px;
+            text-align: right;
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+        .layer-blend-select {
+            background: rgba(17,14,22,0.6);
+            border: 1px solid rgba(139,69,232,0.25);
+            color: inherit;
+            font-size: 9px;
+            padding: 2px 4px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            max-width: 80px;
+            flex-shrink: 0;
+        }
+        .layers-section {
+            margin-bottom: 8px;
+        }
+        .layers-fx-list {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-top: 6px;
+        }
+        .layers-fx-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            border-left: 3px solid var(--pp-cat-color, rgba(255,255,255,0.15));
+            border-radius: 4px;
+            background: rgba(139,69,232,0.03);
+            transition: background 0.15s;
+        }
+        .layers-fx-item:hover { background: rgba(255,255,255,0.05); }
+        .layers-fx-name {
+            font-size: 10px;
+            font-weight: 600;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .layers-fx-settings,
+        .layers-fx-eye {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 2px;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s;
+        }
+        .layers-fx-settings:hover,
+        .layers-fx-eye:hover { color: var(--text-main); }
+        .layers-fx-hidden { opacity: 0.35; }
+        .layers-fx-hidden .layers-fx-eye { opacity: 1; }
+        .layers-header {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 4px 0;
         }
 
         /* ═══ FX EFFECT CARDS ═══ */
@@ -2069,14 +2207,45 @@
         }
 
         /* ═══ EFFECTO-STYLE FX TABS & DROPDOWN ═══ */
+        .fx-tab-bar-wrap {
+            position: relative;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .fx-tab-bar-wrap::before,
+        .fx-tab-bar-wrap::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 18px;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .fx-tab-bar-wrap::before {
+            left: 0;
+            background: linear-gradient(to right, var(--panel-bg, rgba(17,14,22,0.92)), transparent);
+        }
+        .fx-tab-bar-wrap::after {
+            right: 0;
+            background: linear-gradient(to left, var(--panel-bg, rgba(17,14,22,0.92)), transparent);
+        }
+        .fx-tab-bar-wrap.fade-left::before { opacity: 1; }
+        .fx-tab-bar-wrap.fade-right::after { opacity: 1; }
         .fx-tab-bar {
             display: flex;
             gap: 0;
             border-bottom: 1px solid rgba(169,102,255,0.1);
-            margin-bottom: 8px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            scrollbar-width: none;
         }
+        .fx-tab-bar::-webkit-scrollbar { display: none; }
         .fx-tab {
-            flex: 1;
+            flex: 0 0 auto;
             background: none;
             border: none;
             color: var(--text-muted);
@@ -2084,11 +2253,12 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 8px 2px;
+            padding: 8px 6px;
             cursor: pointer;
             position: relative;
             font-family: inherit;
             transition: color 0.15s;
+            white-space: nowrap;
         }
         .fx-tab:hover { color: var(--text-main); }
         .fx-tab.active { color: var(--text-main); }
@@ -3794,7 +3964,9 @@
                     <button class="fx-view-btn active" data-view="effects" role="tab" aria-selected="true">Effects</button>
                     <button class="fx-view-btn" data-view="presets" role="tab" aria-selected="false">Presets</button>
                 </div>
-                <div id="fx-cat-tabs" role="tablist" aria-label="Effect categories"></div>
+                <div class="fx-tab-bar-wrap" id="fx-tab-bar-wrap">
+                    <div id="fx-cat-tabs" role="tablist" aria-label="Effect categories"></div>
+                </div>
                 <div id="fx-effects-view">
                     <div id="fx-favorites-row" class="fx-favorites-row"></div>
                     <div id="fx-card-grid" class="fx-card-grid" role="grid" aria-label="Effects grid"></div>
@@ -3899,6 +4071,8 @@
 
                 <!-- Video Overlay tab content (shown when VIDEO sub-tab active) -->
                 <div id="fx-overlay-panel" style="display:none"></div>
+                <!-- Layers tab content -->
+                <div id="fx-layers-panel" style="display:none"></div>
 
             <!-- REMOVED: old static FX categories/cards/params — now JS-generated by buildFxPanel() -->
 
@@ -4179,8 +4353,8 @@
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
 <script src="blob-core.js?v=20260325"></script>
-<script src="blob-fx.js?v=20260325"></script>
-<script src="blob-shader-fx.js?v=20260325"></script>
+<script src="blob-fx.js?v=20260325b"></script>
+<script src="blob-shader-fx.js?v=20260325b"></script>
 <script src="blob-overlay.js?v=20260324"></script>
 <script src="blob-audio.js?v=20260325"></script>
 <script src="blob-timeline.js?v=20260325"></script>

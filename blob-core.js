@@ -63,6 +63,7 @@ let bgDim = 0;
 let productInfo = { brand: '', name: '', material: '', price: '', size: '' };
 let activeVizModes = new Set([1]);
 let activeEffects = new Set();
+let hiddenEffects = new Set(); // effects toggled off via Layers eye but not removed
 let currentPreset = null; // currently applied preset name (null = none)
 let fxLayerAll = false;
 let asciiCellSize = 10;
@@ -207,6 +208,15 @@ let rgbShiftIntensity = 70;
 // Master FX toggle
 let masterFxEnabled = true;
 
+// ── LAYER SYSTEM ──
+let blobsVisible = true;
+let blobsOpacity = 1.0;
+let fxMasterOpacity = 1.0;
+let maskOverlayVisible = true;
+let beatFlashVisible = true;
+let _fxOpacityBuf = null;
+let _blobOpacityBuf = null;
+
 // ── NEW EFFECTS v2 ──
 // Threshold
 let thresholdLevel = 128;
@@ -347,6 +357,18 @@ let pixelMode = 'square';
 
 let videoX, videoY, videoW, videoH;
 let currentVideoUrl = null;
+
+// ── COORDINATE HELPERS ──
+function videoToScreenCoords(vx, vy) {
+    let sx = map(vx, 0, videoEl.width, videoX, videoX + videoW);
+    if (usingWebcam) sx = 2 * videoX + videoW - sx;
+    return { x: sx, y: map(vy, 0, videoEl.height, videoY, videoY + videoH) };
+}
+function screenToVideoCoords(sx, sy) {
+    let vx = map(sx, videoX, videoX + videoW, 0, videoEl.width);
+    if (usingWebcam) vx = videoEl.width - vx;
+    return { x: vx, y: map(sy, videoY, videoY + videoH, 0, videoEl.height) };
+}
 
 // Video zoom/pan state
 let vidZoom = 1;
@@ -1650,6 +1672,7 @@ function setup() {
     background(0);
     textFont('Helvetica Neue');
     textSize(11);
+    restoreLayerState();
 
     // Video zoom: scroll on canvas (no modifier = video zoom, Ctrl = timeline zoom)
     canvas.elt.addEventListener('wheel', (e) => {
@@ -1860,7 +1883,7 @@ function draw() {
         }
 
         // MASK AI segmentation overlay — brief flash on selection
-        if (currentMode === 14 && maskOverlay) {
+        if (currentMode === 14 && maskOverlay && maskOverlayVisible) {
             push();
             // Fade overlay out over 1.5s after auto-finalize
             if (maskReady && maskIndicatorStart > 0) {
@@ -1932,13 +1955,28 @@ function draw() {
         }
 
         // VIDEO mode: apply effects to video only (before blobs)
-        if (!fxLayerAll) {
+        if (!fxLayerAll && fxMasterOpacity > 0) {
+            // Snapshot pre-FX canvas for opacity blending
+            if (fxMasterOpacity < 1.0) {
+                if (!_fxOpacityBuf || _fxOpacityBuf.width !== drawingContext.canvas.width || _fxOpacityBuf.height !== drawingContext.canvas.height) {
+                    _fxOpacityBuf = document.createElement('canvas');
+                    _fxOpacityBuf.width = drawingContext.canvas.width;
+                    _fxOpacityBuf.height = drawingContext.canvas.height;
+                }
+                _fxOpacityBuf.getContext('2d').drawImage(drawingContext.canvas, 0, 0);
+            }
             _applySplitSideFx(() => {
                 try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
                 try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
                 if (typeof applyPerEffectAudioSync === 'function') applyPerEffectAudioSync();
                 processShaderFX();
             });
+            if (fxMasterOpacity < 1.0) {
+                drawingContext.save();
+                drawingContext.globalAlpha = 1.0 - fxMasterOpacity;
+                drawingContext.drawImage(_fxOpacityBuf, 0, 0);
+                drawingContext.restore();
+            }
         }
 
         // Video overlay (after effects, before blob tracking)
@@ -1993,6 +2031,15 @@ function draw() {
         }
 
         // Clip all blob/line drawing to the video frame
+        if (blobsVisible && blobsOpacity > 0) {
+        if (blobsOpacity < 1.0) {
+            if (!_blobOpacityBuf || _blobOpacityBuf.width !== drawingContext.canvas.width || _blobOpacityBuf.height !== drawingContext.canvas.height) {
+                _blobOpacityBuf = document.createElement('canvas');
+                _blobOpacityBuf.width = drawingContext.canvas.width;
+                _blobOpacityBuf.height = drawingContext.canvas.height;
+            }
+            _blobOpacityBuf.getContext('2d').drawImage(drawingContext.canvas, 0, 0);
+        }
         drawingContext.save();
         drawingContext.beginPath();
         drawingContext.rect(videoX, videoY, videoW, videoH);
@@ -2014,9 +2061,8 @@ function draw() {
             if (activeVizModes.has(10) || activeVizModes.has(11) || activeVizModes.has(12)) {
                 // ZOOM / THERMO / ASCII — video crop inside blob
                 push();
-                let srcX = map(p.posicao.x, videoX, videoX + videoW, 0, videoEl.width);
-                if (usingWebcam) srcX = videoEl.width - srcX; // mirror source for webcam
-                let srcY = map(p.posicao.y, videoY, videoY + videoH, 0, videoEl.height);
+                let _vc = screenToVideoCoords(p.posicao.x, p.posicao.y);
+                let srcX = _vc.x, srcY = _vc.y;
                 let isFaceZoom = false;
                 let absZoom = Math.abs(vizZoomLevel);
                 let sampleR;
@@ -2155,22 +2201,43 @@ function draw() {
         }
 
         drawingContext.restore(); // end clip
+        if (blobsOpacity < 1.0) {
+            drawingContext.save();
+            drawingContext.globalAlpha = 1.0 - blobsOpacity;
+            drawingContext.drawImage(_blobOpacityBuf, 0, 0);
+            drawingContext.restore();
+        }
+        } // end blobsVisible
 
         // ALL mode: apply effects to everything including blobs
-        if (fxLayerAll) {
+        if (fxLayerAll && fxMasterOpacity > 0) {
+            if (fxMasterOpacity < 1.0) {
+                if (!_fxOpacityBuf || _fxOpacityBuf.width !== drawingContext.canvas.width || _fxOpacityBuf.height !== drawingContext.canvas.height) {
+                    _fxOpacityBuf = document.createElement('canvas');
+                    _fxOpacityBuf.width = drawingContext.canvas.width;
+                    _fxOpacityBuf.height = drawingContext.canvas.height;
+                }
+                _fxOpacityBuf.getContext('2d').drawImage(drawingContext.canvas, 0, 0);
+            }
             _applySplitSideFx(() => {
                 try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
                 try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
                 if (typeof applyPerEffectAudioSync === 'function') applyPerEffectAudioSync();
                 processShaderFX();
             });
+            if (fxMasterOpacity < 1.0) {
+                drawingContext.save();
+                drawingContext.globalAlpha = 1.0 - fxMasterOpacity;
+                drawingContext.drawImage(_fxOpacityBuf, 0, 0);
+                drawingContext.restore();
+            }
         }
 
         // Update timeline playhead
         if (getTimelineDuration() > 0) updateTimelinePlayhead();
     }
     // Flash overlay on beat (FLASH sync target only — too intense in MIX)
-    if (audioSync && audioSyncTarget === 'flash' && beatIntensity > 0.02) {
+    if (audioSync && audioSyncTarget === 'flash' && beatIntensity > 0.02 && beatFlashVisible) {
         push();
         noStroke();
         fill(255, beatIntensity * 160);
@@ -3395,6 +3462,31 @@ function updateButtonStates() {
     const colorModes = new Set([1, 2, 5, 10, 11, 13]);
     let g1 = document.getElementById('group-1');
     if (g1) g1.classList.toggle('param-dimmed', !colorModes.has(currentMode));
+
+    // Sync layer panel
+    if (typeof updateLayerStates === 'function') updateLayerStates();
+}
+
+// ── LAYER PERSISTENCE ──────────────────────
+function saveLayerState() {
+    try {
+        localStorage.setItem('blobfx-layers', JSON.stringify({
+            blobsVisible, blobsOpacity, fxMasterOpacity,
+            maskOverlayVisible, beatFlashVisible
+        }));
+    } catch(e) {}
+}
+function restoreLayerState() {
+    try {
+        const s = JSON.parse(localStorage.getItem('blobfx-layers'));
+        if (s) {
+            if (typeof s.blobsVisible === 'boolean') blobsVisible = s.blobsVisible;
+            if (typeof s.blobsOpacity === 'number') blobsOpacity = s.blobsOpacity;
+            if (typeof s.fxMasterOpacity === 'number') fxMasterOpacity = s.fxMasterOpacity;
+            if (typeof s.maskOverlayVisible === 'boolean') maskOverlayVisible = s.maskOverlayVisible;
+            if (typeof s.beatFlashVisible === 'boolean') beatFlashVisible = s.beatFlashVisible;
+        }
+    } catch(e) {}
 }
 
 // ── TOP BAR STATUS ──────────────────────

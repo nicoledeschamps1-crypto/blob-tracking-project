@@ -157,10 +157,8 @@ function trackPoints() {
 
         for (let i = 0; i < numPoints; i++) {
             let c = candidates[i];
-            let screenX = map(c.x, 0, w, videoX, videoX + videoW);
-            if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
-            let screenY = map(c.y, 0, h, videoY, videoY + videoH);
-            trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
+            let sc = videoToScreenCoords(c.x, c.y);
+            trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
         }
         return;
     }
@@ -208,10 +206,8 @@ function trackPoints() {
         let blobVarLevel = paramValues[6];
         for (let i = 0; i < numPoints; i++) {
             let c = candidates[i];
-            let screenX = map(c.x, 0, w, videoX, videoX + videoW);
-            if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
-            let screenY = map(c.y, 0, h, videoY, videoY + videoH);
-            trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
+            let sc = videoToScreenCoords(c.x, c.y);
+            trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
         }
         return;
     }
@@ -354,10 +350,8 @@ function trackPoints() {
 
     for (let i = 0; i < numPoints; i++) {
         let c = candidates[i];
-        let screenX = map(c.x, 0, w, videoX, videoX + videoW);
-        if (usingWebcam) screenX = 2 * videoX + videoW - screenX;
-        let screenY = map(c.y, 0, h, videoY, videoY + videoH);
-        trackedPoints.push(new TrackedPoint(screenX, screenY, c.c, blobVarLevel));
+        let sc = videoToScreenCoords(c.x, c.y);
+        trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
     }
 }
 
