@@ -143,7 +143,7 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        canvas {
+        canvas#defaultCanvas0 {
             display: block;
             position: absolute;
             top: 0;
@@ -826,6 +826,59 @@
             color: var(--text-muted);
         }
 
+        /* ═══ PER-EFFECT AUDIO SYNC ═══ */
+        .fx-audio-sync {
+            margin-top: 8px;
+            border-top: 1px solid rgba(169,102,255,0.08);
+        }
+        .fx-audio-sync-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0 4px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .sync-label {
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .sync-label.active {
+            color: #8B45E8;
+        }
+        .fx-audio-sync.collapsed .fx-audio-sync-body {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .fx-audio-sync-body {
+            max-height: 400px;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out, opacity 0.15s ease-out;
+            opacity: 1;
+            padding: 0 2px;
+        }
+        .fx-audio-sync-body .selector-btn {
+            font-size: 7px;
+            padding: 2px 5px;
+        }
+        .fx-audio-sync-meter {
+            height: 4px;
+            background: var(--color-surface);
+            border-radius: 2px;
+            margin: 6px 0 2px;
+        }
+        .fx-audio-sync-meter-fill {
+            height: 100%;
+            background: #8B45E8;
+            border-radius: 2px;
+            transition: width 50ms linear;
+        }
+
         /* ═══ FX EFFECT CARDS ═══ */
         .fx-card-grid {
             display: grid;
@@ -1435,8 +1488,8 @@
         #timeline-container {
             position: fixed;
             bottom: 10px;
-            left: 280px;
-            right: 280px;
+            left: 358px;
+            right: 358px;
             height: var(--tl-height);
             background: rgba(12, 9, 16, 0.97);
             backdrop-filter: blur(14px);
@@ -1828,6 +1881,86 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        /* ═══ AUDIO SYNC SUB-LANES ═══ */
+        .tl-audio-sublanes {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            max-height: 100px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .tl-audio-sublanes.hidden { display: none; }
+        .tl-audio-sublane {
+            height: 20px;
+            display: flex;
+            align-items: center;
+            background: rgba(12,9,16,0.6);
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+        .tl-sublane-label {
+            width: 60px;
+            font-size: 7px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-left: 4px;
+            flex-shrink: 0;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            z-index: 1;
+        }
+        .tl-sublane-mute {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            opacity: 0.6;
+            font-size: 10px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0;
+        }
+        .tl-sublane-mute:hover { opacity: 1; }
+        .tl-sublane-mute.muted { opacity: 0.3; }
+        .tl-sublane-canvas {
+            flex: 1;
+            height: 100%;
+            display: block;
+        }
+        .tl-sublane-playhead {
+            position: absolute;
+            width: 1px;
+            top: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.6);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .tl-sublane-region {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 1px;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .tl-sublane-region .region-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            cursor: ew-resize;
+        }
+        .tl-sublane-region .region-handle-left { left: -2px; }
+        .tl-sublane-region .region-handle-right { right: -2px; }
+
         #tl-drag-hint {
             font-size: var(--font-sm);
             color: var(--text-muted);
@@ -2366,13 +2499,12 @@
         /* ═══ TOP BAR ═══ */
         #top-bar {
             position: fixed;
-            top: 4px;
+            top: 0;
             left: 0;
             right: 0;
-            height: 32px;
-            background: var(--color-panel);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(169,102,255,0.08);
+            height: 36px;
+            background: linear-gradient(to right in oklch, oklch(40% 0.28 15) 0%, oklch(40% 0.27 5) 18%, oklch(38% 0.24 340) 40%, oklch(35% 0.22 310) 65%, oklch(30% 0.20 285) 100%);
+            border-bottom: 1px solid rgba(169,102,255,0.15);
             z-index: 1000;
             display: flex;
             align-items: center;
@@ -2452,7 +2584,45 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
-        #top-bar .tb-fps { font-variant-numeric: tabular-nums; }
+        /* App title in top bar */
+        .tb-title-zone { gap: 5px !important; }
+        .tb-saturn { opacity: 0.85; flex-shrink: 0; }
+        .tb-app-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.85);
+            white-space: nowrap;
+        }
+        /* Record group subtle background */
+        .tb-record-group {
+            background: rgba(255,255,255,0.06);
+            border-radius: var(--radius-md);
+            padding: 2px 4px;
+        }
+        /* FX count badge */
+        .tb-fx-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--color-accent-light);
+            letter-spacing: 0.3px;
+            font-family: 'Commit Mono', monospace;
+        }
+        .tb-fx-badge:empty { display: none; }
+        .tb-fx-badge:empty + .tb-divider { display: none; }
+        /* FPS hover reveal */
+        #top-bar .tb-fps {
+            font-variant-numeric: tabular-nums;
+            opacity: 0;
+            transition: opacity 0.2s;
+            width: 0;
+            overflow: hidden;
+        }
+        #top-bar:hover .tb-fps {
+            opacity: 1;
+            width: auto;
+        }
         #top-bar .tb-fps.good { color: var(--color-success); }
         #top-bar .tb-fps.warn { color: var(--color-yellow); }
         #top-bar .tb-fps.bad { color: var(--color-danger); }
@@ -2645,7 +2815,7 @@
 
         @media (max-width: 1200px) {
             .panel { width: 240px; padding: var(--sp-4); }
-            #timeline-container { left: 290px; right: 290px; }
+            #timeline-container { left: 318px; right: 318px; } /* 240+40+2+24+12 */
         }
         @media (max-width: 900px) {
             /* Off-canvas drawer mode */
@@ -3015,21 +3185,12 @@
             letter-spacing: 0.3px;
         }
 
-        /* ═══ RED→PURPLE GRADIENT ACCENT BAR ═══ */
-        #accent-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(to right in oklch, oklch(55% 0.28 25), oklch(55% 0.28 330), oklch(60% 0.28 300), oklch(58% 0.26 285));
-            z-index: 9999;
-            pointer-events: none;
-        }
-        /* sRGB fallback for older browsers */
+        /* Accent bar hidden — gradient moved to top-bar */
+        #accent-bar { display: none; }
+        /* sRGB fallback for top-bar gradient */
         @supports not (background: linear-gradient(to right in oklch, red, blue)) {
-            #accent-bar {
-                background: linear-gradient(to right, #E8001D 0%, #C2006E 30%, #B300C0 60%, #7B2DFF 100%);
+            #top-bar {
+                background: linear-gradient(to right, #8B0000 0%, #7A0020 18%, #6B0050 40%, #4A0070 65%, #2D0060 100%);
             }
         }
 
@@ -3128,6 +3289,10 @@
     <!-- ═══ TOP BAR ═══ -->
     <header id="top-bar" role="toolbar" aria-label="Main toolbar">
         <button class="drawer-toggle" id="drawer-toggle-left" title="Open tracking panel" aria-label="Open tracking panel">&#9776;</button>
+        <!-- Saturn icon -->
+        <svg class="tb-saturn" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="11" ry="3.5" transform="rotate(-25 12 12)"/></svg>
+        <div class="tb-divider"></div>
+        <!-- Transport -->
         <div class="tb-zone">
             <button class="tb-btn" id="tb-play" title="Play/Pause (Space)" aria-label="Play or Pause" data-tooltip="Play/Pause (Space)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -3135,6 +3300,10 @@
             <button class="tb-btn" id="tb-restart" title="Restart (Home)" aria-label="Restart" data-tooltip="Restart (Home)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
             </button>
+        </div>
+        <div class="tb-divider"></div>
+        <!-- Record group -->
+        <div class="tb-zone tb-record-group">
             <button class="tb-btn" id="tb-record" title="Record (Shift+R)" aria-label="Toggle Recording" data-tooltip="Record (Shift+R)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>
             </button>
@@ -3144,18 +3313,24 @@
             <button class="tb-btn" id="tb-photo" title="Screenshot (P)" aria-label="Take Screenshot" data-tooltip="Screenshot (P)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg>
             </button>
-        </div>
-        <div class="tb-divider"></div>
-        <div class="tb-zone">
             <span class="tb-rec-dot" id="tb-rec-dot"></span>
             <span class="tb-status" id="tb-rec-time"></span>
         </div>
+        <!-- Right zone -->
         <div class="tb-zone tb-zone-right" aria-live="polite">
-            <span class="tb-status tb-fps" id="tb-fps">--</span>
+            <span class="tb-fx-badge" id="tb-fx-badge" title="Active effects"></span>
             <div class="tb-divider"></div>
+            <span class="tb-status tb-fps" id="tb-fps"></span>
             <span class="tb-status no-source" id="tb-source">NO SOURCE</span>
             <div class="tb-divider"></div>
             <span class="tb-status" id="tb-mode">OFF</span>
+            <div class="tb-divider"></div>
+            <button class="tb-btn" id="tb-settings-btn" title="Settings" aria-label="Settings">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+            </button>
+            <button class="tb-btn" id="tb-help-btn" title="Help (?)" aria-label="Help">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+            </button>
         </div>
         <button class="drawer-toggle" id="drawer-toggle-right" title="Open effects panel" aria-label="Open effects panel">FX</button>
     </header>
@@ -3197,7 +3372,6 @@
             </div>
             <div class="subtitle">
                 | Made with HUESOFSATURN
-                | Source: <a href="https://instagram.com/pbltrr" target="_blank">@pbltrr</a>
             </div>
         </div>
 
@@ -3827,6 +4001,7 @@
                 </div>
             </div>
         </div>
+        <div id="tl-audio-sublanes" class="tl-audio-sublanes hidden"></div>
         <div id="tl-drag-hint">drag effects/modes to place &bull; + BLOB = snapshot params at playhead &bull; alt+drag waveform = offset audio</div>
     </div>
     <div id="drag-ghost"></div>
@@ -4003,12 +4178,12 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260324"></script>
-<script src="blob-fx.js?v=20260324"></script>
-<script src="blob-shader-fx.js?v=20260324"></script>
+<script src="blob-core.js?v=20260325"></script>
+<script src="blob-fx.js?v=20260325"></script>
+<script src="blob-shader-fx.js?v=20260325"></script>
 <script src="blob-overlay.js?v=20260324"></script>
-<script src="blob-audio.js?v=20260324"></script>
-<script src="blob-timeline.js?v=20260324"></script>
+<script src="blob-audio.js?v=20260325"></script>
+<script src="blob-timeline.js?v=20260325"></script>
 <script src="blob-mask.js?v=20260324"></script>
 <script src="blob-tracking.js?v=20260324"></script>
 

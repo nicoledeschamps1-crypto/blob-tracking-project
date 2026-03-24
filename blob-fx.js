@@ -62,7 +62,7 @@ const EFFECT_TYPES = {
         'bloom','dither','atkinson','pxsort','pixel',
         'y2kblue',
         'glitch','noise','grain','crt',
-        'ntsc','paperscan','xerox','grunge'],
+        'ntsc','paperscan','xerox','grunge','datamosh','pxsortgpu'],
     hybrid: ['halftone','ascii','dots','led','printstamp'],
     draw: ['grid','scanlines','vignette','stripe']
 };
@@ -2417,6 +2417,8 @@ function buildFxPanel() {
                 group.appendChild(row);
             }
         });
+        // ── AUDIO SYNC SECTION ──
+        buildFxAudioSyncSection(effectName, group);
         container.appendChild(group);
     }
 
@@ -2994,6 +2996,259 @@ function updateDropdownMarkers() {
 }
 
 // ---------------------------------------------------------------------------
+// buildFxAudioSyncSection() — collapsible per-effect audio sync controls
+// ---------------------------------------------------------------------------
+function buildFxAudioSyncSection(effectName, group) {
+    let paramMap = FX_PARAM_MAP[effectName];
+    if (!paramMap || paramMap.length === 0) return;
+
+    // Filter to numeric params only
+    let defaults = FX_DEFAULTS[effectName] || {};
+    let numericParams = paramMap.filter((p, i) => {
+        let def = defaults[p.v];
+        return typeof def === 'number' || def === undefined;
+    });
+    if (numericParams.length === 0) return;
+
+    let section = document.createElement('div');
+    section.className = 'fx-audio-sync collapsed';
+    section.id = 'fx-audio-sync-' + effectName;
+
+    // Header row
+    let header = document.createElement('div');
+    header.className = 'fx-audio-sync-header';
+    header.innerHTML =
+        `<span class="sync-label">AUDIO SYNC</span>` +
+        `<label class="fx-toggle-switch" style="margin-left:auto" onclick="event.stopPropagation()">` +
+            `<input type="checkbox" id="fx-async-toggle-${effectName}">` +
+            `<span class="toggle-slider"></span>` +
+        `</label>` +
+        `<span class="sync-chevron" style="font-size:10px;color:var(--text-muted);transition:transform 0.2s">›</span>`;
+    section.appendChild(header);
+
+    // Body
+    let body = document.createElement('div');
+    body.className = 'fx-audio-sync-body';
+
+    // Parameter selector
+    let paramRow = document.createElement('div');
+    paramRow.style.cssText = 'margin:6px 0 4px;';
+    let paramLabel = document.createElement('label');
+    paramLabel.style.cssText = 'font-size:8px;font-weight:700;letter-spacing:0.5px;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:2px';
+    paramLabel.textContent = 'Target Parameter';
+    let paramSelect = document.createElement('select');
+    paramSelect.id = 'fx-async-param-' + effectName;
+    paramSelect.style.cssText = 'width:100%;background:var(--btn-bg);color:var(--text-primary);border:1px solid var(--btn-border);border-radius:4px;padding:3px 6px;font-size:9px;outline:none';
+    numericParams.forEach((p, idx) => {
+        let opt = document.createElement('option');
+        opt.value = idx;
+        // Convert camelCase to readable label
+        let label = p.v.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+        opt.textContent = label;
+        paramSelect.appendChild(opt);
+    });
+    paramRow.appendChild(paramLabel);
+    paramRow.appendChild(paramSelect);
+    body.appendChild(paramRow);
+
+    // Band selector
+    let bandLabel = document.createElement('label');
+    bandLabel.style.cssText = 'font-size:8px;font-weight:700;letter-spacing:0.5px;color:var(--text-muted);text-transform:uppercase;display:block;margin:6px 0 2px';
+    bandLabel.textContent = 'Frequency Band';
+    body.appendChild(bandLabel);
+    let bandRow = document.createElement('div');
+    bandRow.className = 'selector-row';
+    bandRow.id = 'fx-async-band-' + effectName;
+    ['kick','bass','vocal','hats','full'].forEach((b, i) => {
+        let btn = document.createElement('button');
+        btn.className = 'selector-btn' + (i === 0 ? ' active' : '');
+        btn.dataset.value = b;
+        btn.textContent = b.toUpperCase();
+        bandRow.appendChild(btn);
+    });
+    body.appendChild(bandRow);
+
+    // Sliders: Sensitivity, Threshold, Release
+    let sliders = [
+        {id: 'sensitivity', label: 'Sensitivity', min: 0, max: 100, val: 50},
+        {id: 'threshold', label: 'Threshold', min: 0, max: 100, val: 10},
+        {id: 'release', label: 'Release', min: 0, max: 100, val: 40}
+    ];
+    sliders.forEach(s => {
+        let row = document.createElement('div');
+        row.className = 'fx-inline-slider';
+        row.innerHTML =
+            `<label class="fx-slider-label">${s.label}</label>` +
+            `<input type="range" id="fx-async-${s.id}-${effectName}" min="${s.min}" max="${s.max}" step="1" value="${s.val}">` +
+            `<input type="number" id="fx-async-${s.id}-val-${effectName}" min="${s.min}" max="${s.max}" step="1" value="${s.val}" style="width:36px">`;
+        body.appendChild(row);
+    });
+
+    // Energy meter
+    let meterWrap = document.createElement('div');
+    meterWrap.className = 'fx-audio-sync-meter';
+    meterWrap.innerHTML = `<div class="fx-audio-sync-meter-fill" id="fx-audio-meter-${effectName}" style="width:0%"></div>`;
+    body.appendChild(meterWrap);
+
+    section.appendChild(body);
+    group.appendChild(section);
+}
+
+// ---------------------------------------------------------------------------
+// wireFxAudioSync() — wire per-effect audio sync controls + persistence
+// ---------------------------------------------------------------------------
+let _fxAudioSyncSaveTimer = null;
+function _saveFxAudioSync() {
+    clearTimeout(_fxAudioSyncSaveTimer);
+    _fxAudioSyncSaveTimer = setTimeout(() => {
+        let data = {};
+        for (let [k, v] of Object.entries(fxAudioSync)) {
+            data[k] = { enabled: v.enabled, band: v.band, paramIndex: v.paramIndex,
+                         sensitivity: v.sensitivity, threshold: v.threshold, release: v.release,
+                         regions: v.regions || [] };
+        }
+        try { localStorage.setItem('blobfx-audio-sync', JSON.stringify(data)); } catch(e) {}
+    }, 500);
+}
+
+function _loadFxAudioSync() {
+    try {
+        let raw = localStorage.getItem('blobfx-audio-sync');
+        if (!raw) return;
+        let data = JSON.parse(raw);
+        for (let [k, v] of Object.entries(data)) {
+            fxAudioSync[k] = Object.assign({}, FX_AUDIO_SYNC_DEFAULTS, v, { smoothedValue: 0 });
+        }
+    } catch(e) {}
+}
+
+function _ensureFxAudioSync(effectName) {
+    if (!fxAudioSync[effectName]) {
+        fxAudioSync[effectName] = Object.assign({}, FX_AUDIO_SYNC_DEFAULTS);
+    }
+    return fxAudioSync[effectName];
+}
+
+function syncFxAudioSyncUI(effectName) {
+    let cfg = fxAudioSync[effectName];
+    if (!cfg) return;
+    let section = document.getElementById('fx-audio-sync-' + effectName);
+    if (!section) return;
+
+    let toggle = document.getElementById('fx-async-toggle-' + effectName);
+    if (toggle) toggle.checked = cfg.enabled;
+
+    section.classList.toggle('collapsed', !cfg.enabled);
+    let label = section.querySelector('.sync-label');
+    if (label) label.classList.toggle('active', cfg.enabled);
+    let chevron = section.querySelector('.sync-chevron');
+    if (chevron) chevron.style.transform = cfg.enabled ? 'rotate(90deg)' : '';
+
+    let paramSel = document.getElementById('fx-async-param-' + effectName);
+    if (paramSel) paramSel.value = cfg.paramIndex;
+
+    // Band buttons
+    let bandBtns = document.querySelectorAll('#fx-async-band-' + effectName + ' .selector-btn');
+    bandBtns.forEach(b => b.classList.toggle('active', b.dataset.value === cfg.band));
+
+    // Sliders
+    ['sensitivity','threshold','release'].forEach(key => {
+        let sl = document.getElementById('fx-async-' + key + '-' + effectName);
+        let inp = document.getElementById('fx-async-' + key + '-val-' + effectName);
+        if (sl) sl.value = cfg[key];
+        if (inp) inp.value = cfg[key];
+    });
+}
+
+function wireFxAudioSyncListeners() {
+    for (let effectName of Object.keys(FX_UI_CONFIG)) {
+        let section = document.getElementById('fx-audio-sync-' + effectName);
+        if (!section) continue;
+
+        // Toggle
+        let toggle = document.getElementById('fx-async-toggle-' + effectName);
+        if (toggle) {
+            toggle.addEventListener('change', () => {
+                let cfg = _ensureFxAudioSync(effectName);
+                cfg.enabled = toggle.checked;
+                cfg._baseValue = null; // recapture baseline on next frame
+                section.classList.toggle('collapsed', !cfg.enabled);
+                let label = section.querySelector('.sync-label');
+                if (label) label.classList.toggle('active', cfg.enabled);
+                let chevron = section.querySelector('.sync-chevron');
+                if (chevron) chevron.style.transform = cfg.enabled ? 'rotate(90deg)' : '';
+                _saveFxAudioSync();
+                if (typeof renderAudioSyncSublanes === 'function') renderAudioSyncSublanes();
+            });
+        }
+
+        // Header click expands/collapses (but not toggle click)
+        let header = section.querySelector('.fx-audio-sync-header');
+        if (header) {
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('.fx-toggle-switch')) return;
+                let cfg = fxAudioSync[effectName];
+                if (!cfg || !cfg.enabled) return; // can only collapse/expand when enabled
+                section.classList.toggle('collapsed');
+                let chevron = section.querySelector('.sync-chevron');
+                if (chevron) chevron.style.transform = section.classList.contains('collapsed') ? '' : 'rotate(90deg)';
+            });
+        }
+
+        // Parameter selector
+        let paramSel = document.getElementById('fx-async-param-' + effectName);
+        if (paramSel) {
+            paramSel.addEventListener('change', () => {
+                let cfg = _ensureFxAudioSync(effectName);
+                cfg.paramIndex = parseInt(paramSel.value) || 0;
+                cfg._baseValue = null; // recapture on next frame
+                _saveFxAudioSync();
+            });
+        }
+
+        // Band selector
+        document.querySelectorAll('#fx-async-band-' + effectName + ' .selector-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                let cfg = _ensureFxAudioSync(effectName);
+                cfg.band = btn.dataset.value;
+                document.querySelectorAll('#fx-async-band-' + effectName + ' .selector-btn')
+                    .forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                _saveFxAudioSync();
+            });
+        });
+
+        // Sliders
+        ['sensitivity','threshold','release'].forEach(key => {
+            let sl = document.getElementById('fx-async-' + key + '-' + effectName);
+            let inp = document.getElementById('fx-async-' + key + '-val-' + effectName);
+            if (sl && inp) {
+                sl.addEventListener('input', () => {
+                    let v = parseFloat(sl.value);
+                    inp.value = v;
+                    let cfg = _ensureFxAudioSync(effectName);
+                    cfg[key] = v;
+                    _saveFxAudioSync();
+                });
+                inp.addEventListener('change', () => {
+                    let v = Math.max(parseFloat(sl.min), Math.min(parseFloat(sl.max), parseFloat(inp.value) || 0));
+                    sl.value = v; inp.value = v;
+                    let cfg = _ensureFxAudioSync(effectName);
+                    cfg[key] = v;
+                    _saveFxAudioSync();
+                });
+                inp.addEventListener('keydown', e => e.stopPropagation());
+            }
+        });
+
+        // Sync UI if config was loaded from localStorage
+        if (fxAudioSync[effectName]) {
+            syncFxAudioSyncUI(effectName);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // setupFxUIListeners() — Effecto-style panel build + event wiring
 // ---------------------------------------------------------------------------
 function setupFxUIListeners() {
@@ -3044,6 +3299,9 @@ function setupFxUIListeners() {
         });
     }
 
+    // ── LOAD PERSISTED AUDIO SYNC ──
+    _loadFxAudioSync();
+
     // ── BUILD THE PANEL ──
     buildFxPanel();
     buildPresetPanel();
@@ -3070,6 +3328,9 @@ function setupFxUIListeners() {
             }
         });
     }
+
+    // ── PER-EFFECT AUDIO SYNC ──
+    wireFxAudioSyncListeners();
 
     // ── SWATCH GRIDS ──
     // Halftone presets (special: sets ink + paper colors)

@@ -207,6 +207,7 @@ function refreshTimeline() {
     updateScrollIndicator();
     renderSongOverview();
     updateAudioSectionIndicator();
+    if (typeof renderAudioSyncSublanes === 'function') renderAudioSyncSublanes();
 }
 
 // ── Core Timeline Functions ──────────────
@@ -360,6 +361,9 @@ function updateTimelinePlayhead() {
         let seg = timelineSegments.find(s => s.id == el.dataset.id);
         if (seg) el.classList.toggle('active', currentTime >= seg.startTime && currentTime <= seg.endTime);
     });
+
+    // Update audio sync sub-lane playheads
+    if (typeof updateSublanePlayheads === 'function') updateSublanePlayheads();
 }
 
 function formatTime(s) {
@@ -650,6 +654,317 @@ function renderTimelineWaveform() {
             container.appendChild(marker);
             _cachedBeatMarkers.push(marker);
         }
+    }
+}
+
+// ── Audio Sync Sub-Lanes ──────────────────────────────────────────────────
+let _sublaneCache = {};      // { effectName: { canvas, ctx, muteBtn, playhead } }
+let _sublaneRegionDrag = null;
+
+function renderAudioSyncSublanes() {
+    let container = document.getElementById('tl-audio-sublanes');
+    if (!container) return;
+
+    // Gather enabled effects
+    let enabled = [];
+    if (typeof fxAudioSync !== 'undefined') {
+        for (let [name, cfg] of Object.entries(fxAudioSync)) {
+            if (cfg.enabled) enabled.push(name);
+        }
+    }
+
+    if (enabled.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+
+    // Build/update sub-lane DOM elements
+    let existing = container.querySelectorAll('.tl-audio-sublane');
+    let existingMap = {};
+    existing.forEach(el => { existingMap[el.dataset.effect] = el; });
+
+    // Remove stale lanes
+    existing.forEach(el => {
+        if (!enabled.includes(el.dataset.effect)) {
+            el.remove();
+            delete _sublaneCache[el.dataset.effect];
+        }
+    });
+
+    let vr = getVisibleTimeRange();
+    let dur = getTimelineDuration();
+    if (!dur) return;
+
+    enabled.forEach(effectName => {
+        let lane = existingMap[effectName];
+        if (!lane) {
+            lane = _createSublane(effectName);
+            container.appendChild(lane);
+        }
+        _drawSublaneWaveform(effectName, vr, dur);
+        _drawSublaneRegions(effectName, vr, dur);
+        _updateSublanePlayhead(effectName, vr);
+    });
+}
+
+function _createSublane(effectName) {
+    let lane = document.createElement('div');
+    lane.className = 'tl-audio-sublane';
+    lane.dataset.effect = effectName;
+
+    let cfg = fxAudioSync[effectName];
+    let catColor = '#8B45E8';
+    if (typeof FX_CAT_COLORS !== 'undefined' && typeof FX_CATEGORIES !== 'undefined') {
+        catColor = FX_CAT_COLORS[FX_CATEGORIES[effectName]] || catColor;
+    }
+    lane.style.borderLeft = '2px solid ' + catColor;
+
+    // Label + mute
+    let label = document.createElement('div');
+    label.className = 'tl-sublane-label';
+    let muteBtn = document.createElement('button');
+    muteBtn.className = 'tl-sublane-mute';
+    muteBtn.textContent = '\u266A'; // music note
+    muteBtn.title = 'Toggle audio sync';
+    muteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cfg.enabled = !cfg.enabled;
+        muteBtn.classList.toggle('muted', !cfg.enabled);
+        // Sync FX panel toggle
+        let panelToggle = document.getElementById('fx-async-toggle-' + effectName);
+        if (panelToggle) panelToggle.checked = cfg.enabled;
+        let section = document.getElementById('fx-audio-sync-' + effectName);
+        if (section) {
+            section.classList.toggle('collapsed', !cfg.enabled);
+            let lbl = section.querySelector('.sync-label');
+            if (lbl) lbl.classList.toggle('active', cfg.enabled);
+        }
+        if (typeof _saveFxAudioSync === 'function') _saveFxAudioSync();
+        renderAudioSyncSublanes();
+    });
+    let nameSpan = document.createElement('span');
+    let uiCfg = typeof FX_UI_CONFIG !== 'undefined' ? FX_UI_CONFIG[effectName] : null;
+    nameSpan.textContent = uiCfg ? uiCfg.label : effectName.toUpperCase();
+    nameSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38px';
+    label.appendChild(muteBtn);
+    label.appendChild(nameSpan);
+    lane.appendChild(label);
+
+    // Canvas
+    let canvas = document.createElement('canvas');
+    canvas.className = 'tl-sublane-canvas';
+    canvas.height = 20;
+    lane.appendChild(canvas);
+
+    // Playhead indicator
+    let playhead = document.createElement('div');
+    playhead.className = 'tl-sublane-playhead';
+    lane.appendChild(playhead);
+
+    _sublaneCache[effectName] = { canvas, ctx: null, muteBtn, playhead, lane };
+
+    // Phase 3: region creation via click-drag on canvas
+    _setupSublaneRegionDrag(effectName, canvas);
+
+    return lane;
+}
+
+function _drawSublaneWaveform(effectName, vr, dur) {
+    let cache = _sublaneCache[effectName];
+    if (!cache) return;
+    let canvas = cache.canvas;
+    let rect = canvas.parentElement.getBoundingClientRect();
+    let w = Math.max(rect.width - 60, 100); // minus label width
+    canvas.width = w;
+    let ctx = canvas.getContext('2d');
+    cache.ctx = ctx;
+    ctx.clearRect(0, 0, w, 20);
+
+    let cfg = fxAudioSync[effectName];
+    let catColor = '#8B45E8';
+    if (typeof FX_CAT_COLORS !== 'undefined' && typeof FX_CATEGORIES !== 'undefined') {
+        catColor = FX_CAT_COLORS[FX_CATEGORIES[effectName]] || catColor;
+    }
+
+    // Use pre-analyzed waveform data if available
+    let waveData = null;
+    if (typeof tlWaveform !== 'undefined' && tlWaveform) {
+        let bandKey = cfg.band === 'kick' ? 'bass' : cfg.band === 'hats' ? 'high' :
+                      cfg.band === 'vocal' ? 'mid' : cfg.band === 'bass' ? 'bass' : 'full';
+        waveData = tlWaveform[bandKey] || tlWaveform.full;
+    }
+
+    if (!waveData || waveData.length === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.font = '8px sans-serif';
+        ctx.fillText('no audio', w/2 - 18, 13);
+        return;
+    }
+
+    // Determine if regions exist for opacity handling
+    let hasRegions = cfg.regions && cfg.regions.length > 0;
+
+    // Draw waveform bars
+    let barCount = Math.min(w, waveData.length);
+    let samplesPerBar = waveData.length / barCount;
+    let visStart = vr.start / dur;
+    let visEnd = vr.end / dur;
+
+    ctx.fillStyle = catColor;
+    for (let i = 0; i < barCount; i++) {
+        let t = visStart + (i / barCount) * (visEnd - visStart);
+        let sampleIdx = Math.floor(t * waveData.length);
+        if (sampleIdx < 0 || sampleIdx >= waveData.length) continue;
+        let val = waveData[sampleIdx];
+        let h = Math.sqrt(val) * 18;
+        let barTime = t * dur;
+
+        // Regions: dim waveform outside active regions
+        if (hasRegions) {
+            let inRegion = cfg.regions.some(r => barTime >= r.startTime && barTime <= r.endTime);
+            ctx.globalAlpha = inRegion ? 0.7 : 0.15;
+        } else {
+            ctx.globalAlpha = 0.5;
+        }
+
+        ctx.fillRect(i, 20 - h, 1, h);
+    }
+    ctx.globalAlpha = 1;
+}
+
+function _drawSublaneRegions(effectName, vr, dur) {
+    let cache = _sublaneCache[effectName];
+    if (!cache) return;
+    let lane = cache.lane;
+    let cfg = fxAudioSync[effectName];
+    if (!cfg.regions || cfg.regions.length === 0) return;
+
+    // Remove old region overlays
+    lane.querySelectorAll('.tl-sublane-region').forEach(el => el.remove());
+
+    let catColor = '#8B45E8';
+    if (typeof FX_CAT_COLORS !== 'undefined' && typeof FX_CATEGORIES !== 'undefined') {
+        catColor = FX_CAT_COLORS[FX_CATEGORIES[effectName]] || catColor;
+    }
+
+    let canvasRect = cache.canvas.getBoundingClientRect();
+    let canvasW = cache.canvas.width;
+    let labelW = 60;
+
+    cfg.regions.forEach((region, idx) => {
+        let startPct = (region.startTime - vr.start) / (vr.end - vr.start);
+        let endPct = (region.endTime - vr.start) / (vr.end - vr.start);
+        if (endPct < 0 || startPct > 1) return;
+        startPct = Math.max(0, startPct);
+        endPct = Math.min(1, endPct);
+
+        let left = labelW + startPct * canvasW;
+        let width = (endPct - startPct) * canvasW;
+
+        let div = document.createElement('div');
+        div.className = 'tl-sublane-region';
+        div.dataset.regionIdx = idx;
+        div.style.left = left + 'px';
+        div.style.width = Math.max(4, width) + 'px';
+        div.style.background = catColor.replace(')', ',0.15)').replace('rgb', 'rgba');
+        div.style.borderColor = catColor;
+
+        // Resize handles
+        div.innerHTML = '<div class="region-handle region-handle-left"></div><div class="region-handle region-handle-right"></div>';
+
+        // Double-click to delete region
+        div.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            cfg.regions.splice(idx, 1);
+            if (typeof _saveFxAudioSync === 'function') _saveFxAudioSync();
+            renderAudioSyncSublanes();
+        });
+
+        lane.appendChild(div);
+    });
+}
+
+function _updateSublanePlayhead(effectName, vr) {
+    let cache = _sublaneCache[effectName];
+    if (!cache || !cache.playhead) return;
+
+    let now = 0;
+    if (typeof audioElement !== 'undefined' && audioElement && audioElement.currentTime) now = audioElement.currentTime;
+    else if (typeof videoEl !== 'undefined' && videoEl) now = videoEl.time();
+
+    let pct = (now - vr.start) / (vr.end - vr.start);
+    if (pct < 0 || pct > 1) {
+        cache.playhead.style.display = 'none';
+        return;
+    }
+    cache.playhead.style.display = '';
+    let canvasW = cache.canvas.width;
+    cache.playhead.style.left = (60 + pct * canvasW) + 'px';
+
+    // Energy glow
+    let cfg = fxAudioSync[effectName];
+    let alpha = cfg ? Math.min(1, cfg.smoothedValue * 1.5) : 0.6;
+    cache.playhead.style.background = `rgba(255,255,255,${alpha})`;
+}
+
+// Phase 3: region drag creation on sub-lane canvas
+function _setupSublaneRegionDrag(effectName, canvas) {
+    let dragState = null;
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        let rect = canvas.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let vr = getVisibleTimeRange();
+        let startTime = vr.start + (x / rect.width) * (vr.end - vr.start);
+        dragState = { startTime, currentTime: startTime, rect, vr };
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!dragState) return;
+        let x = e.clientX - dragState.rect.left;
+        let vr = dragState.vr;
+        dragState.currentTime = vr.start + (x / dragState.rect.width) * (vr.end - vr.start);
+        dragState.currentTime = Math.max(0, Math.min(getTimelineDuration(), dragState.currentTime));
+
+        // Draw temporary selection
+        let cache = _sublaneCache[effectName];
+        if (cache && cache.ctx) {
+            _drawSublaneWaveform(effectName, vr, getTimelineDuration());
+            let ctx = cache.ctx;
+            let w = cache.canvas.width;
+            let s = Math.min(dragState.startTime, dragState.currentTime);
+            let en = Math.max(dragState.startTime, dragState.currentTime);
+            let x1 = ((s - vr.start) / (vr.end - vr.start)) * w;
+            let x2 = ((en - vr.start) / (vr.end - vr.start)) * w;
+            ctx.fillStyle = 'rgba(139,69,232,0.25)';
+            ctx.fillRect(x1, 0, x2 - x1, 20);
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!dragState) return;
+        let s = Math.min(dragState.startTime, dragState.currentTime);
+        let en = Math.max(dragState.startTime, dragState.currentTime);
+        // Minimum 0.2s region
+        if (en - s >= 0.2) {
+            let cfg = _ensureFxAudioSync(effectName);
+            cfg.regions.push({ startTime: s, endTime: en });
+            if (typeof _saveFxAudioSync === 'function') _saveFxAudioSync();
+        }
+        dragState = null;
+        renderAudioSyncSublanes();
+    });
+}
+
+// Update sub-lane playheads (called from updateTimelinePlayhead)
+function updateSublanePlayheads() {
+    if (typeof fxAudioSync === 'undefined') return;
+    let vr = getVisibleTimeRange();
+    for (let name of Object.keys(_sublaneCache)) {
+        _updateSublanePlayhead(name, vr);
     }
 }
 

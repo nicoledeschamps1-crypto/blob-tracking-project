@@ -382,6 +382,128 @@ function applyAudioSync() {
     }
 }
 
+// ── Per-Effect Audio Sync Engine ──────────────────────────────────────────
+let _fxSyncUIFrame = 0;
+function applyPerEffectAudioSync() {
+    if (!(audioLoaded && audioPlaying) && !micActive) return;
+    let keys = Object.keys(fxAudioSync);
+    if (keys.length === 0) return;
+
+    let now = 0;
+    if (audioElement && audioElement.currentTime) now = audioElement.currentTime;
+    else if (typeof videoEl !== 'undefined' && videoEl) now = videoEl.time();
+
+    let doUI = (++_fxSyncUIFrame % 6 === 0); // throttle UI updates
+
+    for (let i = 0; i < keys.length; i++) {
+        let effectName = keys[i];
+        let cfg = fxAudioSync[effectName];
+
+        // Get target parameter info
+        let paramMap = FX_PARAM_MAP[effectName];
+        if (!paramMap || !paramMap[cfg.paramIndex]) continue;
+        let p = paramMap[cfg.paramIndex];
+
+        if (!cfg.enabled || !activeEffects.has(effectName)) {
+            // Restore baseline when disabled
+            if (cfg._baseValue != null) {
+                p.s(cfg._baseValue);
+                cfg._baseValue = null;
+                cfg.smoothedValue = 0;
+            }
+            continue;
+        }
+
+        // Phase 3: time-region check
+        if (cfg.regions && cfg.regions.length > 0) {
+            let inRegion = false;
+            for (let r = 0; r < cfg.regions.length; r++) {
+                if (now >= cfg.regions[r].startTime && now <= cfg.regions[r].endTime) {
+                    inRegion = true; break;
+                }
+            }
+            if (!inRegion) {
+                if (cfg.smoothedValue > 0.001) cfg.smoothedValue *= 0.9;
+                else cfg.smoothedValue = 0;
+                // Set to baseline when outside region
+                if (cfg._baseValue != null) p.s(cfg._baseValue);
+                continue;
+            }
+        }
+
+        // Capture baseline: use FX_DEFAULTS as the reliable source,
+        // falling back to current value only on first activation
+        if (cfg._baseValue == null) {
+            let defaults = FX_DEFAULTS[effectName];
+            if (defaults && defaults[p.v] !== undefined) {
+                cfg._baseValue = defaults[p.v];
+            } else {
+                cfg._baseValue = p.g();
+            }
+        }
+
+        // Get band energy
+        let energy = getEnergyForBand(cfg.band);
+
+        // Threshold gating
+        let gate = Math.min(cfg.threshold / 100, 0.99);
+        if (energy > gate) {
+            energy = (energy - gate) / (1 - gate);
+        } else {
+            energy = 0;
+        }
+
+        // Sensitivity scaling
+        let sens = (cfg.sensitivity / 50) * 1.5;
+        energy = Math.min(energy * sens, 1);
+
+        // Smoothing (attack/release)
+        let releaseRate = 0.03 + (cfg.release / 100) * 0.47;
+        let rate = energy > cfg.smoothedValue ? 0.55 : releaseRate;
+        cfg.smoothedValue += (energy - cfg.smoothedValue) * rate;
+
+        // Find slider min/max from FX_UI_CONFIG
+        let uiCfg = FX_UI_CONFIG[effectName];
+        let minVal = 0, maxVal = 100;
+        let sliderSid = null, valId = null;
+        if (uiCfg) {
+            let pName = p.v.replace(/([A-Z])/g, '-$1').toLowerCase();
+            for (let c = 0; c < uiCfg.controls.length; c++) {
+                let ctrl = uiCfg.controls[c];
+                if (ctrl.type === 'slider' && ctrl.sid && ctrl.sid.includes(pName)) {
+                    minVal = ctrl.min; maxVal = ctrl.max;
+                    sliderSid = ctrl.sid; valId = ctrl.vid;
+                    break;
+                }
+            }
+        }
+
+        // Modulate: lerp from baseline toward max using smoothed energy
+        let baseVal = cfg._baseValue;
+        let modulated = baseVal + (maxVal - baseVal) * cfg.smoothedValue;
+        modulated = Math.max(minVal, Math.min(maxVal, modulated));
+        p.s(modulated);
+
+        // Update the UI slider + number input so user can SEE it moving
+        if (doUI && sliderSid) {
+            let sl = document.getElementById(sliderSid);
+            let inp = document.getElementById(valId);
+            let displayVal = Math.round(modulated);
+            if (sl) sl.value = displayVal;
+            if (inp) inp.value = displayVal;
+        }
+    }
+
+    // Update energy meters
+    if (doUI) {
+        for (let i = 0; i < keys.length; i++) {
+            let cfg = fxAudioSync[keys[i]];
+            let meter = document.getElementById('fx-audio-meter-' + keys[i]);
+            if (meter) meter.style.width = (cfg.smoothedValue * 100) + '%';
+        }
+    }
+}
+
 function renderMiniSpectrum() {
     let canvas = document.getElementById('mini-spectrum');
     if (!canvas || !audioAnalyser || !frequencyData) return;

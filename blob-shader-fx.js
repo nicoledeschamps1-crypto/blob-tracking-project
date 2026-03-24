@@ -1203,6 +1203,170 @@ void main() {
     fragColor = vec4(mix(base, result, u_opacity), 1.0);
 }`;
 
+// ── Datamosh shader ──────────────────────────────────────────
+// Simulates I-frame removal: motion vectors from frame differences
+// displace pixels from the history buffer, compounding over time.
+// Two modes: MELT (classic) and SHATTER (extreme multi-directional).
+const FRAG_DATAMOSH = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+out vec4 fragColor;
+uniform sampler2D u_texture;   // current frame
+uniform sampler2D u_history;   // persistent history (accumulates)
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_opacity;
+uniform float u_decay;         // 0=max melt persistence, 1=fast refresh
+uniform float u_threshold;     // motion sensitivity (lower=more melt)
+uniform float u_intensity;     // displacement magnitude
+uniform float u_mode;          // 0=melt, 1=shatter
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Estimate motion direction from frame difference (poor-man's optical flow)
+vec2 estimateMotion(vec2 uv, float px) {
+    float cL = length(texture(u_texture, uv - vec2(px, 0.0)).rgb - texture(u_history, uv - vec2(px, 0.0)).rgb);
+    float cR = length(texture(u_texture, uv + vec2(px, 0.0)).rgb - texture(u_history, uv + vec2(px, 0.0)).rgb);
+    float cU = length(texture(u_texture, uv + vec2(0.0, px)).rgb - texture(u_history, uv + vec2(0.0, px)).rgb);
+    float cD = length(texture(u_texture, uv - vec2(0.0, px)).rgb - texture(u_history, uv - vec2(0.0, px)).rgb);
+    return vec2(cR - cL, cU - cD);
+}
+
+void main() {
+    vec2 uv = v_texCoord;
+    vec2 px = 1.0 / u_resolution;
+    vec4 current = texture(u_texture, uv);
+    vec4 history = texture(u_history, uv);
+
+    // Motion vector at multiple scales for robust flow
+    vec2 motionNear = estimateMotion(uv, px.x * 2.0);
+    vec2 motionFar  = estimateMotion(uv, px.x * 5.0);
+    vec2 motion = mix(motionNear, motionFar, 0.35);
+    float motionMag = length(motion);
+
+    // Refresh rate — very slow so melt persists hard
+    float refresh = u_decay * 0.08;
+
+    vec3 result;
+
+    if (u_mode < 0.5) {
+        // ── MELT MODE (classic I-frame removal) ──
+        // Large displacement scale — this is what makes it dramatic
+        float dispScale = u_intensity * 0.15;
+        vec2 disp = motion * dispScale;
+
+        // Multi-tap displaced history — smoother, more liquid melt
+        vec2 d1 = clamp(uv + disp, 0.0, 1.0);
+        vec2 d2 = clamp(uv + disp * 1.3, 0.0, 1.0);
+        vec2 d3 = clamp(uv + disp * 0.6, 0.0, 1.0);
+        vec3 melted = (texture(u_history, d1).rgb * 0.5 +
+                       texture(u_history, d2).rgb * 0.25 +
+                       texture(u_history, d3).rgb * 0.25);
+
+        // Motion mask — even tiny motion keeps the melt going
+        float motionMask = smoothstep(u_threshold * 0.02, u_threshold * 0.15, motionMag);
+
+        // Almost always keep the displaced history — barely let current in
+        float keepMelt = 1.0 - refresh - (1.0 - motionMask) * refresh * 4.0;
+        keepMelt = clamp(keepMelt, 0.0, 0.99);
+        result = mix(current.rgb, melted, keepMelt);
+
+        // Chromatic aberration along motion direction
+        float cShift = motionMag * u_intensity * 0.025;
+        vec2 chromaDir = normalize(motion + vec2(0.001));
+        result.r = mix(result.r, texture(u_history, clamp(d1 + chromaDir * cShift, 0.0, 1.0)).r, motionMask * 0.6);
+        result.b = mix(result.b, texture(u_history, clamp(d1 - chromaDir * cShift, 0.0, 1.0)).b, motionMask * 0.6);
+
+        // Boost saturation in melted areas — makes colors pop like real datamosh
+        float lum = dot(result, vec3(0.299, 0.587, 0.114));
+        result = mix(vec3(lum), result, 1.0 + motionMask * 0.4);
+
+    } else {
+        // ── SHATTER MODE (extreme melt + multi-directional) ──
+        // Even larger displacement + perpendicular spread
+        float dispScale = u_intensity * 0.22;
+        vec2 disp = motion * dispScale;
+        vec2 perpDisp = vec2(-motion.y, motion.x) * dispScale * 0.4;
+
+        // 5-tap: forward, spread left/right, further forward, and a wild offset
+        vec2 d1 = clamp(uv + disp, 0.0, 1.0);
+        vec2 d2 = clamp(uv + disp + perpDisp, 0.0, 1.0);
+        vec2 d3 = clamp(uv + disp - perpDisp, 0.0, 1.0);
+        vec2 d4 = clamp(uv + disp * 1.8, 0.0, 1.0);
+        vec2 d5 = clamp(uv + disp * 0.4 + perpDisp * 1.5, 0.0, 1.0);
+
+        vec3 melted = texture(u_history, d1).rgb * 0.3 +
+                      texture(u_history, d2).rgb * 0.2 +
+                      texture(u_history, d3).rgb * 0.2 +
+                      texture(u_history, d4).rgb * 0.15 +
+                      texture(u_history, d5).rgb * 0.15;
+
+        float motionMask = smoothstep(u_threshold * 0.01, u_threshold * 0.1, motionMag);
+
+        float keepMelt = 1.0 - refresh * 0.5 - (1.0 - motionMask) * refresh * 2.0;
+        keepMelt = clamp(keepMelt, 0.0, 0.995);
+        result = mix(current.rgb, melted, keepMelt);
+
+        // Heavy chromatic shatter
+        float cShift = motionMag * u_intensity * 0.04;
+        result.r = texture(u_history, clamp(d1 + vec2(cShift, cShift * 0.5), 0.0, 1.0)).r * keepMelt +
+                   current.r * (1.0 - keepMelt);
+        result.b = texture(u_history, clamp(d2 - vec2(cShift * 0.5, cShift), 0.0, 1.0)).b * keepMelt +
+                   current.b * (1.0 - keepMelt);
+
+        // Aggressive saturation boost
+        float lum = dot(result, vec3(0.299, 0.587, 0.114));
+        result = mix(vec3(lum), result, 1.0 + motionMask * 0.7);
+    }
+
+    fragColor = vec4(mix(current.rgb, result, u_opacity), 1.0);
+}`;
+
+// ── GPU Pixel Sort shader ────────────────────────────────────
+const FRAG_PXSORT_GPU = `#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+out vec4 fragColor;
+uniform sampler2D u_texture;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_opacity;
+uniform float u_lo;         // luminance low threshold (0-1)
+uniform float u_hi;         // luminance high threshold (0-1)
+uniform float u_direction;  // 0=horizontal, 1=vertical
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+void main() {
+    vec2 uv = v_texCoord;
+    vec3 col = texture(u_texture, uv).rgb;
+    float lum = dot(col, vec3(0.299, 0.587, 0.114));
+
+    if (lum >= u_lo && lum <= u_hi) {
+        // Normalized position in the threshold range
+        float t = (lum - u_lo) / max(u_hi - u_lo, 0.001);
+        // Displacement magnitude in pixels, scaled by range position
+        float maxDisp = 30.0 / (u_direction < 0.5 ? u_resolution.x : u_resolution.y);
+        // Add subtle noise to break up uniform bands
+        float noise = hash(floor(uv * u_resolution)) * 0.3;
+        float disp = (t - 0.5 + noise) * maxDisp;
+        vec2 sortUV;
+        if (u_direction < 0.5) {
+            sortUV = vec2(clamp(uv.x + disp, 0.0, 1.0), uv.y);
+        } else {
+            sortUV = vec2(uv.x, clamp(uv.y + disp, 0.0, 1.0));
+        }
+        vec3 sorted = texture(u_texture, sortUV).rgb;
+        fragColor = vec4(mix(col, sorted, u_opacity), 1.0);
+    } else {
+        fragColor = vec4(col, 1.0);
+    }
+}`;
+
 // Blend mode constants
 const BLEND_NORMAL = 0;
 const BLEND_MULTIPLY = 1;
@@ -1238,6 +1402,9 @@ class ShaderFXPipeline {
         this.ready = false;
         this._pingPongIdx = 0;
         this._blendProgram = null;       // blend pass program entry
+        this._historyFBO = null;         // datamosh persistent history
+        this._historyTexture = null;
+        this._historyValid = false;
     }
 
     init(width, height) {
@@ -1272,6 +1439,7 @@ class ShaderFXPipeline {
             this._initQuad();
             this.sourceTexture = this._createTexture();
             this._initFramebuffers();
+            this._initHistoryFBO();
             this.registerEffect('passthrough', VERT_PASSTHROUGH, FRAG_PASSTHROUGH);
             this.ready = true;
             // Re-register effects on restore
@@ -1281,6 +1449,7 @@ class ShaderFXPipeline {
         this._initQuad();
         this.sourceTexture = this._createTexture();
         this._initFramebuffers();
+        this._initHistoryFBO();
         this.registerEffect('passthrough', VERT_PASSTHROUGH, FRAG_PASSTHROUGH);
         this.ready = true;
         this.enabled = true;
@@ -1333,6 +1502,25 @@ class ShaderFXPipeline {
             this.fbTextures[i] = tex;
         }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    _initHistoryFBO() {
+        const gl = this.gl;
+        if (this._historyFBO) { gl.deleteTexture(this._historyTexture); gl.deleteFramebuffer(this._historyFBO); }
+        const tex = this._createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+            console.error('[ShaderFX] History FBO incomplete');
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this._historyFBO = fbo;
+        this._historyTexture = tex;
+        this._historyValid = false;
     }
 
     _compileShader(type, source) {
@@ -1439,6 +1627,90 @@ class ShaderFXPipeline {
         gl.bindVertexArray(null);
     }
 
+    _renderDatamosh(inputTexture, targetFBO, opacity) {
+        const gl = this.gl;
+        const entry = this.programs.get('datamosh');
+        if (!entry) return;
+
+        // First frame: seed history with current input
+        if (!this._historyValid) {
+            const pt = this.programs.get('passthrough');
+            if (pt) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this._historyFBO);
+                gl.viewport(0, 0, this.width, this.height);
+                gl.useProgram(pt.program);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, inputTexture);
+                if (pt.uniforms['u_texture']) gl.uniform1i(pt.uniforms['u_texture'].location, 0);
+                gl.bindVertexArray(this.quadVAO);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                gl.bindVertexArray(null);
+            }
+            this._historyValid = true;
+        }
+
+        // Render datamosh: current (TEXTURE0) + history (TEXTURE1)
+        gl.bindFramebuffer(gl.FRAMEBUFFER, targetFBO);
+        gl.viewport(0, 0, this.width, this.height);
+        gl.useProgram(entry.program);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, inputTexture);
+        if (entry.uniforms['u_texture']) gl.uniform1i(entry.uniforms['u_texture'].location, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this._historyTexture);
+        if (entry.uniforms['u_history']) gl.uniform1i(entry.uniforms['u_history'].location, 1);
+
+        if (entry.uniforms['u_resolution']) gl.uniform2f(entry.uniforms['u_resolution'].location, this.width, this.height);
+        if (entry.uniforms['u_time']) gl.uniform1f(entry.uniforms['u_time'].location, performance.now() / 1000.0);
+        if (entry.uniforms['u_opacity']) gl.uniform1f(entry.uniforms['u_opacity'].location, opacity);
+
+        // Sync datamosh params
+        if (SHADER_EFFECT_REGISTRY['datamosh']) SHADER_EFFECT_REGISTRY['datamosh'].sync();
+
+        gl.bindVertexArray(this.quadVAO);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindVertexArray(null);
+
+        // Write-back: copy result to history FBO for next frame
+        // Read from targetFBO's texture (or from screen if targetFBO is null)
+        const resultTexture = targetFBO ? this.fbTextures[this._pingPongIdx] : null;
+        if (resultTexture) {
+            const pt = this.programs.get('passthrough');
+            if (pt) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this._historyFBO);
+                gl.viewport(0, 0, this.width, this.height);
+                gl.useProgram(pt.program);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, resultTexture);
+                if (pt.uniforms['u_texture']) gl.uniform1i(pt.uniforms['u_texture'].location, 0);
+                gl.bindVertexArray(this.quadVAO);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                gl.bindVertexArray(null);
+            }
+        } else {
+            // Last in chain — read back from canvas via readPixels + texImage2D
+            // More efficient: just copy the input blended result before final output
+            // For simplicity, copy input (pre-datamosh) as approximation for history
+            const pt = this.programs.get('passthrough');
+            if (pt) {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this._historyFBO);
+                gl.viewport(0, 0, this.width, this.height);
+                gl.useProgram(pt.program);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, inputTexture);
+                if (pt.uniforms['u_texture']) gl.uniform1i(pt.uniforms['u_texture'].location, 0);
+                gl.bindVertexArray(this.quadVAO);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                gl.bindVertexArray(null);
+            }
+        }
+
+        // Reset active texture to TEXTURE0
+        gl.activeTexture(gl.TEXTURE0);
+    }
+
     process(sourceCanvas) {
         if (!this.ready || !this.enabled) return;
         const gl = this.gl;
@@ -1462,6 +1734,17 @@ class ShaderFXPipeline {
             const isLast = (i === chain.length - 1);
             const blendMode = this.effectBlendMode.get(effectName) || 0;
             const opacity = this.effectOpacity.get(effectName) ?? 1.0;
+
+            // Datamosh needs custom render path (2 texture inputs)
+            if (effectName === 'datamosh') {
+                const targetFBO = isLast ? null : this.framebuffers[this._pingPongIdx];
+                this._renderDatamosh(inputTexture, targetFBO, opacity);
+                if (!isLast) {
+                    inputTexture = this.fbTextures[this._pingPongIdx];
+                    this._pingPongIdx = 1 - this._pingPongIdx;
+                }
+                continue;
+            }
 
             if (blendMode === 0) {
                 // Normal blend: effect handles opacity internally
@@ -1539,6 +1822,17 @@ class ShaderFXPipeline {
             }
         }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // Resize history FBO
+        if (this._historyTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, this._historyTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this._historyFBO);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._historyTexture, 0);
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            this._historyValid = false;
+        }
         console.log('[ShaderFX] Resized to', w, 'x', h);
     }
 
@@ -1560,6 +1854,7 @@ class ShaderFXPipeline {
             gl.deleteTexture(this.fbTextures[i]);
             gl.deleteFramebuffer(this.framebuffers[i]);
         }
+        if (this._historyFBO) { gl.deleteTexture(this._historyTexture); gl.deleteFramebuffer(this._historyFBO); }
         gl.deleteBuffer(this.quadVBO);
         gl.deleteVertexArray(this.quadVAO);
         this.glCanvas.remove();
@@ -1581,9 +1876,11 @@ const SHADER_CHAIN_ORDER = [
     'chroma', 'rgbshift', 'blursharp', 'emboss',
     'wave', 'swirl', 'ripple', 'curve',
     // Pattern tier
-    'bloom', 'pixel', 'dither',
+    'bloom', 'pixel', 'dither', 'pxsortgpu',
     // Overlay tier
     'glitch', 'noise', 'grain', 'crt', 'ntsc',
+    // Datamosh (post-overlay, needs history from fully-processed frame)
+    'datamosh',
     // Hybrid → shader
     'halftone',
     // Draw → shader
@@ -1768,6 +2065,20 @@ function registerCoreShaderEffects() {
             shaderFX.setUniform('curve','u_intensity',sign * curveIntensity/100);
             shaderFX.setUniform('curve','u_mode',modeIdx);
             shaderFX.setUniform('curve','u_fringe',curveFringe/100);
+        }},
+        // Datamosh — persistent history feedback
+        { name:'datamosh', frag:FRAG_DATAMOSH, sync:()=>{
+            shaderFX.setUniform('datamosh','u_decay',datamoshDecay/100);
+            shaderFX.setUniform('datamosh','u_threshold',datamoshThreshold/100);
+            shaderFX.setUniform('datamosh','u_intensity',datamoshIntensity/100);
+            let m={melt:0,shatter:1}[datamoshMode]||0;
+            shaderFX.setUniform('datamosh','u_mode',m);
+        }},
+        // GPU Pixel Sort — single-pass pseudo-sort
+        { name:'pxsortgpu', frag:FRAG_PXSORT_GPU, sync:()=>{
+            shaderFX.setUniform('pxsortgpu','u_lo',pxsortgpuLo/255);
+            shaderFX.setUniform('pxsortgpu','u_hi',pxsortgpuHi/255);
+            shaderFX.setUniform('pxsortgpu','u_direction',pxsortgpuDir==='vertical'?1:0);
         }},
     ];
 

@@ -109,6 +109,8 @@ let ditherColorMode = 'bw';
 let pxsortLo = 30;
 let pxsortHi = 220;
 let pxsortDir = 'horizontal';
+let datamoshDecay = 20, datamoshThreshold = 40, datamoshIntensity = 75, datamoshMode = 'melt';
+let pxsortgpuLo = 30, pxsortgpuHi = 220, pxsortgpuDir = 'horizontal';
 let noiseIntensity = 25;
 let noiseScale = 1;
 let noiseColorMode = 'mono';
@@ -479,9 +481,9 @@ const FX_CATEGORIES = {
     chroma:'distortion', rgbshift:'distortion', curve:'distortion', wave:'distortion', jitter:'distortion', mblur:'distortion', emboss:'distortion',
     blursharp:'distortion', modulate:'distortion', ripple:'distortion', swirl:'distortion', reedglass:'distortion', polar2rect:'distortion', rect2polar:'distortion', radblur:'distortion', zoomblur:'distortion', circblur:'distortion', elgrid:'distortion',
     bloom:'pattern', dither:'pattern', atkinson:'pattern', halftone:'pattern', pxsort:'pattern', pixel:'pattern', led:'pattern',
-    printstamp:'pattern', y2kblue:'pattern',
+    printstamp:'pattern', y2kblue:'pattern', pxsortgpu:'pattern',
     ascii:'overlay', glitch:'overlay', noise:'overlay', grain:'overlay', dots:'overlay', grid:'overlay', scanlines:'overlay', vignette:'overlay', crt:'overlay',
-    ntsc:'overlay', stripe:'overlay', paperscan:'overlay', xerox:'overlay', grunge:'overlay'
+    ntsc:'overlay', stripe:'overlay', paperscan:'overlay', xerox:'overlay', grunge:'overlay', datamosh:'overlay'
 };
 const FX_CAT_COLORS = { color:'#6C5CE7', distortion:'#00B894', pattern:'#FDCB6E', overlay:'#E17055' };
 const FX_PARAM_MAP = {
@@ -499,6 +501,8 @@ const FX_PARAM_MAP = {
     atkinson: [{v:'atkinsonColorMode',g:()=>atkinsonColorMode,s:v=>atkinsonColorMode=v},{v:'atkinsonThreshold',g:()=>atkinsonThreshold,s:v=>atkinsonThreshold=v},{v:'atkinsonSpread',g:()=>atkinsonSpread,s:v=>atkinsonSpread=v},{v:'atkinsonStrength',g:()=>atkinsonStrength,s:v=>atkinsonStrength=v}],
     halftone: [{v:'halfSpacing',g:()=>halfSpacing,s:v=>halfSpacing=v},{v:'halfColorMode',g:()=>halfColorMode,s:v=>halfColorMode=v},{v:'halfAngle',g:()=>halfAngle,s:v=>halfAngle=v},{v:'halfContrast',g:()=>halfContrast,s:v=>halfContrast=v},{v:'halfSpread',g:()=>halfSpread,s:v=>halfSpread=v},{v:'halfShape',g:()=>halfShape,s:v=>halfShape=v},{v:'halfInkColor',g:()=>halfInkColor,s:v=>halfInkColor=v},{v:'halfPaperColor',g:()=>halfPaperColor,s:v=>halfPaperColor=v},{v:'halfInverted',g:()=>halfInverted,s:v=>halfInverted=v}],
     pxsort: [{v:'pxsortLo',g:()=>pxsortLo,s:v=>pxsortLo=v},{v:'pxsortHi',g:()=>pxsortHi,s:v=>pxsortHi=v},{v:'pxsortDir',g:()=>pxsortDir,s:v=>pxsortDir=v}],
+    datamosh: [{v:'datamoshDecay',g:()=>datamoshDecay,s:v=>datamoshDecay=v},{v:'datamoshThreshold',g:()=>datamoshThreshold,s:v=>datamoshThreshold=v},{v:'datamoshIntensity',g:()=>datamoshIntensity,s:v=>datamoshIntensity=v},{v:'datamoshMode',g:()=>datamoshMode,s:v=>datamoshMode=v}],
+    pxsortgpu: [{v:'pxsortgpuLo',g:()=>pxsortgpuLo,s:v=>pxsortgpuLo=v},{v:'pxsortgpuHi',g:()=>pxsortgpuHi,s:v=>pxsortgpuHi=v},{v:'pxsortgpuDir',g:()=>pxsortgpuDir,s:v=>pxsortgpuDir=v}],
     pixel: [{v:'pixelSize',g:()=>pixelSize,s:v=>pixelSize=v},{v:'pixelMode',g:()=>pixelMode,s:v=>pixelMode=v}],
     ascii: [{v:'asciiCellSize',g:()=>asciiCellSize,s:v=>asciiCellSize=v},{v:'asciiColorMode',g:()=>asciiColorMode,s:v=>asciiColorMode=v},{v:'asciiCharSet',g:()=>asciiCharSet,s:v=>asciiCharSet=v},{v:'asciiInvert',g:()=>asciiInvert,s:v=>asciiInvert=v}],
     glitch: [{v:'glitchIntensity',g:()=>glitchIntensity,s:v=>glitchIntensity=v},{v:'glitchFreq',g:()=>glitchFreq,s:v=>glitchFreq=v},{v:'glitchMode',g:()=>glitchMode,s:v=>glitchMode=v},{v:'glitchChannelShift',g:()=>glitchChannelShift,s:v=>glitchChannelShift=v},{v:'glitchBlockSize',g:()=>glitchBlockSize,s:v=>glitchBlockSize=v},{v:'glitchSeed',g:()=>glitchSeed,s:v=>glitchSeed=v},{v:'glitchSpeed',g:()=>glitchSpeed,s:v=>glitchSpeed=v}],
@@ -555,7 +559,8 @@ const EFFECT_FN_MAP = {
     reedglass:()=>applyReedGlass(), polar2rect:()=>applyPolar2Rect(), rect2polar:()=>applyRect2Polar(),
     radblur:()=>applyRadialBlur(), zoomblur:()=>applyZoomBlur(), circblur:()=>applyCircBlur(), elgrid:()=>applyElasticGrid(),
     printstamp:()=>applyPrintStamp(), y2kblue:()=>applyY2KBlue(),
-    ntsc:()=>applyNTSC(), stripe:()=>applyStripe(), paperscan:()=>applyPaperScan(), xerox:()=>applyXerox(), grunge:()=>applyGrunge()
+    ntsc:()=>applyNTSC(), stripe:()=>applyStripe(), paperscan:()=>applyPaperScan(), xerox:()=>applyXerox(), grunge:()=>applyGrunge(),
+    datamosh:()=>{}, pxsortgpu:()=>{}
 };
 
 // ── SHARED PALETTES (used by Palette, Dither, Gradient effects) ──
@@ -641,7 +646,9 @@ const FX_DEFAULTS = {
     stripe: {stripeDensity:10,stripeAngle:0,stripeThickness:2,stripeOpacity:50,stripeMode:'linear'},
     paperscan: {paperscanIntensity:40,paperscanFiber:3,paperscanWarmth:30},
     xerox: {xeroxContrast:60,xeroxNoise:40,xeroxDarkness:50},
-    grunge: {grungeTint:'#cc6677',grungePosterize:3,grungeGrain:50}
+    grunge: {grungeTint:'#cc6677',grungePosterize:3,grungeGrain:50},
+    datamosh: {datamoshDecay:20,datamoshThreshold:40,datamoshIntensity:75,datamoshMode:'melt'},
+    pxsortgpu: {pxsortgpuLo:30,pxsortgpuHi:220,pxsortgpuDir:'horizontal'}
 };
 
 // ── FX_PRESETS — Built-in preset definitions (inspired by effect.app) ──
@@ -1414,6 +1421,19 @@ const FX_UI_CONFIG = {
         {type:'color',cid:'grunge-tint',hid:'grunge-tint-hex',label:'Tint',setter:v=>grungeTint=v},
         {type:'slider',sid:'slider-grunge-posterize',vid:'val-grunge-posterize',label:'Posterize',min:2,max:8,step:1,setter:v=>grungePosterize=v},
         {type:'slider',sid:'slider-grunge-grain',vid:'val-grunge-grain',label:'Grain',min:0,max:100,step:1,setter:v=>grungeGrain=v}
+    ]},
+    datamosh: { label:'Datamosh', hasRandomize:true, controls:[
+        {type:'selector',cid:'datamosh-mode-buttons',label:'Mode',setter:v=>datamoshMode=v,
+         opts:[{v:'melt',l:'MELT'},{v:'shatter',l:'SHATTER'}]},
+        {type:'slider',sid:'slider-datamosh-decay',vid:'val-datamosh-decay',label:'Decay',min:0,max:100,step:1,setter:v=>datamoshDecay=v},
+        {type:'slider',sid:'slider-datamosh-threshold',vid:'val-datamosh-threshold',label:'Threshold',min:0,max:100,step:1,setter:v=>datamoshThreshold=v},
+        {type:'slider',sid:'slider-datamosh-intensity',vid:'val-datamosh-intensity',label:'Intensity',min:5,max:100,step:1,setter:v=>datamoshIntensity=v}
+    ]},
+    pxsortgpu: { label:'Pixel Sort GPU', controls:[
+        {type:'slider',sid:'slider-pxsortgpu-lo',vid:'val-pxsortgpu-lo',label:'Low',min:0,max:255,step:1,setter:v=>pxsortgpuLo=v},
+        {type:'slider',sid:'slider-pxsortgpu-hi',vid:'val-pxsortgpu-hi',label:'High',min:0,max:255,step:1,setter:v=>pxsortgpuHi=v},
+        {type:'selector',cid:'pxsortgpu-dir-buttons',label:'Direction',setter:v=>pxsortgpuDir=v,
+         opts:[{v:'horizontal',l:'HORIZ'},{v:'vertical',l:'VERT'}]}
     ]}
 };
 
@@ -1437,6 +1457,23 @@ let audioPlaying = false;
 let audioSync = false;
 let audioSyncTarget = 'all';
 let frequencyData = null;
+
+// Per-effect audio sync state
+let fxAudioSync = {};
+const FX_AUDIO_SYNC_DEFAULTS = {
+    enabled: false, band: 'kick', paramIndex: 0,
+    sensitivity: 50, threshold: 10, release: 40,
+    smoothedValue: 0, _baseValue: null, regions: []
+};
+function getEnergyForBand(band) {
+    switch(band) {
+        case 'kick': return smoothBass;
+        case 'bass': return smoothBass;
+        case 'vocal': return smoothMid;
+        case 'hats': return smoothTreble;
+        case 'full': default: return smoothOverall;
+    }
+}
 let audioGainNode = null;
 let audioObjectUrl = null;
 
@@ -1899,6 +1936,7 @@ function draw() {
             _applySplitSideFx(() => {
                 try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
                 try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+                if (typeof applyPerEffectAudioSync === 'function') applyPerEffectAudioSync();
                 processShaderFX();
             });
         }
@@ -2123,6 +2161,7 @@ function draw() {
             _applySplitSideFx(() => {
                 try { applyActiveEffects(); } catch(e) { console.warn('FX error:', e); }
                 try { if (timelineSegments.length > 0) applyTimelineEffects(); } catch(e) { console.warn('Timeline FX error:', e); }
+                if (typeof applyPerEffectAudioSync === 'function') applyPerEffectAudioSync();
                 processShaderFX();
             });
         }
@@ -3116,7 +3155,7 @@ function setupCoreUIListeners() {
         ui.uiControls.classList.toggle('collapsed');
         ui.toggleBtn.classList.toggle('rotated');
         if (ui.tlContainer) {
-            ui.tlContainer.style.left = ui.uiControls.classList.contains('collapsed') ? '24px' : '320px';
+            ui.tlContainer.style.left = ui.uiControls.classList.contains('collapsed') ? '24px' : '358px';
         }
     });
 
@@ -3124,12 +3163,16 @@ function setupCoreUIListeners() {
         ui.uiControlsRight.classList.toggle('collapsed');
         ui.toggleBtnRight.classList.toggle('rotated');
         if (ui.tlContainer) {
-            ui.tlContainer.style.right = ui.uiControlsRight.classList.contains('collapsed') ? '24px' : '320px';
+            ui.tlContainer.style.right = ui.uiControlsRight.classList.contains('collapsed') ? '24px' : '358px';
         }
     });
 
-    // Help button + overlay close
+    // Help + Settings buttons (panel + top bar)
     document.getElementById('help-btn').addEventListener('click', toggleHelp);
+    let tbHelpBtn = document.getElementById('tb-help-btn');
+    if (tbHelpBtn) tbHelpBtn.addEventListener('click', toggleHelp);
+    let tbSettingsBtn = document.getElementById('tb-settings-btn');
+    if (tbSettingsBtn) tbSettingsBtn.addEventListener('click', toggleSettings);
     document.getElementById('help-overlay').addEventListener('click', (e) => {
         if (e.target.id === 'help-overlay') toggleHelp();
     });
@@ -3359,9 +3402,13 @@ function updateTopBar() {
     // FPS
     let fpsEl = document.getElementById('tb-fps');
     if (fpsEl) {
-        let fps = Math.round(frameRate());
-        fpsEl.textContent = fps + ' FPS';
-        fpsEl.className = 'tb-status tb-fps ' + (fps >= 30 ? 'good' : fps >= 15 ? 'warn' : 'bad');
+        if (!usingWebcam && !videoLoaded) {
+            fpsEl.textContent = '';
+        } else {
+            let fps = Math.round(frameRate());
+            fpsEl.textContent = fps + ' FPS';
+            fpsEl.className = 'tb-status tb-fps ' + (fps >= 30 ? 'good' : fps >= 15 ? 'warn' : 'bad');
+        }
     }
     // Source — amber when no source loaded
     let srcEl = document.getElementById('tb-source');
@@ -3378,6 +3425,12 @@ function updateTopBar() {
     if (modeEl) {
         modeEl.textContent = MODE_NAMES[currentMode] || 'OFF';
         modeEl.classList.toggle('active', currentMode > 0);
+    }
+    // FX badge — show count of active effects
+    let fxBadge = document.getElementById('tb-fx-badge');
+    if (fxBadge) {
+        let count = activeEffects ? activeEffects.size : 0;
+        fxBadge.textContent = count > 0 ? count + ' FX' : '';
     }
     // Recording time
     let dotEl = document.getElementById('tb-rec-dot');
