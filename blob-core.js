@@ -2997,7 +2997,12 @@ function setupCoreUIListeners() {
         btn.addEventListener('click', (e) => {
             showLines = (e.target.dataset.value === 'on');
             document.getElementById('line-options-group').style.display = showLines ? '' : 'none';
-            updateButtonStates();
+            // Only update line button active states — don't call full updateButtonStates()
+            // which auto-switches tracking tabs and causes unwanted mode tab changes
+            ui.lineButtons.forEach(b => {
+                const isOn = b.dataset.value === 'on';
+                b.classList.toggle('active', showLines === isOn);
+            });
         });
     });
 
@@ -3345,11 +3350,7 @@ function setupCoreUIListeners() {
     let helpCloseBtn = document.getElementById('help-close-btn');
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
 
-    // Wire file/audio input containers (moved from inline onclick for consistency)
-    let fileContainer = document.getElementById('file-input-container');
-    if (fileContainer) fileContainer.addEventListener('click', () => document.getElementById('videoUpload').click());
-    let audioContainer = document.getElementById('audio-input-container');
-    if (audioContainer) audioContainer.addEventListener('click', () => document.getElementById('audioUpload').click());
+    // File inputs now cover their full containers (no programmatic .click() — works on iOS Safari)
 
     // Keyboard support for toggle button
     let toggleBtn = document.getElementById('toggle-btn');
@@ -3840,7 +3841,11 @@ function stopWebcam() {
 
 function handleFile(event) {
     const file = event.target.files[0];
-    if (file && file.type.startsWith('video/')) {
+    if (!file) return;
+    // iOS Safari may report empty file.type — fall back to extension check
+    const ext = file.name.split('.').pop().toLowerCase();
+    const isVideo = file.type.startsWith('video/') || ['mp4','mov','webm','m4v','avi','mkv','qt'].includes(ext);
+    if (isVideo) {
         if (usingWebcam) stopWebcam();
         if (videoEl) { videoEl.stop(); videoEl.remove(); }
         ui.fileName.innerText = file.name;
@@ -4401,8 +4406,8 @@ function mouseDragged() {
 function mousePressed() {
     // Don't handle clicks that landed on UI elements (buttons, inputs, panels)
     let el = document.elementFromPoint(mouseX, mouseY);
-    if (el && el.closest('.panel, #timeline-container, .modal-overlay, .settings-modal')) return;
-    if (mouseButton === RIGHT) { lastX = mouseX; return; }
+    if (el && el.closest('.panel, #timeline-container, .modal-overlay, #settings-overlay, #top-bar, .drawer-toggle, .panel-overlay')) return false;
+    if (mouseButton === RIGHT) { lastX = mouseX; return false; }
     if (currentMode === 14 && mouseButton === LEFT) {
         if (mouseX >= videoX && mouseX <= videoX + videoW && mouseY >= videoY && mouseY <= videoY + videoH) {
             if (window.mpSegmenterReady) {
@@ -4420,7 +4425,7 @@ function mousePressed() {
             // Don't pick color when clicking the split divider
             if (splitZoomEnabled) {
                 let splitX = Math.round(width * splitPosition / 100);
-                if (Math.abs(mouseX - splitX) < 10) return;
+                if (Math.abs(mouseX - splitX) < 10) return false;
             }
             // Store previous mode so user can undo with Escape
             window._prevModeBeforeColorPick = currentMode;
@@ -4441,4 +4446,5 @@ function mousePressed() {
             updateButtonStates();
         }
     }
+    return false;
 }

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["feature_name", "slug", "sprints", "total_criteria", "contract_path"],
+  "additionalProperties": false,
+  "properties": {
+    "feature_name": {
+      "type": "string",
+      "description": "Human-readable feature name"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-safe slug for file naming (e.g. 'preset-sharing')"
+    },
+    "contract_path": {
+      "type": "string",
+      "description": "Path to the written contract file relative to project root"
+    },
+    "total_criteria": {
+      "type": "integer",
+      "description": "Total ISC criteria across all sprints"
+    },
+    "sprints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "title", "criteria_count", "files", "dependencies"],
+        "additionalProperties": false,
+        "properties": {
+          "number": { "type": "integer" },
+          "title": { "type": "string" },
+          "criteria_count": { "type": "integer" },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Files this sprint modifies"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "description": "Sprint numbers that must complete first"
+          },
+          "complexity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          }
+        }
+      }
+    }
+  }
+}

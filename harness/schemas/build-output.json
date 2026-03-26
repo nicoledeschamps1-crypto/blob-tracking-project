@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["sprint_number", "criteria_results", "files_changed"],
+  "additionalProperties": false,
+  "properties": {
+    "sprint_number": { "type": "integer" },
+    "criteria_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "self_assessment", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "description": "e.g. ISC-F1" },
+          "self_assessment": { "type": "string", "enum": ["PASS", "UNCERTAIN", "FAIL"] },
+          "evidence": { "type": "string", "description": "What you did and why you believe this assessment" }
+        }
+      }
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Files modified in this sprint"
+    },
+    "known_issues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Things you're worried about — be honest"
+    },
+    "pass_count": { "type": "integer" },
+    "uncertain_count": { "type": "integer" },
+    "fail_count": { "type": "integer" }
+  }
+}

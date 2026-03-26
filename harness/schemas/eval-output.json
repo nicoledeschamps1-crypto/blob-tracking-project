@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["verdict", "criteria", "design_scores", "bugs", "required_fixes"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL", "CONDITIONAL"],
+      "description": "PASS: all criteria met. FAIL: critical failures. CONDITIONAL: proceed but fix before final delivery."
+    },
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "method", "result", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "description": "e.g. ISC-F1" },
+          "text": { "type": "string", "description": "The 8-word criterion" },
+          "method": { "type": "string", "enum": ["Browser", "Read", "Grep", "CLI"] },
+          "result": { "type": "string", "enum": ["PASS", "FAIL"] },
+          "evidence": { "type": "string", "description": "Specific evidence: what you saw, clicked, or evaluated" }
+        }
+      }
+    },
+    "design_scores": {
+      "type": "object",
+      "required": ["quality", "originality", "craft", "functionality", "weighted_total"],
+      "additionalProperties": false,
+      "properties": {
+        "quality": { "type": "number", "minimum": 1, "maximum": 10 },
+        "originality": { "type": "number", "minimum": 1, "maximum": 10 },
+        "craft": { "type": "number", "minimum": 1, "maximum": 10 },
+        "functionality": { "type": "number", "minimum": 1, "maximum": 10 },
+        "weighted_total": { "type": "number", "minimum": 1, "maximum": 10 }
+      }
+    },
+    "bugs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "location", "severity"],
+        "additionalProperties": false,
+        "properties": {
+          "description": { "type": "string" },
+          "location": { "type": "string", "description": "file:line or UI element" },
+          "severity": { "type": "string", "enum": ["critical", "major", "minor"] },
+          "repro_steps": { "type": "string" }
+        }
+      }
+    },
+    "required_fixes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Specific fix instruction for the generator"
+      }
+    },
+    "console_errors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "JS errors found in browser console"
+    },
+    "pass_count": { "type": "integer" },
+    "fail_count": { "type": "integer" }
+  }
+}

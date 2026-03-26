@@ -186,8 +186,8 @@ function buildOverlayPanel() {
     container.innerHTML = `
         <span class="tab-desc">Overlay a video or image on top of your tracked scene</span>
 
-        <div class="overlay-upload-zone" id="overlay-upload-zone">
-            <input type="file" id="overlay-file-input" accept="video/*,image/*" style="display:none">
+        <label class="overlay-upload-zone" id="overlay-upload-zone" for="overlay-file-input">
+            <input type="file" id="overlay-file-input" accept="video/*,image/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none">
             <div class="overlay-upload-content" id="overlay-upload-content">
                 <span class="overlay-upload-icon">&#x1F4F9;</span>
                 <span class="overlay-upload-text">Drop video/image or click to upload</span>
@@ -196,7 +196,7 @@ function buildOverlayPanel() {
                 <span class="overlay-filename" id="overlay-filename"></span>
                 <button class="overlay-remove-btn" id="overlay-remove-btn" title="Remove overlay">&times;</button>
             </div>
-        </div>
+        </label>
 
         <div class="overlay-controls" id="overlay-controls" style="display:none">
             <div class="overlay-toggle-row">
@@ -255,11 +255,7 @@ function buildOverlayPanel() {
     const fileInput = document.getElementById('overlay-file-input');
     const uploadZone = document.getElementById('overlay-upload-zone');
 
-    // Click to upload
-    uploadZone.addEventListener('click', (e) => {
-        if (e.target.id === 'overlay-remove-btn') return;
-        fileInput.click();
-    });
+    // File input now covers the full zone (no programmatic .click() needed — works on iOS)
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) loadOverlayFile(fileInput.files[0]);

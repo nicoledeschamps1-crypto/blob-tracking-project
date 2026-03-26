@@ -574,6 +574,7 @@
         }
 
         #file-input-container {
+            display: block;
             border: 1px dashed var(--slider-track);
             padding: 12px;
             text-align: center;
@@ -592,7 +593,11 @@
             box-shadow: 0 0 12px rgba(108,92,231,0.1);
         }
 
-        input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+        #file-input-container input[type="file"],
+        #audio-input-container input[type="file"] {
+            position: absolute; width: 1px; height: 1px; opacity: 0;
+            overflow: hidden; pointer-events: none;
+        }
 
         .upload-label {
             display: flex;
@@ -1367,6 +1372,9 @@
 
         /* Audio Section */
         #audio-input-container {
+            display: block;
+            position: relative;
+            overflow: hidden;
             border: 1px dashed var(--slider-track);
             border-radius: 8px;
             padding: 12px;
@@ -2945,12 +2953,13 @@
         /* Drawer toggle buttons — hidden on desktop */
         .drawer-toggle {
             display: none;
+            flex-shrink: 0;
             background: transparent;
             border: 1px solid transparent;
             border-radius: var(--radius-md);
             color: var(--color-text);
             padding: 4px 8px;
-            min-height: 24px;
+            min-height: 44px;
             min-width: 44px;
             cursor: pointer;
             font-family: inherit;
@@ -2997,7 +3006,7 @@
         }
         @media (max-width: 900px) {
             /* Off-canvas drawer mode */
-            .drawer-toggle { display: flex; }
+            .drawer-toggle { display: flex; background: rgba(139,69,232,0.15); border-color: rgba(255,255,255,0.15); touch-action: manipulation; }
             .panel-close-btn { display: flex; align-items: center; justify-content: center; }
 
             .panel {
@@ -3042,7 +3051,7 @@
             }
         }
         @media (max-width: 700px) {
-            :root { --tl-height: 180px; }
+            :root { --tl-height: 220px; }
             /* Hide non-essential top bar items */
             #top-bar .tb-fps,
             #top-bar #tb-source,
@@ -3056,13 +3065,52 @@
             #top-bar #btn-save-rec {
                 display: none;
             }
-            #top-bar { padding: 0 var(--sp-1); gap: 2px; overflow: hidden; }
+            #top-bar { padding: 0 var(--sp-1); gap: 2px; overflow: visible; }
             #top-bar .tb-zone { gap: 2px; }
             #top-bar .tb-zone-right { gap: 2px; }
             #top-bar .tb-btn { padding: 4px 4px; min-height: 28px; }
             .drawer-toggle { padding: 4px 6px; min-width: 36px; }
             .panel { width: 280px; padding: var(--sp-3); font-size: var(--font-sm); }
-            #timeline-container { left: 10px; right: 10px; }
+            #timeline-container { left: 4px; right: 4px; bottom: 4px; padding: 6px 8px; gap: 3px; border-radius: 8px; }
+
+            /* ── Mobile timeline: compact toolbar rows ── */
+            .timeline-controls {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .timeline-controls .action-btn {
+                padding: 4px 6px;
+                min-width: 28px;
+                min-height: 28px;
+            }
+            .tl-band-selector { margin-left: 2px; gap: 1px; }
+            .tl-band-btn { padding: 2px 6px; font-size: 10px; }
+            #timeline-time { font-size: 10px; }
+            /* Hide record btn in timeline (already in top bar) */
+            #tl-btn-record { display: none; }
+
+            .timeline-controls-row2 {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .timeline-controls-row2 button {
+                padding: 3px 8px;
+                font-size: 10px;
+                min-height: 26px;
+            }
+            /* Hide zoom slider on mobile — not useful for touch */
+            .tl-zoom-controls { display: none; }
+            /* Hide verbose hint text */
+            #tl-drag-hint { display: none; }
+            .tl-hint-sub { display: none; }
+            .tl-hint-main { font-size: 10px; }
+
+            /* Offset label + audio section: compact */
+            #tl-offset-label { font-size: 9px; }
+            .tl-audio-section { font-size: 9px; }
+
+            /* Sync config row: wrap on mobile */
+            .tl-sync-row { flex-wrap: wrap; gap: 4px 8px; }
         }
         /* ═══ TRACKING TOGGLE ═══ */
         .tracking-toggle-row {
@@ -3271,6 +3319,8 @@
             opacity: 0.7;
         }
         .overlay-upload-zone {
+            display: block;
+            position: relative;
             border: 1.5px dashed rgba(139,69,232,0.35);
             border-radius: var(--radius-md, 8px);
             padding: 16px;
@@ -3576,7 +3626,7 @@
 
             <!-- Source (Upload + Camera) -->
             <div class="source-row">
-                <div id="file-input-container">
+                <label id="file-input-container" for="videoUpload">
                     <div class="upload-label">
                         <svg class="icon" viewBox="0 0 24 24">
                             <path d="M19 13v5c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1v-5c0-.55-.45-1-1-1s-1 .45-1 1v6c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6c0-.55-.45-1-1-1s-1 .45-1 1zm-7-9.41l2.29 2.29c.39.39 1.02.39 1.41 0s.39-1.02 0-1.41l-4-4a.9959.9959 0 0 0-1.41 0l-4 4c-.39.39-.39 1.02 0 1.41s1.02.39 1.41 0L11 3.59V15c0 .55.45 1 1 1s1-.45 1-1V3.59z"/>
@@ -3585,7 +3635,7 @@
                     </div>
                     <div id="file-name">mp4 or mov</div>
                     <input type="file" id="videoUpload" accept="video/*">
-                </div>
+                </label>
                 <button id="webcam-btn" title="Use Webcam" aria-label="Toggle webcam">
                     <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                     CAM
@@ -3843,7 +3893,7 @@
             <div class="control-group">
                 <label>Audio</label>
                 <div class="source-row">
-                <div id="audio-input-container" data-tooltip="" title="">
+                <label id="audio-input-container" for="audioUpload" data-tooltip="" title="">
                     <div class="upload-label">
                         <svg class="icon" viewBox="0 0 24 24">
                             <path d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/>
@@ -3852,7 +3902,7 @@
                     </div>
                     <div id="audio-name">mp3, wav, ogg</div>
                     <input type="file" id="audioUpload" accept="audio/*">
-                </div>
+                </label>
                 <button id="mic-btn" title="Use Microphone" aria-label="Toggle microphone input">
                     <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
                     MIC
@@ -4028,7 +4078,6 @@
                 </div>
                 <!-- Camera tab content (shown when CAMERA sub-tab active) -->
                 <div id="fx-camera-panel" style="display:none">
-                    <span class="tab-desc">Virtual camera movement and framing</span>
                     <span class="panel-crosslink" id="link-to-zoom" title="Jump to Zoom controls in left panel">← Zoom controls</span>
                     <label id="label-autofollow">Auto-Follow</label>
                     <div class="selector-row" id="zoom-autofollow-buttons" aria-labelledby="label-autofollow">
@@ -4391,10 +4440,10 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260325c"></script>
+<script src="blob-core.js?v=20260325f"></script>
 <script src="blob-fx.js?v=20260325c"></script>
-<script src="blob-shader-fx.js?v=20260325b"></script>
-<script src="blob-overlay.js?v=20260324"></script>
+<script src="blob-shader-fx.js?v=20260325c"></script>
+<script src="blob-overlay.js?v=20260325d"></script>
 <script src="blob-audio.js?v=20260325"></script>
 <script src="blob-timeline.js?v=20260325"></script>
 <script src="blob-mask.js?v=20260324"></script>

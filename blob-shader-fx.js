@@ -2121,6 +2121,7 @@ function hasShaderVersion(name) {
 // ═══════════════════════════════════════════════════════════════
 
 const shaderFX = new ShaderFXPipeline();
+window.shaderFX = shaderFX;
 
 function initShaderFX() {
     if (typeof p5Canvas === 'undefined' || !p5Canvas) {
