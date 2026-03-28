@@ -789,10 +789,10 @@ function _drawSublaneWaveform(effectName, vr, dur) {
 
     // Use pre-analyzed waveform data if available
     let waveData = null;
-    if (typeof tlWaveform !== 'undefined' && tlWaveform) {
+    if (typeof tlWaveform !== 'undefined' && tlWaveform && tlWaveform.length > 0) {
         let bandKey = cfg.band === 'kick' ? 'bass' : cfg.band === 'hats' ? 'high' :
                       cfg.band === 'vocal' ? 'mid' : cfg.band === 'bass' ? 'bass' : 'full';
-        waveData = tlWaveform[bandKey] || tlWaveform.full;
+        waveData = tlWaveform.map(w => w[bandKey] || w.full || 0);
     }
 
     if (!waveData || waveData.length === 0) {
@@ -912,17 +912,14 @@ function _updateSublanePlayhead(effectName, vr) {
 function _setupSublaneRegionDrag(effectName, canvas) {
     let dragState = null;
 
-    canvas.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
-        let rect = canvas.getBoundingClientRect();
-        let x = e.clientX - rect.left;
-        let vr = getVisibleTimeRange();
-        let startTime = vr.start + (x / rect.width) * (vr.end - vr.start);
-        dragState = { startTime, currentTime: startTime, rect, vr };
-        e.preventDefault();
-    });
+    // Clean up previous document listeners for this effect to prevent leaks
+    let cache = _sublaneCache[effectName];
+    if (cache && cache._docMoveHandler) {
+        document.removeEventListener('mousemove', cache._docMoveHandler);
+        document.removeEventListener('mouseup', cache._docUpHandler);
+    }
 
-    document.addEventListener('mousemove', (e) => {
+    const onMove = (e) => {
         if (!dragState) return;
         let x = e.clientX - dragState.rect.left;
         let vr = dragState.vr;
@@ -942,9 +939,9 @@ function _setupSublaneRegionDrag(effectName, canvas) {
             ctx.fillStyle = 'rgba(139,69,232,0.25)';
             ctx.fillRect(x1, 0, x2 - x1, 20);
         }
-    });
+    };
 
-    document.addEventListener('mouseup', () => {
+    const onUp = () => {
         if (!dragState) return;
         let s = Math.min(dragState.startTime, dragState.currentTime);
         let en = Math.max(dragState.startTime, dragState.currentTime);
@@ -956,7 +953,26 @@ function _setupSublaneRegionDrag(effectName, canvas) {
         }
         dragState = null;
         renderAudioSyncSublanes();
+    };
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        let rect = canvas.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let vr = getVisibleTimeRange();
+        let startTime = vr.start + (x / rect.width) * (vr.end - vr.start);
+        dragState = { startTime, currentTime: startTime, rect, vr };
+        e.preventDefault();
     });
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+
+    // Store references for cleanup on next call
+    if (cache) {
+        cache._docMoveHandler = onMove;
+        cache._docUpHandler = onUp;
+    }
 }
 
 // Update sub-lane playheads (called from updateTimelinePlayhead)

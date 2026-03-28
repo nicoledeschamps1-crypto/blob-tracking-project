@@ -91,7 +91,7 @@ function applyActiveEffects() {
     let _gpuHandled = [];
     if (typeof shaderFX !== 'undefined' && shaderFX.ready && shaderFX.enabled &&
         typeof SHADER_EFFECT_REGISTRY !== 'undefined') {
-        for (const name of activeEffects) {
+        for (const name of [...activeEffects]) {
             if (SHADER_EFFECT_REGISTRY[name]) {
                 _gpuHandled.push(name);
             }
@@ -104,6 +104,7 @@ function applyActiveEffects() {
         }
     }
 
+    try {
     let hasPixel = EFFECT_TYPES.pixel.some(e => _fxActive(e));
     let hasHybrid = EFFECT_TYPES.hybrid.some(e => _fxActive(e));
 
@@ -183,8 +184,10 @@ function applyActiveEffects() {
     if (_fxActive('slidestretch')) applySlideStretch();
     if (_fxActive('cornerpin')) applyCornerPin();
 
+    } finally {
     // Restore GPU-handled effects to activeEffects
     for (const name of _gpuHandled) activeEffects.add(name);
+    }
 }
 
 // Apply a single named effect (used by split view dual FX)
@@ -2984,67 +2987,6 @@ function updatePostProcessList() {
     if (typeof _rebuildActiveEffectsList === 'function') _rebuildActiveEffectsList();
     let wrapper = document.getElementById('fx-postprocess');
     if (wrapper) wrapper.style.display = 'none';
-    return;
-    let container = document.getElementById('fx-pp-list');
-    if (!container || !wrapper) return;
-
-    if (activeEffects.size === 0) {
-        wrapper.style.display = 'none';
-        return;
-    }
-    wrapper.style.display = '';
-    container.innerHTML = '';
-
-    activeEffects.forEach(name => {
-        let cfg = FX_UI_CONFIG[name];
-        let label = cfg ? cfg.label : name.toUpperCase();
-        let item = document.createElement('div');
-        item.className = 'fx-pp-item';
-        let catColor = FX_CAT_COLORS[FX_CATEGORIES[name]] || '#4A3D60';
-        item.style.setProperty('--pp-cat-color', catColor);
-        item.innerHTML = `<span class="fx-pp-drag">⁞⁞</span>` +
-            `<button class="fx-pp-settings" title="Settings" data-effect="${name}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>` +
-            `<span class="fx-pp-name">${label}</span>` +
-            `<button class="fx-pp-eye visible" title="Toggle visibility" data-effect="${name}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>` +
-            `<button class="fx-pp-remove" title="Remove" data-effect="${name}">&mdash;</button>`;
-        container.appendChild(item);
-    });
-
-    // Wire up eye toggles
-    container.querySelectorAll('.fx-pp-eye').forEach(btn => {
-        btn.addEventListener('click', () => {
-            let eff = btn.dataset.effect;
-            activeEffects.delete(eff);
-            updateEffectCardStates();
-            updateFxOnButton();
-            updateDropdownMarkers();
-            updatePostProcessList();
-        });
-    });
-
-    // Wire up settings buttons (navigate to effect)
-    container.querySelectorAll('.fx-pp-settings').forEach(btn => {
-        btn.addEventListener('click', () => {
-            let eff = btn.dataset.effect;
-            let cat = FX_CATEGORIES[eff];
-            if (cat) switchFxCategory(cat);
-            selectFxEffect(eff);
-            let sel = document.getElementById('fx-effect-select');
-            if (sel) sel.value = eff;
-        });
-    });
-
-    // Wire up remove buttons
-    container.querySelectorAll('.fx-pp-remove').forEach(btn => {
-        btn.addEventListener('click', () => {
-            let eff = btn.dataset.effect;
-            activeEffects.delete(eff);
-            updateEffectCardStates();
-            updateFxOnButton();
-            updateDropdownMarkers();
-            updatePostProcessList();
-        });
-    });
 }
 
 function updateDropdownMarkers() {

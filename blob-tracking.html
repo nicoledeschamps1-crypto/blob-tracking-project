@@ -4440,14 +4440,14 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260325f"></script>
-<script src="blob-fx.js?v=20260325c"></script>
-<script src="blob-shader-fx.js?v=20260325c"></script>
-<script src="blob-overlay.js?v=20260325d"></script>
-<script src="blob-audio.js?v=20260325"></script>
-<script src="blob-timeline.js?v=20260325"></script>
-<script src="blob-mask.js?v=20260324"></script>
-<script src="blob-tracking.js?v=20260325b"></script>
+<script src="blob-core.js?v=20260327"></script>
+<script src="blob-fx.js?v=20260327"></script>
+<script src="blob-shader-fx.js?v=20260327"></script>
+<script src="blob-overlay.js?v=20260327"></script>
+<script src="blob-audio.js?v=20260327"></script>
+<script src="blob-timeline.js?v=20260327"></script>
+<script src="blob-mask.js?v=20260327"></script>
+<script src="blob-tracking.js?v=20260327"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">
@@ -4481,12 +4481,36 @@ async function initSegmenter() {
             hintEl.textContent = 'Click on the object you want to track';
         }
     } catch (e) {
-        console.error("Failed to load MediaPipe segmenter:", e);
-        let loadEl = document.getElementById('mask-loading');
-        if (loadEl) {
-            loadEl.style.display = '';
-            loadEl.textContent = 'AI model failed to load';
-            loadEl.style.color = '#E17055';
+        console.warn("GPU segmenter failed, trying CPU fallback:", e);
+        try {
+            const visionCPU = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
+            );
+            window.mpSegmenter = await InteractiveSegmenter.createFromOptions(visionCPU, {
+                baseOptions: {
+                    modelAssetPath:
+                        "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite",
+                    delegate: "CPU"
+                },
+                outputCategoryMask: true,
+                outputConfidenceMasks: true,
+            });
+            window.mpSegmenterReady = true;
+            console.log("MediaPipe Interactive Segmenter ready (CPU fallback)");
+            let loadEl = document.getElementById('mask-loading');
+            if (loadEl) loadEl.style.display = 'none';
+            let hintEl = document.getElementById('mask-hint');
+            if (hintEl && document.getElementById('mask-controls-group').style.display !== 'none') {
+                hintEl.textContent = 'Click on the object you want to track';
+            }
+        } catch (e2) {
+            console.error("Failed to load MediaPipe segmenter (GPU + CPU):", e2);
+            let loadEl = document.getElementById('mask-loading');
+            if (loadEl) {
+                loadEl.style.display = '';
+                loadEl.textContent = 'AI model failed to load';
+                loadEl.style.color = '#E17055';
+            }
         }
     }
 }

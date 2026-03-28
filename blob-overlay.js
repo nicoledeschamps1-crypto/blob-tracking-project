@@ -39,11 +39,12 @@ function loadOverlayFile(file) {
     // Clean up previous
     disposeOverlay();
 
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
+    const ext = file.name ? file.name.split('.').pop().toLowerCase() : '';
+    const isVideo = file.type.startsWith('video/') || ['mp4','mov','webm','m4v','avi','mkv','qt'].includes(ext);
+    const isImage = file.type.startsWith('image/') || ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext);
 
     if (!isVideo && !isImage) {
-        console.warn('[Overlay] Unsupported file type:', file.type);
+        console.warn('[Overlay] Unsupported file type:', file.type, ext);
         return;
     }
 

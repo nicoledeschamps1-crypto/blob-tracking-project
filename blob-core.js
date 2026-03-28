@@ -3919,6 +3919,7 @@ function handleFile(event) {
                 videoLoaded = false; videoPlaying = false;
                 ui.fileName.innerText = 'video failed to load';
                 syncPlayIcon(false);
+                if (currentVideoUrl) { URL.revokeObjectURL(currentVideoUrl); currentVideoUrl = null; }
             }, { once: true });
         }
     }

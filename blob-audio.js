@@ -8,7 +8,9 @@ function initAudioContext() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioContext.state === 'suspended') audioContext.resume();
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+    }
 }
 
 function handleAudioFile(event) {
@@ -62,35 +64,41 @@ function handleAudioFile(event) {
     audioElement.addEventListener('pause', () => { audioPlaying = false; });
 
     audioElement.addEventListener('canplaythrough', () => {
-        if (audioContext.state === 'suspended') audioContext.resume();
-        audioSource = audioContext.createMediaElementSource(audioElement);
-        audioAnalyser = audioContext.createAnalyser();
-        audioAnalyser.fftSize = 4096;
-        audioAnalyser.smoothingTimeConstant = 0;
-        audioGainNode = audioContext.createGain();
+        const connectGraph = () => {
+            audioSource = audioContext.createMediaElementSource(audioElement);
+            audioAnalyser = audioContext.createAnalyser();
+            audioAnalyser.fftSize = 4096;
+            audioAnalyser.smoothingTimeConstant = 0;
+            audioGainNode = audioContext.createGain();
 
-        audioSource.connect(audioAnalyser);
-        audioAnalyser.connect(audioGainNode);
-        audioGainNode.connect(audioContext.destination);
+            audioSource.connect(audioAnalyser);
+            audioAnalyser.connect(audioGainNode);
+            audioGainNode.connect(audioContext.destination);
 
-        frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
-        floatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
-        prevFloatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
-        resetBandDetectors();
-        audioLoaded = true;
-        updateButtonStates();
-        if (audioElement.duration && isFinite(audioElement.duration)) {
-            audioDuration = audioElement.duration;
-        }
-
-        // Only auto-play audio if video is currently playing
-        if (videoPlaying) {
-            let startTime = getAudioTimeForVideo(videoEl ? videoEl.time() : 0);
-            if (startTime >= 0) {
-                audioElement.currentTime = startTime;
-                audioElement.play().catch(() => { audioPlaying = false; });
-                audioPlaying = true;
+            frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+            floatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+            prevFloatFreqData = new Float32Array(audioAnalyser.frequencyBinCount);
+            resetBandDetectors();
+            audioLoaded = true;
+            updateButtonStates();
+            if (audioElement.duration && isFinite(audioElement.duration)) {
+                audioDuration = audioElement.duration;
             }
+
+            // Only auto-play audio if video is currently playing
+            if (videoPlaying) {
+                let startTime = getAudioTimeForVideo(videoEl ? videoEl.time() : 0);
+                if (startTime >= 0) {
+                    audioElement.currentTime = startTime;
+                    audioElement.play().catch(() => { audioPlaying = false; });
+                    audioPlaying = true;
+                }
+            }
+        };
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(connectGraph).catch(() => connectGraph());
+        } else {
+            connectGraph();
         }
     }, { once: true });
 }

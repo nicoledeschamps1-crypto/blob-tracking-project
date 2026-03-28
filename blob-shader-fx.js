@@ -1731,6 +1731,7 @@ class ShaderFXPipeline {
         for (let i = 0; i < chain.length; i++) {
             const effectName = chain[i];
             const entry = this.programs.get(effectName);
+            if (!entry) continue;
             const isLast = (i === chain.length - 1);
             const blendMode = this.effectBlendMode.get(effectName) || 0;
             const opacity = this.effectOpacity.get(effectName) ?? 1.0;
