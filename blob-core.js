@@ -1799,6 +1799,20 @@ function setup() {
     textSize(11);
     restoreLayerState();
 
+    // First-run overlay dismiss
+    const froDismiss = document.getElementById('first-run-dismiss');
+    const froOverlay = document.getElementById('first-run-overlay');
+    if (froDismiss && froOverlay) {
+        const dismissFirstRun = () => {
+            froOverlay.style.display = 'none';
+            localStorage.setItem('hod-onboarded', 'true');
+        };
+        froDismiss.addEventListener('click', dismissFirstRun);
+        froOverlay.addEventListener('click', (e) => {
+            if (e.target === froOverlay) dismissFirstRun();
+        });
+    }
+
     // Video zoom: scroll on canvas (no modifier = video zoom, Ctrl = timeline zoom)
     canvas.elt.addEventListener('wheel', (e) => {
         // Skip if cursor is over panels or timeline
@@ -4090,6 +4104,11 @@ function handleFile(event) {
         videoEl = createVideo(url, () => {
             videoEl.volume(0); videoEl.loop(); videoEl.hide();
             videoLoaded = true; videoPlaying = true;
+            // Show first-run overlay (once per user)
+            if (!localStorage.getItem('hod-onboarded')) {
+                const fro = document.getElementById('first-run-overlay');
+                if (fro) fro.style.display = '';
+            }
             // Enable video audio source button
             const vab = document.getElementById('audio-src-video');
             if (vab) vab.disabled = false;

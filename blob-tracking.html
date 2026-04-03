@@ -1035,12 +1035,19 @@
             color: var(--btn-text-active);
         }
         .fx-card.viewing {
-            border-color: var(--cat-color, var(--color-accent));
+            border: 1px dotted var(--cat-color, var(--color-accent));
             color: var(--btn-text-active);
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
         }
         .fx-card.active-effect {
-            box-shadow: inset 0 -2px 0 var(--cat-color, var(--color-accent));
+            background: color-mix(in srgb, var(--cat-color, var(--color-accent)) 15%, transparent);
+            border-left: 2px solid var(--cat-color, var(--color-accent));
+            box-shadow: none;
+        }
+        .fx-card.active-effect.viewing {
+            background: color-mix(in srgb, var(--cat-color, var(--color-accent)) 20%, transparent);
+            border: 1px dotted var(--cat-color, var(--color-accent));
+            border-left: 2px solid var(--cat-color, var(--color-accent));
         }
         .fx-card .fx-fav {
             position: absolute;
@@ -2194,10 +2201,35 @@
             opacity: 1;
         }
 
+        /* ═══ FX SEARCH ═══ */
+        .fx-search-wrap {
+            padding: 0 0 6px;
+        }
+        .fx-search {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 3px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: var(--font-xs);
+            padding: 5px 8px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .fx-search:focus {
+            border-color: var(--color-accent);
+        }
+        .fx-search::placeholder {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
         /* ═══ EFFECTO-STYLE FX TABS & DROPDOWN ═══ */
         .fx-tab-bar-wrap {
             position: relative;
-            margin-bottom: 8px;
+            margin: 0 -4px 8px;
             overflow: hidden;
         }
         .fx-tab-bar-wrap::before,
@@ -2226,26 +2258,26 @@
             display: flex;
             gap: 0;
             border-bottom: 1px solid rgba(169,102,255,0.1);
-            overflow-x: auto;
-            overflow-y: hidden;
-            white-space: nowrap;
-            scrollbar-width: none;
+            overflow: hidden;
         }
-        .fx-tab-bar::-webkit-scrollbar { display: none; }
         .fx-tab {
-            flex: 0 0 auto;
+            flex: 1 1 0;
             background: none;
             border: none;
             color: var(--text-muted);
             font-size: var(--font-xs);
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 8px 6px;
+            text-align: center;
+            letter-spacing: 0;
+            padding: 8px 2px;
             cursor: pointer;
             position: relative;
             font-family: inherit;
             transition: color 0.15s;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
         .fx-tab:hover { color: var(--text-main); }
@@ -2260,21 +2292,24 @@
             background: var(--tab-color, #6C5CE7);
         }
         .fx-tab .tab-dot {
-            display: inline-block;
-            width: 5px;
-            height: 5px;
+            position: absolute;
+            top: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
-            margin-right: 3px;
-            vertical-align: middle;
             opacity: 0;
             transition: opacity 0.2s;
             background: var(--tab-color, #6C5CE7);
         }
         .fx-tab.has-active .tab-dot { opacity: 1; }
         .fx-tab .tab-count {
-            font-size: 8px;
-            margin-left: 2px;
-            opacity: 0.6;
+            position: absolute;
+            top: 2px;
+            right: 0;
+            font-size: 7px;
+            opacity: 0.5;
         }
         .fx-dropdown-row {
             display: flex;
@@ -2914,9 +2949,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            pointer-events: none;
             z-index: 1;
-            gap: 6px;
+            gap: 10px;
         }
         #tl-empty-hint.hidden { display: none; }
         .tl-hint-main {
@@ -2926,12 +2960,33 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .tl-hint-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .tl-hint-btn {
+            background: rgba(139,69,232,0.15);
+            border: 1px solid rgba(139,69,232,0.3);
+            color: rgba(255,255,255,0.7);
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 14px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tl-hint-btn:hover {
+            background: rgba(139,69,232,0.25);
+            border-color: rgba(139,69,232,0.5);
+            color: #fff;
+        }
         .tl-hint-sub {
             font-size: var(--font-xs);
-            color: rgba(255,255,255,0.32);
-            background: rgba(139,69,232,0.04);
-            padding: 4px 10px;
-            border-radius: var(--radius-sm);
+            color: rgba(255,255,255,0.25);
             letter-spacing: 0.3px;
         }
         .tl-hint-sub kbd {
@@ -2940,7 +2995,7 @@
             border-radius: 2px;
             font-family: inherit;
             font-size: var(--font-xs);
-            color: rgba(255,255,255,0.35);
+            color: rgba(255,255,255,0.3);
         }
         /* ═══ ACCORDION SECTIONS ═══ */
         .accordion-section {
@@ -3759,6 +3814,67 @@
             margin-top: 12px;
             font-style: italic;
         }
+
+        /* ═══ FIRST-RUN OVERLAY ═══ */
+        .first-run-overlay {
+            position: fixed;
+            top: var(--topbar-h, 40px);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 60px;
+            animation: firstRunFadeIn 0.3s ease;
+        }
+        @keyframes firstRunFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .first-run-hint {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            padding: 14px 20px;
+            border-radius: 8px;
+            background: rgba(139,69,232,0.25);
+            border: 1px solid rgba(139,69,232,0.4);
+            backdrop-filter: blur(4px);
+        }
+        .first-run-hint strong {
+            color: var(--color-accent, #8B45E8);
+        }
+        .first-run-hint svg {
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+        .first-run-dismiss {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-accent, #8B45E8);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 24px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .first-run-dismiss:hover {
+            filter: brightness(1.15);
+        }
     </style>
 </head>
 <body data-section="create">
@@ -3838,6 +3954,19 @@
             <div class="empty-step"><span class="step-num">4.</span> Use the timeline below to sync effects to audio beats</div>
         </div>
         <div class="empty-tip">Tip: Click &#x26A1; SYNC to auto-generate beat-synced effects</div>
+    </div>
+
+    <!-- First-run hint overlay (shown once after first video load) -->
+    <div id="first-run-overlay" class="first-run-overlay" style="display:none">
+        <div class="first-run-hint first-run-left">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M5 12l7-7M5 12l7 7"/></svg>
+            <span>Enable <strong>Tracking</strong> for blobs</span>
+        </div>
+        <div class="first-run-hint first-run-right">
+            <span>Try an <strong>Effect</strong></span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M19 12l-7-7M19 12l-7 7"/></svg>
+        </div>
+        <button class="first-run-dismiss" id="first-run-dismiss">Got it</button>
     </div>
 
     <!-- LEFT PANEL -->
@@ -4424,6 +4553,9 @@
                     <button class="fx-view-btn active" data-view="effects" role="tab" aria-selected="true">Effects</button>
                     <button class="fx-view-btn" data-view="presets" role="tab" aria-selected="false">Presets</button>
                 </div>
+                <div class="fx-search-wrap">
+                    <input type="text" id="fx-search" class="fx-search" placeholder="Search effects…" autocomplete="off" spellcheck="false">
+                </div>
                 <div class="fx-tab-bar-wrap" id="fx-tab-bar-wrap">
                     <div id="fx-cat-tabs" role="tablist" aria-label="Effect categories"></div>
                 </div>
@@ -4621,8 +4753,12 @@
                 <div id="timeline-playhead"></div>
                 <div id="timeline-ghost"></div>
                 <div id="tl-empty-hint">
-                    <div class="tl-hint-main">drag effects or modes here</div>
-                    <div class="tl-hint-sub"><kbd>+ BLOB</kbd> snapshot params &bull; <kbd>SYNC</kbd> auto-generate from beats &bull; <kbd>?</kbd> all shortcuts</div>
+                    <div class="tl-hint-main">Timeline</div>
+                    <div class="tl-hint-actions">
+                        <button class="tl-hint-btn" id="tl-add-effect-btn" title="Switch to Create section to pick an effect">+ Add Effect</button>
+                        <button class="tl-hint-btn" id="tl-sync-beats-btn" title="Auto-generate beat-synced segments">⚡ Sync to Beats</button>
+                    </div>
+                    <div class="tl-hint-sub">or drag effects here &bull; <kbd>?</kbd> shortcuts</div>
                 </div>
             </div>
         </div>
@@ -4810,14 +4946,14 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260402h"></script>
-<script src="blob-fx.js?v=20260402h"></script>
-<script src="blob-shader-fx.js?v=20260402h"></script>
-<script src="blob-overlay.js?v=20260402h"></script>
-<script src="blob-audio.js?v=20260402h"></script>
-<script src="blob-timeline.js?v=20260402h"></script>
-<script src="blob-mask.js?v=20260402h"></script>
-<script src="blob-tracking.js?v=20260402h"></script>
+<script src="blob-core.js?v=20260402i"></script>
+<script src="blob-fx.js?v=20260402i"></script>
+<script src="blob-shader-fx.js?v=20260402i"></script>
+<script src="blob-overlay.js?v=20260402i"></script>
+<script src="blob-audio.js?v=20260402i"></script>
+<script src="blob-timeline.js?v=20260402i"></script>
+<script src="blob-mask.js?v=20260402i"></script>
+<script src="blob-tracking.js?v=20260402i"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">

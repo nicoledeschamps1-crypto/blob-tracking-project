@@ -1768,6 +1768,20 @@ function setupTimelineUIListeners() {
         });
     });
 
+    // Timeline empty-state action buttons
+    const tlAddBtn = document.getElementById('tl-add-effect-btn');
+    if (tlAddBtn) {
+        tlAddBtn.addEventListener('click', () => {
+            if (typeof switchSection === 'function') switchSection('create');
+        });
+    }
+    const tlSyncBtn = document.getElementById('tl-sync-beats-btn');
+    if (tlSyncBtn) {
+        tlSyncBtn.addEventListener('click', () => {
+            if (syncBtn) syncBtn.click();
+        });
+    }
+
     // Zoom slider
     if (ui.tlZoomSlider) {
         ui.tlZoomSlider.addEventListener('input', (e) => {

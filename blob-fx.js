@@ -2266,6 +2266,36 @@ function buildFxPanel() {
     }
     buildFxFavoritesRow();
 
+    // ── FX SEARCH ──
+    const searchInput = document.getElementById('fx-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.trim().toLowerCase();
+            const cards = document.querySelectorAll('#fx-card-grid .fx-card');
+            if (!q) {
+                // Restore normal category view
+                cards.forEach(card => {
+                    card.style.display = card.dataset.cat === currentFxCat ? '' : 'none';
+                });
+                return;
+            }
+            // Show matches across ALL categories
+            cards.forEach(card => {
+                const label = (FX_UI_CONFIG[card.dataset.effect] || {}).label || '';
+                const match = label.toLowerCase().includes(q) || card.dataset.effect.includes(q);
+                card.style.display = match ? '' : 'none';
+            });
+        });
+        // Clear search on Escape
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+                searchInput.blur();
+            }
+        });
+    }
+
     // ── DROPDOWN ROW (compact toggle/drag controls) ──
     let selRow = document.getElementById('fx-selector-row');
     selRow.className = 'fx-dropdown-row';
@@ -2544,6 +2574,9 @@ const FX_TAB_DESCS = {
 
 function switchFxCategory(cat) {
     currentFxCat = cat;
+    // Clear search when switching categories
+    const searchInput = document.getElementById('fx-search');
+    if (searchInput && searchInput.value) { searchInput.value = ''; }
     // Update tab active state
     document.querySelectorAll('.fx-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
 
