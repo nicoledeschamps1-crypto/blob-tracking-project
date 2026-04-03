@@ -27,7 +27,7 @@ let lineWeight = 1;
 let lineStraight = false;
 let lineDashed = false;
 let connectionMode = 'chain'; // chain, hub, web
-let blobStyle = 'box'; // box, lframe, xframe, scope, win2k, grid, dash, glow, particle
+let blobStyle = 'box'; // box, lframe, xframe, scope, win2k, grid, dash, glow, particle, label, label2, backdrop
 let _blobParticles = [];
 const _MAX_PARTICLES = 500;
 let trackBoxColor = '#969696'; // default gray tracking box color
@@ -1982,6 +1982,9 @@ function setup() {
 
     // Initialize WebGL2 shader pipeline (Phase 0)
     initShaderFX();
+
+    // Initialize Region FX pipeline (per-blob effects)
+    if (typeof initRegionFX === 'function') initRegionFX();
 }
 
 // Update zoom UI elements
@@ -2421,6 +2424,10 @@ function draw() {
                 drawBlobStyle(p, zW, zH, _tbc, _vizA, _vizWt);
                 pop();
             } else {
+                // Region FX: per-blob shader effects
+                if (typeof applyRegionFX === 'function' && regionFXEnabled && regionFXMode !== 'none') {
+                    applyRegionFX(p, document.getElementById('defaultCanvas0'));
+                }
                 drawBlobStyle(p, pw, ph, _tbc, 255, trackBoxWeight);
             }
             drawPointInfo(p);

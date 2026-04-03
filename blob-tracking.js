@@ -1039,6 +1039,9 @@ function drawBlobStyle(p, w, h, tbc, alpha, weight) {
         case 'dash':     _drawDash(px, py, w, h, r, g, b, a, wt); break;
         case 'glow':     _drawGlow(px, py, w, h, r, g, b, a, wt); break;
         case 'particle': _drawParticleSpawn(px, py, r, g, b); break;
+        case 'label':    _drawLabel(px, py, w, h, r, g, b, a, wt, p); break;
+        case 'label2':   _drawLabel2(px, py, w, h, r, g, b, a, wt, p); break;
+        case 'backdrop': _drawBackdrop(px, py, w, h, r, g, b, a); break;
         default: // box
             stroke(r, g, b, a); noFill(); strokeWeight(wt); rectMode(CENTER);
             rect(px, py, w, h);
@@ -1239,4 +1242,77 @@ function _updateBlobParticles() {
         ctx.arc(pt.x, pt.y, pt.sz * pt.life, 0, Math.PI * 2);
         ctx.fill();
     }
+}
+
+// ── LABEL style — blob ID text at center with background rect ──
+function _drawLabel(px, py, w, h, r, g, b, a, wt, pt) {
+    let ctx = drawingContext;
+    ctx.save();
+    let idText = '#' + (pt.id !== undefined ? pt.id : '?');
+    let fontSize = Math.max(10, Math.min(w, h) * 0.35);
+    ctx.font = 'bold ' + Math.round(fontSize) + 'px "Commit Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let tm = ctx.measureText(idText);
+    let padX = 6, padY = 3;
+    let bgW = tm.width + padX * 2;
+    let bgH = fontSize + padY * 2;
+    // Background rect
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(px - bgW / 2, py - bgH / 2, bgW, bgH);
+    // Text
+    ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a / 255) + ')';
+    ctx.fillText(idText, px, py);
+    ctx.restore();
+}
+
+// ── LABEL2 style — pill chip with ID + coordinates ──────────
+function _drawLabel2(px, py, w, h, r, g, b, a, wt, pt) {
+    let ctx = drawingContext;
+    ctx.save();
+    let idText = '#' + (pt.id !== undefined ? pt.id : '?');
+    let coordText = Math.round(px) + ',' + Math.round(py);
+    let label = idText + '  ' + coordText;
+    let fontSize = Math.max(11, Math.min(w, h) * 0.3);
+    ctx.font = '600 ' + Math.round(fontSize) + 'px "Commit Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let tm = ctx.measureText(label);
+    let padX = 10, padY = 5;
+    let bgW = tm.width + padX * 2;
+    let bgH = fontSize + padY * 2;
+    let rad = bgH / 2; // pill radius
+    // Pill background
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.beginPath();
+    ctx.moveTo(px - bgW / 2 + rad, py - bgH / 2);
+    ctx.lineTo(px + bgW / 2 - rad, py - bgH / 2);
+    ctx.arcTo(px + bgW / 2, py - bgH / 2, px + bgW / 2, py, rad);
+    ctx.arcTo(px + bgW / 2, py + bgH / 2, px + bgW / 2 - rad, py + bgH / 2, rad);
+    ctx.lineTo(px - bgW / 2 + rad, py + bgH / 2);
+    ctx.arcTo(px - bgW / 2, py + bgH / 2, px - bgW / 2, py, rad);
+    ctx.arcTo(px - bgW / 2, py - bgH / 2, px - bgW / 2 + rad, py - bgH / 2, rad);
+    ctx.closePath();
+    ctx.fill();
+    // Pill border
+    ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a / 255 * 0.6) + ')';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Text
+    ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a / 255) + ')';
+    ctx.fillText(label, px, py + 1);
+    ctx.restore();
+}
+
+// ── BACKDROP style — semi-transparent filled rectangle ──────
+function _drawBackdrop(px, py, w, h, r, g, b, a) {
+    let ctx = drawingContext;
+    ctx.save();
+    ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a / 255 * 0.4) + ')';
+    ctx.fillRect(px - w / 2, py - h / 2, w, h);
+    // Subtle border
+    ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (a / 255 * 0.2) + ')';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px - w / 2, py - h / 2, w, h);
+    ctx.restore();
 }

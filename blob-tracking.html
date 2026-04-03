@@ -4443,6 +4443,31 @@
                         <button class="selector-btn" data-value="dash" title="Dashed rectangle outline around each blob">DASH</button>
                         <button class="selector-btn" data-value="glow" title="Soft glowing halo around each blob">GLOW</button>
                         <button class="selector-btn" data-value="particle" title="Particles emit and drift from blob positions">PARTICLE</button>
+                        <button class="selector-btn" data-value="label" title="Blob ID label with background">LABEL</button>
+                        <button class="selector-btn" data-value="label2" title="Pill chip with ID and coordinates">LABEL2</button>
+                        <button class="selector-btn" data-value="backdrop" title="Semi-transparent filled rectangle behind blob">BACKDROP</button>
+                    </div>
+                    <!-- Region Effects -->
+                    <div class="control-group" id="region-fx-group" style="margin-top:8px;">
+                        <div class="control-label">Region Effects</div>
+                        <label class="checkbox-label"><input type="checkbox" id="region-fx-toggle"> Enable</label>
+                        <div id="region-fx-options" style="display:none">
+                            <div class="selector-row selector-wrap" id="region-fx-buttons">
+                                <button class="selector-btn" data-rfx="inv">INV</button>
+                                <button class="selector-btn" data-rfx="pixel">PIXEL</button>
+                                <button class="selector-btn" data-rfx="thermal">THERMAL</button>
+                                <button class="selector-btn" data-rfx="blur">BLUR</button>
+                            </div>
+                            <div class="control-group" style="margin-top:6px;">
+                                <label>Intensity <span class="value-display" id="val-rfx-intensity">100</span></label>
+                                <input type="range" id="slider-rfx-intensity" min="0" max="100" value="100" step="1">
+                            </div>
+                            <div class="selector-row" style="margin-top:4px;">
+                                <label class="checkbox-label"><input type="checkbox" id="rfx-invert"> Invert</label>
+                                <label class="checkbox-label"><input type="checkbox" id="rfx-fusion"> Fusion</label>
+                                <label class="checkbox-label"><input type="checkbox" id="rfx-random"> Random</label>
+                            </div>
+                        </div>
                     </div>
                     <div id="product-info-group" style="display:none;margin-top:8px;">
                         <label style="font-size:9px;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:4px;">Tag Text</label>
@@ -5249,6 +5274,7 @@
 <script src="blob-timeline.js?v=20260403c"></script>
 <script src="blob-mask.js?v=20260403c"></script>
 <script src="blob-tracking.js?v=20260403c"></script>
+<script src="blob-region-fx.js?v=20260403c"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">
