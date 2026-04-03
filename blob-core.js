@@ -4601,14 +4601,34 @@ function handleFile(event) {
             }
         });
         _dbg('createVideo called, waiting for callback...');
-        // iOS Safari: video won't load without playsinline + muted.
-        // Without these, iOS suspends after loadstart and never fires canplaythrough.
+        // iOS Safari: set playsinline + muted, then force play().
+        // iOS won't buffer to canplaythrough for large files — it suspends.
+        // Calling .play() from a user gesture (file input change) forces iOS to load.
+        // We also listen for loadeddata as a fallback trigger if canplaythrough never fires.
         if (videoEl && videoEl.elt) {
             videoEl.elt.setAttribute('playsinline', '');
             videoEl.elt.setAttribute('webkit-playsinline', '');
             videoEl.elt.muted = true;
-            videoEl.elt.load(); // restart load with new attributes
-            _dbg('set playsinline+muted, called load()');
+            _dbg('set playsinline+muted');
+            // iOS fallback: if canplaythrough never fires, use loadeddata
+            let _iosFallbackDone = false;
+            videoEl.elt.addEventListener('loadeddata', () => {
+                _dbg('loadeddata fired');
+                if (_iosFallbackDone || videoLoaded) return;
+                _iosFallbackDone = true;
+                _dbg('iOS fallback: triggering play from loadeddata');
+                videoEl.elt.play().then(() => {
+                    _dbg('play() succeeded');
+                }).catch(err => {
+                    _dbg('play() failed: ' + err.message);
+                });
+            }, { once: true });
+            // Force play from user gesture context — this is the key iOS fix
+            videoEl.elt.play().then(() => {
+                _dbg('initial play() succeeded');
+            }).catch(err => {
+                _dbg('initial play() rejected: ' + err.message + ' (expected, will retry on loadeddata)');
+            });
         }
         // Handle video load errors (unsupported format, corrupt file)
         if (videoEl && videoEl.elt) {
