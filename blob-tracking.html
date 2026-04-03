@@ -504,12 +504,11 @@
         }
 
         .source-row #file-input-container {
-            flex: 1;
+            flex: 1 1 0;
         }
 
         #webcam-btn {
-            flex-shrink: 0;
-            width: 52px;
+            flex: 1 1 0;
             border: 1px dashed var(--slider-track);
             border-radius: 8px;
             background: rgba(0,0,0,0.2);
@@ -526,7 +525,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-family: inherit;
-            padding: 0;
+            padding: 12px 0;
         }
 
         #webcam-btn:hover {
@@ -545,6 +544,27 @@
             width: 14px;
             height: 14px;
             fill: currentColor;
+        }
+
+        .camera-device-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .camera-device-select {
+            flex: 1;
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: 3px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: var(--font-xs);
+            padding: 4px 6px;
+            outline: none;
+        }
+        .camera-device-select:focus {
+            border-color: var(--color-accent);
         }
 
         #file-input-container {
@@ -4014,12 +4034,12 @@
                 </label>
                 <button id="webcam-btn" title="Use Webcam" aria-label="Toggle webcam">
                     <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                    CAM
+                    CAMERA
                 </button>
             </div>
-            <div style="display:flex;gap:12px">
-                <span class="hint-text" style="flex:1">Accepts .mp4 or .mov files</span>
-                <span class="hint-text">Use your device's webcam as a live source</span>
+            <div id="camera-device-row" class="camera-device-row" style="display:none">
+                <label for="camera-device-select" style="font-size:var(--font-xs);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px">Camera</label>
+                <select id="camera-device-select" class="camera-device-select"></select>
             </div>
 
             <!-- Zoom — compact viewport controls -->

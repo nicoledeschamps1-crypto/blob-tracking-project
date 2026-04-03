@@ -4029,7 +4029,7 @@ function toggleWebcam() {
     }
 }
 
-function startWebcam() {
+function startWebcam(deviceId) {
     // Stop video audio if active (switching away from file video)
     if (typeof videoAudioActive !== 'undefined' && videoAudioActive && typeof stopVideoAudio === 'function') stopVideoAudio();
     if (typeof _videoAudioSource !== 'undefined') _videoAudioSource = null;
@@ -4044,12 +4044,20 @@ function startWebcam() {
     ui.fileName.innerText = 'webcam active';
     currentMode = 1; _userMode = 1;
 
-    videoEl = createCapture(VIDEO, () => {
+    // Use selected device or saved preference
+    const savedDevice = deviceId || localStorage.getItem('hod-camera-device') || undefined;
+    const constraints = savedDevice
+        ? { video: { deviceId: { exact: savedDevice } } }
+        : VIDEO;
+
+    videoEl = createCapture(constraints, () => {
         videoEl.hide();
         videoLoaded = true;
         videoPlaying = true;
         updateButtonStates();
         syncPlayIcon(true);
+        // Populate device selector after permission is granted
+        populateCameraDevices();
     });
     // Handle webcam permission denial / errors
     if (videoEl && videoEl.elt) {
@@ -4062,6 +4070,34 @@ function startWebcam() {
             syncPlayIcon(false);
         });
     }
+}
+
+function populateCameraDevices() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+        const cams = devices.filter(d => d.kind === 'videoinput');
+        const row = document.getElementById('camera-device-row');
+        const sel = document.getElementById('camera-device-select');
+        if (!row || !sel) return;
+        if (cams.length <= 1) { row.style.display = 'none'; return; }
+        // Show selector
+        row.style.display = '';
+        sel.innerHTML = '';
+        const saved = localStorage.getItem('hod-camera-device');
+        cams.forEach((cam, i) => {
+            const opt = document.createElement('option');
+            opt.value = cam.deviceId;
+            opt.textContent = cam.label || ('Camera ' + (i + 1));
+            if (cam.deviceId === saved) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        // Switch camera on change
+        sel.onchange = () => {
+            const id = sel.value;
+            localStorage.setItem('hod-camera-device', id);
+            if (usingWebcam) startWebcam(id);
+        };
+    }).catch(() => {});
 }
 
 function stopWebcam() {
