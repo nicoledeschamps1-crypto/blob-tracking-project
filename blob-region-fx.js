@@ -18,8 +18,6 @@ let _regionGLCanvas = null;      // offscreen <canvas>
 let _regionPrograms = {};        // compiled programs by name
 let _regionVAO = null;           // fullscreen quad VAO
 let _regionSrcTex = null;        // source texture (p5 canvas upload)
-let _regionFBO = null;           // framebuffer for render-to-texture
-let _regionOutTex = null;        // output texture attached to FBO
 let _regionFrameUploaded = -1;   // frameCount of last texture upload
 const _REGION_SIZE = 256;        // offscreen canvas size
 const _REGION_MODES = ['inv', 'pixel', 'thermal', 'blur', 'glitch', 'tone', 'dither', 'crt', 'edge', 'xray', 'zoom', 'water', 'mask'];
@@ -402,7 +400,20 @@ function initRegionFX() {
     };
     for (let [name, frag] of Object.entries(shaders)) {
         let prog = _regionLinkProgram(gl, _VERT_REGION, frag);
-        if (prog) _regionPrograms[name] = prog;
+        if (prog) {
+            // Cache uniform locations (avoids 3600+ getUniformLocation calls/sec)
+            _regionPrograms[name] = {
+                prog,
+                locs: {
+                    u_texture:   gl.getUniformLocation(prog, 'u_texture'),
+                    u_blobRect:  gl.getUniformLocation(prog, 'u_blobRect'),
+                    u_intensity: gl.getUniformLocation(prog, 'u_intensity'),
+                    u_resolution:gl.getUniformLocation(prog, 'u_resolution'),
+                    u_texelSize: gl.getUniformLocation(prog, 'u_texelSize'),
+                    u_time:      gl.getUniformLocation(prog, 'u_time'),
+                }
+            };
+        }
     }
 
     // Fullscreen quad VAO (clip-space triangle strip: −1..+1)
@@ -424,20 +435,6 @@ function initRegionFX() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-    // FBO + output texture for render-to-texture
-    _regionFBO = gl.createFramebuffer();
-    _regionOutTex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, _regionOutTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, _REGION_SIZE, _REGION_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, _regionFBO);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, _regionOutTex, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     // Context loss handling
@@ -468,8 +465,8 @@ function applyRegionFX(blob, canvasEl) {
         let hash = Math.abs(Math.round(blob.posicao.x * 7 + blob.posicao.y * 13)) % _REGION_MODES.length;
         mode = _REGION_MODES[hash];
     }
-    let prog = _regionPrograms[mode];
-    if (!prog) return;
+    let entry = _regionPrograms[mode];
+    if (!entry) return;
 
     // Upload p5 canvas as texture once per frame
     if (_regionFrameUploaded !== frameCount) {
@@ -507,8 +504,8 @@ function applyRegionFX(blob, canvasEl) {
     // Intensity normalised 0–1
     let intensity = regionFXIntensity / 100;
 
-    // Render to FBO
-    _regionRenderPass(gl, prog, uvX, uvY, uvW, uvH, cw, ch, intensity);
+    // Render to screen buffer
+    _regionRenderPass(gl, entry, uvX, uvY, uvW, uvH, cw, ch, intensity);
 
     // Composite result back onto p5 canvas
     _compositeRegion(
@@ -518,7 +515,8 @@ function applyRegionFX(blob, canvasEl) {
     );
 }
 
-function _regionRenderPass(gl, prog, uvX, uvY, uvW, uvH, canvasW, canvasH, intensity) {
+function _regionRenderPass(gl, entry, uvX, uvY, uvW, uvH, canvasW, canvasH, intensity) {
+    let { prog, locs } = entry;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); // render to screen (preserveDrawingBuffer)
     gl.viewport(0, 0, _REGION_SIZE, _REGION_SIZE);
     gl.useProgram(prog);
@@ -526,32 +524,19 @@ function _regionRenderPass(gl, prog, uvX, uvY, uvW, uvH, canvasW, canvasH, inten
     // Bind source texture
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, _regionSrcTex);
-    let uTex = gl.getUniformLocation(prog, 'u_texture');
-    if (uTex !== null) gl.uniform1i(uTex, 0);
+    if (locs.u_texture !== null) gl.uniform1i(locs.u_texture, 0);
 
-    // u_blobRect
-    let uRect = gl.getUniformLocation(prog, 'u_blobRect');
-    if (uRect !== null) gl.uniform4f(uRect, uvX, uvY, uvW, uvH);
+    // Uniforms (using cached locations)
+    if (locs.u_blobRect !== null) gl.uniform4f(locs.u_blobRect, uvX, uvY, uvW, uvH);
+    if (locs.u_intensity !== null) gl.uniform1f(locs.u_intensity, intensity);
+    if (locs.u_resolution !== null) gl.uniform2f(locs.u_resolution, _REGION_SIZE, _REGION_SIZE);
+    if (locs.u_texelSize !== null) gl.uniform2f(locs.u_texelSize, 1.0 / _REGION_SIZE, 1.0 / _REGION_SIZE);
+    if (locs.u_time !== null) gl.uniform1f(locs.u_time, (typeof millis === 'function' ? millis() : performance.now()) / 1000.0);
 
-    // u_intensity
-    let uInt = gl.getUniformLocation(prog, 'u_intensity');
-    if (uInt !== null) gl.uniform1f(uInt, intensity);
-
-    // u_resolution (for pixelate)
-    let uRes = gl.getUniformLocation(prog, 'u_resolution');
-    if (uRes !== null) gl.uniform2f(uRes, _REGION_SIZE, _REGION_SIZE);
-
-    // u_texelSize (for blur, edge, xray)
-    let uTexel = gl.getUniformLocation(prog, 'u_texelSize');
-    if (uTexel !== null) gl.uniform2f(uTexel, 1.0 / _REGION_SIZE, 1.0 / _REGION_SIZE);
-
-    // u_time (for glitch, water, crt)
-    let uTime = gl.getUniformLocation(prog, 'u_time');
-    if (uTime !== null) gl.uniform1f(uTime, (typeof millis === 'function' ? millis() : performance.now()) / 1000.0);
-
-    // Draw
+    // Draw + flush (flush required before 2D canvas reads WebGL pixels via drawImage)
     gl.bindVertexArray(_regionVAO);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.flush();
     gl.bindVertexArray(null);
 }
 
