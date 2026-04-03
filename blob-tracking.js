@@ -298,8 +298,17 @@ function trackPoints() {
 
     // FACE LANDMARK modes (EYES=15, LIPS=16, FACE=17) — uses MediaPipe landmarks but needs pixel data for color sampling
     if (currentMode >= 15 && currentMode <= 17) {
-        videoEl.loadPixels();
-        if (videoEl.pixels.length === 0) return;
+        // Use offscreen canvas for color sampling instead of p5's heavyweight loadPixels()
+        const vid = videoEl.elt;
+        if (!vid || vid.readyState < 2 || vid.videoWidth === 0) return;
+        if (!window._mpFaceCanvas) window._mpFaceCanvas = document.createElement('canvas');
+        const fc = window._mpFaceCanvas;
+        if (fc.width !== vid.videoWidth || fc.height !== vid.videoHeight) {
+            fc.width = vid.videoWidth; fc.height = vid.videoHeight;
+        }
+        if (!window._mpFaceCtx) window._mpFaceCtx = fc.getContext('2d', { willReadFrequently: true });
+        window._mpFaceCtx.drawImage(vid, 0, 0);
+
         if (!window.mpFaceLandmarkerReady || !window.mpFaceLandmarker) {
             if (!window._faceWarnThrottle || Date.now() - window._faceWarnThrottle > 3000) {
                 window._faceWarnThrottle = Date.now();
@@ -319,19 +328,7 @@ function trackPoints() {
         if (faceDetectFrame >= FACE_DETECT_INTERVAL || !faceLandmarkCache) {
             faceDetectFrame = 0;
             try {
-                // Use offscreen canvas — more reliable than raw video element with MediaPipe + p5.js
-                const vid = videoEl.elt;
-                if (!vid || vid.readyState < 2 || vid.videoWidth === 0) return;
-                if (!window._mpFaceCanvas) {
-                    window._mpFaceCanvas = document.createElement('canvas');
-                }
-                const fc = window._mpFaceCanvas;
-                if (fc.width !== vid.videoWidth || fc.height !== vid.videoHeight) {
-                    fc.width = vid.videoWidth;
-                    fc.height = vid.videoHeight;
-                }
-                if (!window._mpFaceCtx) window._mpFaceCtx = fc.getContext('2d');
-                window._mpFaceCtx.drawImage(vid, 0, 0);
+                // Reuse offscreen canvas already drawn above for color sampling
                 const ts = performance.now();
                 const result = window.mpFaceLandmarker.detectForVideo(fc, ts);
                 if (!window._faceDetectCount) window._faceDetectCount = 0;
@@ -391,6 +388,9 @@ function trackPoints() {
         else if (currentMode === 16) indices = FACE_LIPS_INDICES;
         // mode 17 (FACE) uses all landmarks — indices stays null
 
+        // Get pixel data from offscreen canvas for color sampling (avoids p5 loadPixels)
+        const _facePixelData = window._mpFaceCtx.getImageData(0, 0, w, h).data;
+
         let candidates = [];
         for (let faceIdx = 0; faceIdx < faceLandmarkCache.length; faceIdx++) {
             const landmarks = faceLandmarkCache[faceIdx];
@@ -405,9 +405,9 @@ function trackPoints() {
                 vx = Math.max(0, Math.min(w - 1, vx));
                 vy = Math.max(0, Math.min(h - 1, vy));
 
-                // Sample video pixel color at landmark position
+                // Sample pixel color from offscreen canvas
                 let idx = (vx + vy * w) * 4;
-                let r = videoEl.pixels[idx], g = videoEl.pixels[idx + 1], b = videoEl.pixels[idx + 2];
+                let r = _facePixelData[idx], g = _facePixelData[idx + 1], b = _facePixelData[idx + 2];
                 candidates.push(new CandidatePoint(vx, vy, color(r, g, b)));
             }
         }

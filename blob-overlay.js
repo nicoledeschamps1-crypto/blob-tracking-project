@@ -14,6 +14,7 @@ let overlayLoop = true;
 let overlayMuted = true;
 let overlayFit = 'cover';    // 'cover' | 'contain' | 'stretch'
 let _overlayFileURL = null;  // Object URL for cleanup
+let _overlayLoadGen = 0;
 
 // Blend mode map: display name → globalCompositeOperation value
 const OVERLAY_BLEND_MODES = [
@@ -50,42 +51,50 @@ function loadOverlayFile(file) {
     }
 
     _overlayFileURL = URL.createObjectURL(file);
+    const gen = ++_overlayLoadGen;
+    const thisUrl = _overlayFileURL;
 
     if (isVideo) {
         overlayType = 'video';
-        overlayVideo = document.createElement('video');
-        overlayVideo.src = _overlayFileURL;
-        overlayVideo.loop = overlayLoop;
-        overlayVideo.muted = overlayMuted;
-        overlayVideo.playsInline = true;
-        overlayVideo.crossOrigin = 'anonymous';
-        overlayVideo.addEventListener('loadeddata', () => {
+        const thisVideo = document.createElement('video');
+        overlayVideo = thisVideo;
+        thisVideo.src = thisUrl;
+        thisVideo.loop = overlayLoop;
+        thisVideo.muted = overlayMuted;
+        thisVideo.playsInline = true;
+        thisVideo.crossOrigin = 'anonymous';
+        thisVideo.addEventListener('loadeddata', () => {
+            if (gen !== _overlayLoadGen) return;
             overlayEnabled = true;
-            overlayVideo.play().catch(() => {});
+            thisVideo.play().catch(() => {});
             _updateOverlayUI();
-            console.log('[Overlay] Video loaded:', overlayVideo.videoWidth + 'x' + overlayVideo.videoHeight);
+            console.log('[Overlay] Video loaded:', thisVideo.videoWidth + 'x' + thisVideo.videoHeight);
         });
-        overlayVideo.addEventListener('error', (e) => {
+        thisVideo.addEventListener('error', (e) => {
+            if (gen !== _overlayLoadGen) { thisVideo.pause(); thisVideo.removeAttribute('src'); URL.revokeObjectURL(thisUrl); return; }
             console.error('[Overlay] Video load error:', e);
             _showOverlayError('Failed to load video overlay');
             disposeOverlay();
         });
-        overlayVideo.load();
+        thisVideo.load();
     } else {
         overlayType = 'image';
-        overlayImage = new Image();
-        overlayImage.crossOrigin = 'anonymous';
-        overlayImage.onload = () => {
+        const thisImg = new Image();
+        overlayImage = thisImg;
+        thisImg.crossOrigin = 'anonymous';
+        thisImg.onload = () => {
+            if (gen !== _overlayLoadGen) return;
             overlayEnabled = true;
             _updateOverlayUI();
-            console.log('[Overlay] Image loaded:', overlayImage.width + 'x' + overlayImage.height);
+            console.log('[Overlay] Image loaded:', thisImg.width + 'x' + thisImg.height);
         };
-        overlayImage.onerror = () => {
+        thisImg.onerror = () => {
+            if (gen !== _overlayLoadGen) { URL.revokeObjectURL(thisUrl); return; }
             console.error('[Overlay] Image load error');
             _showOverlayError('Failed to load image overlay');
             disposeOverlay();
         };
-        overlayImage.src = _overlayFileURL;
+        thisImg.src = thisUrl;
     }
 }
 

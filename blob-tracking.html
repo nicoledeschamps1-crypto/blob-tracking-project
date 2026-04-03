@@ -4057,8 +4057,10 @@
                 t.style.cssText = 'position:fixed;bottom:60px;left:8px;right:8px;max-height:30vh;overflow:auto;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.4 monospace;padding:8px;border-radius:6px;z-index:99999;pointer-events:none;';
                 document.body.appendChild(t);
             }
-            t.innerHTML += msg + '<br>'; t.scrollTop = t.scrollHeight;
-            clearTimeout(t._hide); t._hide = setTimeout(function(){ t.innerHTML = ''; }, 15000);
+            t.style.whiteSpace = 'pre-wrap';
+            t.appendChild(document.createTextNode(msg + '\n'));
+            t.scrollTop = t.scrollHeight;
+            clearTimeout(t._hide); t._hide = setTimeout(function(){ t.textContent = ''; }, 15000);
         };
         // Triple-tap Saturn icon loads eruda
         var taps = 0, timer;
@@ -5223,14 +5225,14 @@
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260403a"></script>
-<script src="blob-fx.js?v=20260402i"></script>
-<script src="blob-shader-fx.js?v=20260402i"></script>
-<script src="blob-overlay.js?v=20260402i"></script>
-<script src="blob-audio.js?v=20260402i"></script>
-<script src="blob-timeline.js?v=20260402i"></script>
-<script src="blob-mask.js?v=20260402i"></script>
-<script src="blob-tracking.js?v=20260403a"></script>
+<script src="blob-core.js?v=20260403b"></script>
+<script src="blob-fx.js?v=20260403b"></script>
+<script src="blob-shader-fx.js?v=20260403b"></script>
+<script src="blob-overlay.js?v=20260403b"></script>
+<script src="blob-audio.js?v=20260403b"></script>
+<script src="blob-timeline.js?v=20260403b"></script>
+<script src="blob-mask.js?v=20260403b"></script>
+<script src="blob-tracking.js?v=20260403b"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">
@@ -5239,12 +5241,15 @@ import { InteractiveSegmenter, FilesetResolver }
 
 window.mpSegmenterReady = false;
 window.mpSegmenter = null;
+window._segmenterInitEpoch = 0;
 
 async function initSegmenter() {
+    const epoch = window._segmenterInitEpoch;
     try {
         const vision = await FilesetResolver.forVisionTasks(
             "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
         );
+        if (epoch !== window._segmenterInitEpoch) return;
         window.mpSegmenter = await InteractiveSegmenter.createFromOptions(vision, {
             baseOptions: {
                 modelAssetPath:
@@ -5254,9 +5259,9 @@ async function initSegmenter() {
             outputCategoryMask: true,
             outputConfidenceMasks: true,
         });
+        if (epoch !== window._segmenterInitEpoch) { window.mpSegmenter.close(); window.mpSegmenter = null; return; }
         window.mpSegmenterReady = true;
         console.log("MediaPipe Interactive Segmenter ready");
-        // Update UI if mask mode is already active
         let loadEl = document.getElementById('mask-loading');
         if (loadEl) loadEl.style.display = 'none';
         let hintEl = document.getElementById('mask-hint');
@@ -5264,11 +5269,13 @@ async function initSegmenter() {
             hintEl.textContent = 'Click on the object you want to track';
         }
     } catch (e) {
+        if (epoch !== window._segmenterInitEpoch) return;
         console.warn("GPU segmenter failed, trying CPU fallback:", e);
         try {
             const visionCPU = await FilesetResolver.forVisionTasks(
                 "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
             );
+            if (epoch !== window._segmenterInitEpoch) return;
             window.mpSegmenter = await InteractiveSegmenter.createFromOptions(visionCPU, {
                 baseOptions: {
                     modelAssetPath:
@@ -5278,6 +5285,7 @@ async function initSegmenter() {
                 outputCategoryMask: true,
                 outputConfidenceMasks: true,
             });
+            if (epoch !== window._segmenterInitEpoch) { window.mpSegmenter.close(); window.mpSegmenter = null; return; }
             window.mpSegmenterReady = true;
             console.log("MediaPipe Interactive Segmenter ready (CPU fallback)");
             let loadEl = document.getElementById('mask-loading');
@@ -5287,11 +5295,13 @@ async function initSegmenter() {
                 hintEl.textContent = 'Click on the object you want to track';
             }
         } catch (e2) {
+            if (epoch !== window._segmenterInitEpoch) return;
             console.error("Failed to load MediaPipe segmenter (GPU + CPU):", e2);
+            window._segmenterInitStarted = false; // Allow retry
             let loadEl = document.getElementById('mask-loading');
             if (loadEl) {
                 loadEl.style.display = '';
-                loadEl.textContent = 'AI model failed to load';
+                loadEl.textContent = 'AI model failed to load — tap to retry';
                 loadEl.style.color = '#E17055';
             }
         }
@@ -5304,6 +5314,15 @@ window.initSegmenterLazy = function() {
     window._segmenterInitStarted = true;
     initSegmenter();
 };
+
+// Teardown — call on mode exit to free resources
+window.disposeSegmenter = function() {
+    window._segmenterInitEpoch++;
+    if (window.mpSegmenter) { try { window.mpSegmenter.close(); } catch(_) {} }
+    window.mpSegmenter = null;
+    window.mpSegmenterReady = false;
+    window._segmenterInitStarted = false;
+};
 </script>
 
 <!-- MediaPipe Face Landmarker (Eyes / Lips / Face tracking) -->
@@ -5314,8 +5333,10 @@ import { FaceLandmarker, FilesetResolver }
 window.mpFaceLandmarkerReady = false;
 window.mpFaceLandmarker = null;
 window.mpFaceInitError = null;
+window._faceInitEpoch = 0;
 
 async function initFaceLandmarker() {
+    const epoch = window._faceInitEpoch;
     let statusEl = document.getElementById('face-loading');
     try {
         if (statusEl) { statusEl.style.display = ''; statusEl.textContent = 'Loading vision WASM...'; }
@@ -5323,6 +5344,7 @@ async function initFaceLandmarker() {
         const vision = await FilesetResolver.forVisionTasks(
             "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm"
         );
+        if (epoch !== window._faceInitEpoch) return;
         console.log('[FaceLandmarker] FilesetResolver ready');
         if (statusEl) statusEl.textContent = 'Loading face model...';
 
@@ -5340,12 +5362,15 @@ async function initFaceLandmarker() {
         // Try GPU first, fall back to CPU if GPU delegate fails
         for (const delegate of ["GPU", "CPU"]) {
             try {
+                if (epoch !== window._faceInitEpoch) return;
                 console.log('[FaceLandmarker] Trying delegate:', delegate);
                 if (statusEl) statusEl.textContent = 'Loading face model (' + delegate + ')...';
-                window.mpFaceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+                const lm = await FaceLandmarker.createFromOptions(vision, {
                     baseOptions: { modelAssetPath: modelPath, delegate },
                     ...opts
                 });
+                if (epoch !== window._faceInitEpoch) { lm.close(); return; }
+                window.mpFaceLandmarker = lm;
                 window.mpFaceLandmarkerReady = true;
                 window.mpFaceInitError = null;
                 console.log('[FaceLandmarker] Ready (delegate: ' + delegate + ')');
@@ -5355,20 +5380,23 @@ async function initFaceLandmarker() {
                 console.warn('[FaceLandmarker] ' + delegate + ' failed:', e.message || e);
             }
         }
+        if (epoch !== window._faceInitEpoch) return;
         // Both delegates failed
         const msg = 'Face model failed — both GPU and CPU delegates rejected';
         console.error('[FaceLandmarker]', msg);
         window.mpFaceInitError = msg;
+        window._faceLandmarkerInitStarted = false; // Allow retry
         if (statusEl) {
             statusEl.style.display = '';
             statusEl.textContent = msg;
             statusEl.style.color = '#E17055';
         }
     } catch (e) {
-        // FilesetResolver or import-level error
+        if (epoch !== window._faceInitEpoch) return;
         const msg = 'Face init error: ' + (e.message || e);
         console.error('[FaceLandmarker]', msg);
         window.mpFaceInitError = msg;
+        window._faceLandmarkerInitStarted = false; // Allow retry
         if (statusEl) {
             statusEl.style.display = '';
             statusEl.textContent = msg;
@@ -5382,6 +5410,16 @@ window.initFaceLandmarkerLazy = function() {
     if (window.mpFaceLandmarkerReady || window._faceLandmarkerInitStarted) return;
     window._faceLandmarkerInitStarted = true;
     initFaceLandmarker();
+};
+
+// Teardown — call on mode exit to free resources
+window.disposeFaceLandmarker = function() {
+    window._faceInitEpoch++;
+    if (window.mpFaceLandmarker) { try { window.mpFaceLandmarker.close(); } catch(_) {} }
+    window.mpFaceLandmarker = null;
+    window.mpFaceLandmarkerReady = false;
+    window._faceLandmarkerInitStarted = false;
+    window.mpFaceInitError = null;
 };
 </script>
 </body>

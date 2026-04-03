@@ -56,6 +56,7 @@ let paramBaseline = [...DEFAULT_CONFIG.parametros];
 
 const navOrder = [0, 1, 4, 5, 6, 2, 3, 7];
 let navIndex = 0;
+let _videoLoadGen = 0;
 
 let trackedPoints = [];
 let lastX = 0;
@@ -2354,14 +2355,18 @@ function draw() {
                     let sampleW = Math.min(Math.max(cols, Math.ceil(sw)), 400);
                     let sampleH = Math.min(Math.max(rows, Math.ceil(sh)), 300);
                     if (!_asciiSampler) _asciiSampler = document.createElement('canvas');
-                    _asciiSampler.width = sampleW;
-                    _asciiSampler.height = sampleH;
+                    if (_asciiSampler.width !== sampleW || _asciiSampler.height !== sampleH) {
+                        _asciiSampler.width = sampleW;
+                        _asciiSampler.height = sampleH;
+                    }
                     let actx = _asciiSampler.getContext('2d');
                     actx.drawImage(videoEl.elt || videoEl, sx, sy, sw, sh, 0, 0, sampleW, sampleH);
                     // Downsample to grid resolution for character lookup
                     let gridCanvas = _asciiSampler._grid;
                     if (!gridCanvas) { gridCanvas = document.createElement('canvas'); _asciiSampler._grid = gridCanvas; }
-                    gridCanvas.width = cols; gridCanvas.height = rows;
+                    if (gridCanvas.width !== cols || gridCanvas.height !== rows) {
+                        gridCanvas.width = cols; gridCanvas.height = rows;
+                    }
                     let gctx = gridCanvas.getContext('2d', { willReadFrequently: true });
                     gctx.imageSmoothingEnabled = true;
                     gctx.imageSmoothingQuality = 'high';
@@ -2651,19 +2656,26 @@ function draw() {
         // Apply effects to full canvas
         applyFn();
 
-        // Restore the non-FX side from buffer
+        // Restore the non-FX side from buffer using clipped drawImage (GPU-accelerated, no pixel readback)
         let pd = cvs.width / width;
         let splitX = Math.round(width * splitPosition / 100);
         let splitPx = Math.round(splitX * pd);
+        let ctx = drawingContext;
+        ctx.save();
         if (splitFxSide === 'right') {
             // FX on right only — restore left from clean buffer
-            let leftData = _splitBuf.getContext('2d').getImageData(0, 0, splitPx, cvs.height);
-            drawingContext.putImageData(leftData, 0, 0);
+            ctx.beginPath();
+            ctx.rect(0, 0, splitPx, cvs.height);
+            ctx.clip();
+            ctx.drawImage(_splitBuf, 0, 0);
         } else {
             // FX on left only — restore right from clean buffer
-            let rightData = _splitBuf.getContext('2d').getImageData(splitPx, 0, cvs.width - splitPx, cvs.height);
-            drawingContext.putImageData(rightData, splitPx, 0);
+            ctx.beginPath();
+            ctx.rect(splitPx, 0, cvs.width - splitPx, cvs.height);
+            ctx.clip();
+            ctx.drawImage(_splitBuf, 0, 0);
         }
+        ctx.restore();
     }
 
     // ── Split view: configurable position, mirror, dual FX
@@ -4524,8 +4536,11 @@ function handleFile(event) {
         currentVideoUrl = URL.createObjectURL(file);
         _dbg('blobURL created: ' + currentVideoUrl.slice(0, 60));
         const url = currentVideoUrl;
+        const gen = ++_videoLoadGen;
+        const thisUrl = url;
 
         videoEl = createVideo(url, () => {
+            if (gen !== _videoLoadGen) { _dbg('stale callback (gen ' + gen + '), ignoring'); return; }
             _dbg('createVideo callback fired — video ready');
             videoEl.volume(0); videoEl.loop(); videoEl.hide();
             videoLoaded = true; videoPlaying = true;
@@ -4614,6 +4629,7 @@ function handleFile(event) {
             let _iosFallbackDone = false;
             videoEl.elt.addEventListener('loadeddata', () => {
                 _dbg('loadeddata fired');
+                if (gen !== _videoLoadGen) return;
                 if (_iosFallbackDone || videoLoaded) return;
                 _iosFallbackDone = true;
                 _dbg('iOS fallback: triggering play from loadeddata');
@@ -4633,12 +4649,13 @@ function handleFile(event) {
         // Handle video load errors (unsupported format, corrupt file)
         if (videoEl && videoEl.elt) {
             videoEl.elt.addEventListener('error', (e) => {
+                if (gen !== _videoLoadGen) return;
                 const err = videoEl.elt.error;
                 _dbg('VIDEO ERROR: code=' + (err?.code || '?') + ' msg=' + (err?.message || 'none'));
                 videoLoaded = false; videoPlaying = false;
                 ui.fileName.innerText = 'video failed to load';
                 syncPlayIcon(false);
-                if (currentVideoUrl) { URL.revokeObjectURL(currentVideoUrl); currentVideoUrl = null; }
+                if (currentVideoUrl === thisUrl) { URL.revokeObjectURL(currentVideoUrl); currentVideoUrl = null; }
             }, { once: true });
             // iOS: track intermediate load events
             videoEl.elt.addEventListener('loadstart', () => _dbg('loadstart'), { once: true });

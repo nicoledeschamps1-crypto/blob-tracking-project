@@ -4701,6 +4701,7 @@ function buildLayersPanel() {
     html += '</div>';
 
     container.innerHTML = html;
+    container._built = true;
     _wireLayersPanelEvents(container);
     updateLayerStates();
 

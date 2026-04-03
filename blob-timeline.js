@@ -1239,7 +1239,9 @@ function renderTimelineSegments() {
                 ? 'Mode: ' + (MODE_NAMES[seg.modeValue] || 'MODE')
                 : 'FX: ' + seg.effect.toUpperCase();
             let time = formatTime(seg.startTime) + ' → ' + formatTime(seg.endTime) + ' (' + (seg.endTime - seg.startTime).toFixed(1) + 's)';
-            tooltip.innerHTML = '<strong>' + label + '</strong><br>' + time;
+            var strong = document.createElement('strong');
+            strong.textContent = label;
+            tooltip.replaceChildren(strong, document.createElement('br'), document.createTextNode(time));
             tooltip.style.display = 'block';
             tooltip.style.left = (e.clientX + 12) + 'px';
             tooltip.style.top = (e.clientY - 30) + 'px';
@@ -1400,9 +1402,10 @@ function applyTimelineEffects() {
     let hasBlobsOnTimeline = timelineSegments.some(s => s.type === 'blob');
 
     // When no blob/mode segments active, restore from stable baseline
+    // paramOwner is already USER here (reset at top of draw), so restore unconditionally
     if (blobSegs.length === 0 && modeSegs.length === 0) {
         for (let i = 0; i < paramBaseline.length; i++) {
-            if (paramOwner[i] < PARAM_SRC_AUDIO) paramValues[i] = paramBaseline[i];
+            if (paramOwner[i] <= PARAM_SRC_USER) paramValues[i] = paramBaseline[i];
         }
         // PULSE: suppress blobs between blob segments (on/off pulsing)
         if (hasBlobsOnTimeline) {
