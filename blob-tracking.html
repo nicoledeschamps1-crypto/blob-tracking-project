@@ -8,7 +8,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Hues of Dispositions</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -155,6 +155,28 @@
             top: 0;
             left: 0;
             z-index: 1;
+            touch-action: none; /* prevent scroll/zoom interference with canvas interactions */
+        }
+
+        /* Live slider value tooltip (shown during drag on touch) */
+        .slider-tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: rgba(139,69,232,0.9);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            transform: translate(-50%, -120%);
+            z-index: 3000;
+            display: none;
+            white-space: nowrap;
+        }
+
+        /* Touch context menu hover */
+        #touch-context-menu div:active {
+            background: rgba(139,69,232,0.3);
         }
 
         /* Panel Base (shared by left + right) */
@@ -2729,13 +2751,15 @@
             top: 0;
             left: 0;
             right: 0;
-            height: var(--topbar-h);
+            height: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+            padding-top: env(safe-area-inset-top, 0px);
             background: linear-gradient(to right in oklch, oklch(40% 0.28 15) 0%, oklch(40% 0.27 5) 18%, oklch(38% 0.24 340) 40%, oklch(35% 0.22 310) 65%, oklch(30% 0.20 285) 100%);
             border-bottom: 1px solid rgba(169,102,255,0.15);
             z-index: 1000;
             display: flex;
             align-items: center;
-            padding: 0 var(--sp-4);
+            padding-left: max(var(--sp-4), env(safe-area-inset-left, 0px));
+            padding-right: max(var(--sp-4), env(safe-area-inset-right, 0px));
             gap: var(--sp-2);
             font-family: inherit;
         }
@@ -3273,9 +3297,10 @@
             .panel {
                 width: calc(100vw - 16px) !important;
                 max-width: 100vw;
-                top: var(--topbar-h);
-                height: calc(100vh - var(--topbar-h));
+                top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+                height: calc(100vh - var(--topbar-h) - env(safe-area-inset-top, 0px));
                 padding: var(--sp-4);
+                padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom, 0px));
                 font-size: var(--font-sm);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
@@ -3390,6 +3415,105 @@
 
             /* Sync config row: wrap on mobile */
             .tl-sync-row { flex-wrap: wrap; gap: 4px 8px; }
+        }
+
+        /* ═══ BOTTOM SHEET MODE (≤600px) ═══ */
+        @media (max-width: 600px) {
+            /* Hide side drawer toggles — replaced by bottom sheet */
+            .drawer-toggle { display: none !important; }
+            /* Hide section nav from top bar — moves to bottom sheet handle */
+            .tb-section-nav { display: none !important; }
+
+            /* Both panels become a single bottom sheet */
+            .panel {
+                position: fixed !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                top: auto !important;
+                width: 100vw !important;
+                max-width: 100vw !important;
+                height: auto !important;
+                max-height: 85vh;
+                border-radius: 16px 16px 0 0 !important;
+                transform: translateY(100%) !important;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                z-index: 1002 !important;
+                padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom, 0px)) !important;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .panel.drawer-open {
+                transform: translateY(0) !important;
+            }
+            /* Collapsed state: only section tabs visible (~80px) */
+            .panel.sheet-collapsed {
+                transform: translateY(calc(100% - 80px)) !important;
+            }
+            /* Half state: 55% of viewport */
+            .panel.sheet-half {
+                transform: translateY(45%) !important;
+            }
+            /* Hide right panel entirely — left panel holds everything via section switching */
+            #right-panel { display: none !important; }
+            /* Hide panel close buttons — use sheet handle instead */
+            .panel-close-btn { display: none !important; }
+
+            /* Bottom sheet handle bar */
+            .sheet-handle {
+                display: flex !important;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                flex-direction: column;
+                align-items: center;
+                padding: 8px 0 4px;
+                background: inherit;
+                border-radius: 16px 16px 0 0;
+                cursor: grab;
+                touch-action: none;
+            }
+            .sheet-handle-pill {
+                width: 40px;
+                height: 4px;
+                border-radius: 2px;
+                background: rgba(255,255,255,0.3);
+                margin-bottom: 8px;
+            }
+            /* Section tabs row inside handle */
+            .sheet-section-tabs {
+                display: flex !important;
+                gap: 2px;
+                width: 100%;
+                padding: 0 12px;
+                justify-content: space-around;
+            }
+            .sheet-section-tabs .section-tab {
+                flex: 1;
+                justify-content: center;
+                padding: 8px 4px;
+                min-height: 40px;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            .sheet-section-tabs .section-tab .tab-label-full { display: none; }
+            .sheet-section-tabs .section-tab .tab-label-short { display: none; }
+            .sheet-section-tabs .section-tab .tab-icon { display: inline-block; width: 18px; height: 18px; }
+
+            /* Canvas fills above bottom sheet */
+            canvas#defaultCanvas0 {
+                top: 0 !important;
+            }
+
+            /* Timeline moves above the bottom sheet */
+            #timeline-container {
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 80px !important; /* above collapsed sheet */
+                border-radius: 0 !important;
+                z-index: 1001;
+            }
         }
 
         /* ═══ SMALL PHONE (≤500px) ═══ */
@@ -4003,6 +4127,11 @@
 
     <!-- LEFT PANEL -->
     <aside id="left-panel" class="panel" aria-label="Tracking controls">
+        <!-- Bottom sheet handle (visible only at ≤600px) -->
+        <div class="sheet-handle" id="sheet-handle" style="display:none">
+            <div class="sheet-handle-pill"></div>
+            <div class="sheet-section-tabs" id="sheet-section-tabs"></div>
+        </div>
         <button class="panel-close-btn" id="close-left-panel" aria-label="Close tracking panel">&times;</button>
         <div class="header-section">
             <div class="title-row">
@@ -4050,6 +4179,10 @@
                 </button>
             </div>
             <div id="camera-device-row" class="camera-device-row" style="display:none"></div>
+            <button id="btn-flip-camera" class="selector-btn" style="display:none;width:100%;margin-top:4px" title="Switch front/back camera" onclick="flipCamera()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px"><path d="M9 12c0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3-3 1.34-3 3zm13.5-4.5h-3.21c-.26 0-.5-.11-.67-.29L16.88 5.5c-.35-.38-.86-.5-1.38-.5h-7c-.52 0-1.03.12-1.38.5L5.38 7.21c-.17.18-.41.29-.67.29H1.5c-.83 0-1.5.67-1.5 1.5v9c0 .83.67 1.5 1.5 1.5h21c.83 0 1.5-.67 1.5-1.5V9c0-.83-.67-1.5-1.5-1.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                FLIP CAMERA
+            </button>
 
             <!-- Zoom — compact viewport controls -->
             <div class="control-group" id="zoom-options-panel">
@@ -4201,6 +4334,7 @@
                         <button class="selector-btn" data-value="9">CHROMA</button>
                         <button class="selector-btn" data-value="12">FLICKER</button>
                         <button class="selector-btn" data-value="4">SKIN</button>
+                        <button class="selector-btn" data-value="19">BG SUB</button>
                     </div>
                     <div class="hint-text" style="display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:4px">
                         <span>MOTION: Frame-to-frame pixel movement</span>
@@ -4209,6 +4343,11 @@
                         <span>CHROMA: Isolate by color saturation</span>
                         <span>FLICKER: Rapid brightness changes</span>
                         <span>SKIN: Skin-tone color ranges</span>
+                        <span>BG SUB: Detect changes from captured background</span>
+                    </div>
+                    <div id="bg-sub-controls" style="display:none;margin-top:6px">
+                        <button class="selector-btn" id="btn-capture-bg" style="width:100%;background:rgba(139,69,232,0.2)">CAPTURE BG</button>
+                        <span class="hint-text" id="bg-sub-status">No background captured — click CAPTURE BG with a clean frame</span>
                     </div>
                 </div>
                 <!-- AI tab content -->
@@ -4239,6 +4378,9 @@
                         <button class="selector-btn" data-value="6" title="Display brightness per blob">BRI</button>
                         <button class="selector-btn" data-value="9" title="Color palette strip from detected blobs">PLT</button>
                         <button class="selector-btn" data-value="7" title="Hide all blob visualization overlays">NONE</button>
+                        <button class="selector-btn" data-value="13" title="Motion velocity vectors (requires Persistence)">VEL</button>
+                        <button class="selector-btn" data-value="14" title="Show persistent blob ID numbers (requires Persistence)">ID</button>
+                        <button class="selector-btn" data-value="15" title="Accumulated detection density heatmap">HEAT</button>
                         <button class="selector-btn viz-action" data-value="10" title="Magnified view around blob centers">ZOOM</button>
                         <button class="selector-btn viz-action" data-value="11" title="Heat-map style blob density">THERMO</button>
                         <button class="selector-btn viz-action" data-value="12" title="ASCII character art conversion">ASCII</button>
@@ -4914,6 +5056,8 @@
 </div>
 
 <!-- SETTINGS OVERLAY (Appearance controls) -->
+<div class="slider-tooltip" id="slider-tooltip"></div>
+
 <div id="settings-overlay">
     <div id="settings-content">
         <div class="settings-header">
@@ -4973,18 +5117,75 @@
                 <button class="selector-btn" data-value="web" title="Connect nearby blobs with distance-faded lines — constellation pattern">WEB</button>
             </div>
         </div>
+        <!-- PERSISTENCE SECTION -->
+        <section aria-label="Blob persistence controls" id="persistence-section">
+        <div class="slider-card" style="margin-top:12px">
+            <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;color:rgba(255,255,255,0.6)">Persistence</h3>
+            <span class="tab-desc" style="margin-bottom:8px;display:block">Blobs maintain identity across frames — enables velocity, trails, and smoother tracking</span>
+            <label class="checkbox-label"><input type="checkbox" id="persistence-toggle"> Enable Blob Persistence</label>
+            <div id="persistence-options" style="display:none">
+                <div class="control-group">
+                    <label>Match Distance <input type="number" class="value-input" id="val-match-dist" value="80" min="10" max="300"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-match-dist" min="10" max="300" value="80" step="5"></div>
+                </div>
+                <div class="control-group">
+                    <label>Persist Duration <input type="number" class="value-input" id="val-persist-dur" value="30" min="0" max="120"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-persist-dur" min="0" max="120" value="30" step="1"></div>
+                </div>
+                <div class="control-group">
+                    <label>Min Age <input type="number" class="value-input" id="val-min-age" value="0" min="0" max="30"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-min-age" min="0" max="30" value="0" step="1"></div>
+                </div>
+                <div class="control-group">
+                    <label>Smoothing <input type="number" class="value-input" id="val-smoothing" value="40" min="0" max="100"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-smoothing" min="0" max="100" value="40" step="1"></div>
+                </div>
+                <div class="control-group">
+                    <label>Dedup Radius <input type="number" class="value-input" id="val-dedup" value="0" min="0" max="50"></label>
+                    <div class="slider-wrapper"><input type="range" id="slider-dedup" min="0" max="50" value="0" step="1"></div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                    <label class="checkbox-label" style="flex:1"><input type="checkbox" id="roi-toggle"> Region of Interest</label>
+                    <button class="selector-btn" id="btn-clear-roi" style="font-size:10px;padding:2px 8px;display:none">CLEAR</button>
+                </div>
+                <span class="hint-text" id="roi-hint" style="display:none">Draw a rectangle on the video to limit tracking area</span>
+                <label class="checkbox-label"><input type="checkbox" id="cluster-toggle"> Cluster Mode (DBSCAN)</label>
+                <div id="cluster-options" style="display:none">
+                    <div class="control-group">
+                        <label>Cluster Size (eps) <input type="number" class="value-input" id="val-cluster-eps" value="25" min="10" max="80"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-cluster-eps" min="10" max="80" value="25" step="1"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>Min Points <input type="number" class="value-input" id="val-cluster-min" value="3" min="1" max="10"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-cluster-min" min="1" max="10" value="3" step="1"></div>
+                    </div>
+                </div>
+                <label class="checkbox-label"><input type="checkbox" id="trail-toggle"> Motion Trails</label>
+                <div id="trail-options" style="display:none">
+                    <div class="control-group">
+                        <label>Trail Length <input type="number" class="value-input" id="val-trail-len" value="30" min="5" max="120"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-trail-len" min="5" max="120" value="30" step="1"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>Trail Opacity <input type="number" class="value-input" id="val-trail-opacity" value="50" min="0" max="100"></label>
+                        <div class="slider-wrapper"><input type="range" id="slider-trail-opacity" min="0" max="100" value="50" step="1"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </section>
     </div>
 </div>
 
 <!-- App modules (order matters: core → fx → audio → timeline → mask → tracking) -->
-<script src="blob-core.js?v=20260402i"></script>
+<script src="blob-core.js?v=20260403a"></script>
 <script src="blob-fx.js?v=20260402i"></script>
 <script src="blob-shader-fx.js?v=20260402i"></script>
 <script src="blob-overlay.js?v=20260402i"></script>
 <script src="blob-audio.js?v=20260402i"></script>
 <script src="blob-timeline.js?v=20260402i"></script>
 <script src="blob-mask.js?v=20260402i"></script>
-<script src="blob-tracking.js?v=20260402i"></script>
+<script src="blob-tracking.js?v=20260403a"></script>
 
 <!-- MediaPipe Interactive Segmenter (AI Magic Mask) -->
 <script type="module">

@@ -3,6 +3,48 @@
 // Point tracking, line drawing, point info display
 // ══════════════════════════════════════════
 
+// ── PERFORMANCE (Tier 4) ─────────────────
+let _cachedCandidates = null; // reuse candidates when video is paused
+
+// 4A: Adaptive grid resolution — coarser scan when fewer blobs needed
+function adaptiveGridSize(w) {
+    let baseGrid = w > 1280 ? 30 : 15;
+    let q = paramValues[0];
+    if (q <= 10) return baseGrid * 2;       // few blobs → coarse scan
+    if (q >= 80) return max(8, baseGrid - 5); // many blobs → fine scan
+    return baseGrid;
+}
+
+// 4C: Spatial hash for fast neighbor lookup when >50 blobs
+function buildSpatialHash(blobs, cellSize) {
+    let grid = {};
+    for (let i = 0; i < blobs.length; i++) {
+        let b = blobs[i];
+        if (b.state === 'expired') continue;
+        let cx = Math.floor(b.posicao.x / cellSize);
+        let cy = Math.floor(b.posicao.y / cellSize);
+        let key = cx + ',' + cy;
+        if (!grid[key]) grid[key] = [];
+        grid[key].push(i);
+    }
+    return grid;
+}
+
+function spatialHashNeighbors(grid, x, y, cellSize) {
+    let cx = Math.floor(x / cellSize);
+    let cy = Math.floor(y / cellSize);
+    let result = [];
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            let key = (cx + dx) + ',' + (cy + dy);
+            if (grid[key]) {
+                for (let idx of grid[key]) result.push(idx);
+            }
+        }
+    }
+    return result;
+}
+
 // Fisher-Yates shuffle — O(n), unbiased (replaces sort(() => Math.random() - 0.5))
 function shuffleArray(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -10,6 +52,244 @@ function shuffleArray(arr) {
         let tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     }
     return arr;
+}
+
+// ── CANDIDATE DEDUP (Tier 2) ─────────────
+// Merge candidates within _dedupRadius pixels — reduces noise before matching
+function dedupCandidates(candidates, radius) {
+    if (radius <= 0 || candidates.length === 0) return candidates;
+    let used = new Uint8Array(candidates.length);
+    let merged = [];
+    let r2 = radius * radius;
+    for (let i = 0; i < candidates.length; i++) {
+        if (used[i]) continue;
+        let sumX = candidates[i].x, sumY = candidates[i].y;
+        let cr = red(candidates[i].c), cg = green(candidates[i].c), cb = blue(candidates[i].c);
+        let count = 1;
+        used[i] = 1;
+        for (let j = i + 1; j < candidates.length; j++) {
+            if (used[j]) continue;
+            let dx = candidates[j].x - candidates[i].x;
+            let dy = candidates[j].y - candidates[i].y;
+            if (dx * dx + dy * dy <= r2) {
+                sumX += candidates[j].x; sumY += candidates[j].y;
+                cr += red(candidates[j].c); cg += green(candidates[j].c); cb += blue(candidates[j].c);
+                count++;
+                used[j] = 1;
+            }
+        }
+        merged.push(new CandidatePoint(
+            Math.round(sumX / count), Math.round(sumY / count),
+            color(cr / count, cg / count, cb / count)
+        ));
+    }
+    return merged;
+}
+
+// ── DBSCAN CLUSTERING (Tier 3D) ──────────
+// Standard DBSCAN on candidate points — returns cluster centroids
+function dbscanCluster(candidates, eps, minPts) {
+    let n = candidates.length;
+    if (n === 0) return candidates;
+    let labels = new Int16Array(n); // 0=unvisited, -1=noise, >0=cluster ID
+    let eps2 = eps * eps;
+    let clusterId = 0;
+
+    function regionQuery(idx) {
+        let neighbors = [];
+        let px = candidates[idx].x, py = candidates[idx].y;
+        for (let j = 0; j < n; j++) {
+            let dx = candidates[j].x - px, dy = candidates[j].y - py;
+            if (dx * dx + dy * dy <= eps2) neighbors.push(j);
+        }
+        return neighbors;
+    }
+
+    for (let i = 0; i < n; i++) {
+        if (labels[i] !== 0) continue;
+        let neighbors = regionQuery(i);
+        if (neighbors.length < minPts) {
+            labels[i] = -1; // noise
+            continue;
+        }
+        clusterId++;
+        labels[i] = clusterId;
+        let seed = neighbors.slice();
+        for (let si = 0; si < seed.length; si++) {
+            let qi = seed[si];
+            if (labels[qi] === -1) labels[qi] = clusterId;
+            if (labels[qi] !== 0) continue;
+            labels[qi] = clusterId;
+            let qNeighbors = regionQuery(qi);
+            if (qNeighbors.length >= minPts) {
+                for (let nn of qNeighbors) {
+                    if (labels[nn] === 0 || labels[nn] === -1) seed.push(nn);
+                }
+            }
+        }
+    }
+
+    // Build centroids from clusters
+    let clusters = {};
+    for (let i = 0; i < n; i++) {
+        let lbl = labels[i];
+        if (lbl <= 0) continue; // skip noise
+        if (!clusters[lbl]) clusters[lbl] = { sx: 0, sy: 0, sr: 0, sg: 0, sb: 0, count: 0 };
+        let cl = clusters[lbl];
+        cl.sx += candidates[i].x; cl.sy += candidates[i].y;
+        cl.sr += red(candidates[i].c); cl.sg += green(candidates[i].c); cl.sb += blue(candidates[i].c);
+        cl.count++;
+    }
+    let result = [];
+    for (let lbl in clusters) {
+        let cl = clusters[lbl];
+        result.push(new CandidatePoint(
+            Math.round(cl.sx / cl.count), Math.round(cl.sy / cl.count),
+            color(cl.sr / cl.count, cl.sg / cl.count, cl.sb / cl.count)
+        ));
+    }
+    return result;
+}
+
+// ── BLOB PERSISTENCE MATCHING (Tier 1+2) ─────────────
+// Greedy nearest-neighbor matching — O(n*m) with early cutoff
+// Converts candidates to screen coords, matches against existing PersistentBlobs,
+// handles state machine (new→active→lost→expired), populates trackedPoints[]
+function matchAndUpdateBlobs(candidates, numPoints, blobVarLevel) {
+    // Pick top numPoints from shuffled candidates
+    let picked = candidates.slice(0, numPoints);
+
+    // Convert to screen coords
+    let screenCandidates = [];
+    for (let i = 0; i < picked.length; i++) {
+        let sc = videoToScreenCoords(picked[i].x, picked[i].y);
+        screenCandidates.push({ x: sc.x, y: sc.y, c: picked[i].c, used: false });
+    }
+
+    let maxDist = _maxMoveDistance;
+    let maxDist2 = maxDist * maxDist;
+
+    // Reset match flags
+    for (let b of _persistentBlobs) b.matchedThisFrame = false;
+
+    // Build distance pairs (blob index, candidate index, dist2)
+    // 4C: Use spatial hash when >50 blobs for O(n) instead of O(n*m)
+    let pairs = [];
+    if (_persistentBlobs.length > 50) {
+        let hash = buildSpatialHash(_persistentBlobs, maxDist);
+        for (let ci = 0; ci < screenCandidates.length; ci++) {
+            let nearIdxs = spatialHashNeighbors(hash, screenCandidates[ci].x, screenCandidates[ci].y, maxDist);
+            for (let bi of nearIdxs) {
+                let blob = _persistentBlobs[bi];
+                let dx = blob.posicao.x - screenCandidates[ci].x;
+                let dy = blob.posicao.y - screenCandidates[ci].y;
+                let d2 = dx * dx + dy * dy;
+                if (d2 <= maxDist2) pairs.push({ bi, ci, d2 });
+            }
+        }
+    } else {
+        for (let bi = 0; bi < _persistentBlobs.length; bi++) {
+            let blob = _persistentBlobs[bi];
+            if (blob.state === 'expired') continue;
+            for (let ci = 0; ci < screenCandidates.length; ci++) {
+                let dx = blob.posicao.x - screenCandidates[ci].x;
+                let dy = blob.posicao.y - screenCandidates[ci].y;
+                let d2 = dx * dx + dy * dy;
+                if (d2 <= maxDist2) pairs.push({ bi, ci, d2 });
+            }
+        }
+    }
+
+    // Sort by distance — closest matches first
+    pairs.sort((a, b) => a.d2 - b.d2);
+
+    // Greedy assignment — no double matching
+    let usedBlobs = new Set();
+    let usedCands = new Set();
+    for (let pair of pairs) {
+        if (usedBlobs.has(pair.bi) || usedCands.has(pair.ci)) continue;
+        let blob = _persistentBlobs[pair.bi];
+        let cand = screenCandidates[pair.ci];
+
+        // Save previous position for velocity
+        blob.prevPos.set(blob.posicao.x, blob.posicao.y);
+
+        // EMA smoothing (Tier 2)
+        let sm = _blobSmoothing;
+        if (sm > 0) {
+            blob.posicao.x = lerp(cand.x, blob.posicao.x, sm);
+            blob.posicao.y = lerp(cand.y, blob.posicao.y, sm);
+            blob.width = lerp(blob.width, blob.width, sm); // size stays stable
+            blob.height = lerp(blob.height, blob.height, sm);
+            // Color smoothing — only when close (prevents muddy blending on jumps)
+            if (pair.d2 < maxDist2 * 0.25) {
+                let cr = red(cand.c), cg = green(cand.c), cb = blue(cand.c);
+                let or = red(blob.cor), og = green(blob.cor), ob = blue(blob.cor);
+                blob.cor = color(lerp(cr, or, sm), lerp(cg, og, sm), lerp(cb, ob, sm));
+            } else {
+                blob.cor = cand.c;
+            }
+        } else {
+            blob.posicao.x = cand.x;
+            blob.posicao.y = cand.y;
+            blob.cor = cand.c;
+        }
+
+        // Velocity (Tier 2) — byproduct of persistence
+        blob.velocity.set(blob.posicao.x - blob.prevPos.x, blob.posicao.y - blob.prevPos.y);
+
+        blob.brightness = brightness(blob.cor);
+        blob.state = 'active';
+        blob.lostFrames = 0;
+        blob.age++;
+        blob.matchedThisFrame = true;
+
+        // Trail (for Tier 3, pre-wired)
+        if (_persistenceEnabled) {
+            blob.trail.push({ x: blob.posicao.x, y: blob.posicao.y });
+            if (blob.trail.length > _trailLength) blob.trail.shift();
+        }
+
+        usedBlobs.add(pair.bi);
+        usedCands.add(pair.ci);
+    }
+
+    // Unmatched existing blobs → lost
+    for (let bi = 0; bi < _persistentBlobs.length; bi++) {
+        let blob = _persistentBlobs[bi];
+        if (blob.matchedThisFrame || blob.state === 'expired') continue;
+        blob.lostFrames++;
+        if (blob.lostFrames > _persistDuration) {
+            blob.state = 'expired';
+        } else {
+            blob.state = 'lost';
+        }
+    }
+
+    // Unmatched candidates → new blobs
+    for (let ci = 0; ci < screenCandidates.length; ci++) {
+        if (usedCands.has(ci)) continue;
+        let cand = screenCandidates[ci];
+        let newBlob = new PersistentBlob(cand.x, cand.y, cand.c, blobVarLevel, _nextBlobId++);
+        _persistentBlobs.push(newBlob);
+    }
+
+    // Remove expired blobs; hard cap
+    _persistentBlobs = _persistentBlobs.filter(b => b.state !== 'expired');
+    let hardCap = numPoints * 3;
+    if (_persistentBlobs.length > hardCap) {
+        // Keep newest (highest ID) — sort by age desc, trim
+        _persistentBlobs.sort((a, b) => b.age - a.age);
+        _persistentBlobs.length = hardCap;
+    }
+
+    // Populate trackedPoints from persistent blobs
+    trackedPoints = [];
+    for (let blob of _persistentBlobs) {
+        if (blob.age >= _minBlobAge) {
+            trackedPoints.push(blob); // PersistentBlob is superset of TrackedPoint
+        }
+    }
 }
 
 function trackPoints() {
@@ -153,15 +433,20 @@ function trackPoints() {
         }
 
         shuffleArray(candidates);
+        if (_dedupRadius > 0) candidates = dedupCandidates(candidates, _dedupRadius);
         let quantityLevel = paramValues[0];
         let numPoints = (quantityLevel <= 10) ? floor(quantityLevel) : floor(map(quantityLevel, 11, 100, 11, candidates.length));
         numPoints = min(numPoints, candidates.length);
         let blobVarLevel = paramValues[6];
 
-        for (let i = 0; i < numPoints; i++) {
-            let c = candidates[i];
-            let sc = videoToScreenCoords(c.x, c.y);
-            trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+        if (_persistenceEnabled) {
+            matchAndUpdateBlobs(candidates, numPoints, blobVarLevel);
+        } else {
+            for (let i = 0; i < numPoints; i++) {
+                let c = candidates[i];
+                let sc = videoToScreenCoords(c.x, c.y);
+                trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+            }
         }
         return;
     }
@@ -180,8 +465,7 @@ function trackPoints() {
         }
 
         // Use current mask to generate blob candidates
-        let gridSize = 15;
-        if (w > 1280) gridSize = 30;
+        let gridSize = adaptiveGridSize(w);
         let candidates = [];
         const scaleX = maskSegW / w;
         const scaleY = maskSegH / h;
@@ -205,32 +489,93 @@ function trackPoints() {
         }
 
         shuffleArray(candidates);
+        if (_dedupRadius > 0) candidates = dedupCandidates(candidates, _dedupRadius);
         let quantityLevel = paramValues[0];
         let numPoints = (quantityLevel <= 10) ? floor(quantityLevel) : floor(map(quantityLevel, 11, 100, 11, candidates.length));
         numPoints = min(numPoints, candidates.length);
         let blobVarLevel = paramValues[6];
-        for (let i = 0; i < numPoints; i++) {
-            let c = candidates[i];
-            let sc = videoToScreenCoords(c.x, c.y);
-            trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+        if (_persistenceEnabled) {
+            matchAndUpdateBlobs(candidates, numPoints, blobVarLevel);
+        } else {
+            for (let i = 0; i < numPoints; i++) {
+                let c = candidates[i];
+                let sc = videoToScreenCoords(c.x, c.y);
+                trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+            }
+        }
+        return;
+    }
+
+    // BG SUB mode (19): detect pixels differing from captured reference frame
+    if (currentMode === 19) {
+        videoEl.loadPixels();
+        if (videoEl.pixels.length === 0 || !_bgRefFrame) return;
+        const w = videoEl.width, h = videoEl.height;
+        let gridSize = adaptiveGridSize(w);
+        let threshold = map(paramValues[1], 0, 100, 80, 10); // spectrum controls threshold
+        let candidates = [];
+        for (let y = 0; y < h; y += gridSize) {
+            for (let x = 0; x < w; x += gridSize) {
+                if (_roiEnabled && _roiRect) {
+                    if (x < _roiRect.x1 || x > _roiRect.x2 || y < _roiRect.y1 || y > _roiRect.y2) continue;
+                }
+                let idx = (x + y * w) * 4;
+                let dr = videoEl.pixels[idx] - _bgRefFrame[idx];
+                let dg = videoEl.pixels[idx+1] - _bgRefFrame[idx+1];
+                let db = videoEl.pixels[idx+2] - _bgRefFrame[idx+2];
+                let dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                if (dist > threshold) {
+                    candidates.push(new CandidatePoint(x, y, color(videoEl.pixels[idx], videoEl.pixels[idx+1], videoEl.pixels[idx+2])));
+                }
+            }
+        }
+        shuffleArray(candidates);
+        if (_clusterEnabled && candidates.length > 0) candidates = dbscanCluster(candidates, _clusterEps, _clusterMinPts);
+        if (_dedupRadius > 0) candidates = dedupCandidates(candidates, _dedupRadius);
+        let quantityLevel = paramValues[0];
+        let numPoints = (quantityLevel <= 10) ? floor(quantityLevel) : floor(map(quantityLevel, 11, 100, 11, candidates.length));
+        numPoints = min(numPoints, candidates.length);
+        let blobVarLevel = paramValues[6];
+        if (_persistenceEnabled) {
+            matchAndUpdateBlobs(candidates, numPoints, blobVarLevel);
+        } else {
+            for (let i = 0; i < numPoints; i++) {
+                let c = candidates[i];
+                let sc = videoToScreenCoords(c.x, c.y);
+                trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+            }
         }
         return;
     }
 
     // Pixel-based tracking modes (1-13) need pixel data
-    videoEl.loadPixels();
-    if (videoEl.pixels.length === 0) return;
+    // 4B: Skip loadPixels for paused video — reuse cached candidates (except temporal modes 3, 12)
+    let usePauseCache = !videoPlaying && _cachedCandidates && currentMode !== 3 && currentMode !== 12;
 
     let candidates = [];
-    let spectrum = map(paramValues[1], 0, 100, 0, 70);
-    let gridSize = 15;
-    const w = videoEl.width; const h = videoEl.height;
-    if (w > 1280) gridSize = 30;
+    let spectrum, w, h, gridSize, newGridPixels;
 
-    let newGridPixels = {};
+    if (usePauseCache) {
+        candidates = _cachedCandidates;
+    } else {
+        videoEl.loadPixels();
+        if (videoEl.pixels.length === 0) return;
+    }
+
+    spectrum = map(paramValues[1], 0, 100, 0, 70);
+    w = videoEl.width; h = videoEl.height;
+    gridSize = adaptiveGridSize(w);
+    newGridPixels = {};
+
+    if (usePauseCache) {
+        // Skip grid scan — go straight to output
+    } else {
 
     for (let y = 0; y < h; y += gridSize) {
         for (let x = 0; x < w; x += gridSize) {
+            if (_roiEnabled && _roiRect) {
+                if (x < _roiRect.x1 || x > _roiRect.x2 || y < _roiRect.y1 || y > _roiRect.y2) continue;
+            }
             let index = (x + y * w) * 4;
             let r = videoEl.pixels[index], g = videoEl.pixels[index+1], b = videoEl.pixels[index+2];
             let c = color(r, g, b);
@@ -350,17 +695,81 @@ function trackPoints() {
             }
         }
     }
+    } // end if (!usePauseCache) grid scan
     prevGridPixels = newGridPixels;
+    _cachedCandidates = candidates.slice(); // 4B: cache for paused reuse
+    if (_clusterEnabled && candidates.length > 0) candidates = dbscanCluster(candidates, _clusterEps, _clusterMinPts);
     shuffleArray(candidates);
+    if (_dedupRadius > 0) candidates = dedupCandidates(candidates, _dedupRadius);
     let quantityLevel = paramValues[0];
     let numPoints = (quantityLevel <= 10) ? floor(quantityLevel) : floor(map(quantityLevel, 11, 100, 11, candidates.length));
     numPoints = min(numPoints, candidates.length);
     let blobVarLevel = paramValues[6];
 
-    for (let i = 0; i < numPoints; i++) {
-        let c = candidates[i];
-        let sc = videoToScreenCoords(c.x, c.y);
-        trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+    if (_persistenceEnabled) {
+        matchAndUpdateBlobs(candidates, numPoints, blobVarLevel);
+    } else {
+        for (let i = 0; i < numPoints; i++) {
+            let c = candidates[i];
+            let sc = videoToScreenCoords(c.x, c.y);
+            trackedPoints.push(new TrackedPoint(sc.x, sc.y, c.c, blobVarLevel));
+        }
+    }
+}
+
+function drawHeatmap() {
+    if (!activeVizModes.has(15)) return;
+    // Lazy-init offscreen canvas
+    if (!_heatmapCanvas || _heatmapCanvas.width !== width || _heatmapCanvas.height !== height) {
+        _heatmapCanvas = document.createElement('canvas');
+        _heatmapCanvas.width = width;
+        _heatmapCanvas.height = height;
+        _heatmapCtx = _heatmapCanvas.getContext('2d');
+        _heatmapCtx.fillStyle = 'black';
+        _heatmapCtx.fillRect(0, 0, width, height);
+    }
+    // Fade existing heatmap (decay)
+    _heatmapCtx.globalCompositeOperation = 'source-over';
+    _heatmapCtx.fillStyle = `rgba(0,0,0,${1 - _heatmapDecay})`;
+    _heatmapCtx.fillRect(0, 0, width, height);
+
+    // Add bright dots at each tracked point
+    _heatmapCtx.globalCompositeOperation = 'lighter';
+    for (let p of trackedPoints) {
+        let r = red(p.cor), g = green(p.cor), b = blue(p.cor);
+        let gradient = _heatmapCtx.createRadialGradient(p.posicao.x, p.posicao.y, 0, p.posicao.x, p.posicao.y, 20);
+        gradient.addColorStop(0, `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},0.6)`);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        _heatmapCtx.fillStyle = gradient;
+        _heatmapCtx.fillRect(p.posicao.x - 20, p.posicao.y - 20, 40, 40);
+    }
+
+    // Composite onto main canvas with additive blending
+    drawingContext.save();
+    drawingContext.globalCompositeOperation = 'lighter';
+    drawingContext.globalAlpha = 0.7;
+    drawingContext.drawImage(_heatmapCanvas, 0, 0);
+    drawingContext.restore();
+}
+
+function drawTrails() {
+    if (!_trailEnabled || !_persistenceEnabled || _persistentBlobs.length === 0) return;
+    noFill();
+    for (let blob of _persistentBlobs) {
+        if (blob.trail.length < 2 || blob.state === 'expired') continue;
+        let r = red(blob.cor), g = green(blob.cor), b = blue(blob.cor);
+        let len = min(blob.trail.length, _trailLength);
+        let startIdx = blob.trail.length - len;
+        beginShape();
+        for (let i = startIdx; i < blob.trail.length; i++) {
+            let t = (i - startIdx) / (len - 1); // 0=oldest, 1=newest
+            let alpha = t * _trailOpacity * 255;
+            let weight = 0.5 + t * 2.5;
+            stroke(r, g, b, alpha);
+            strokeWeight(weight);
+            vertex(blob.trail[i].x, blob.trail[i].y);
+        }
+        endShape();
     }
 }
 
@@ -503,6 +912,46 @@ function drawPointInfo(p) {
             text(pHex, offsetX, curY + chipSize + 10);
             pop();
             curY += chipSize + 16;
+        }
+        else if (vizMode === 14) { // ID (persistent blob ID)
+            if (_persistenceEnabled && p.id !== undefined) {
+                push();
+                fill(0, 255, 200, 220); noStroke(); textSize(13); textStyle(BOLD);
+                text(`#${p.id}`, offsetX, curY);
+                textStyle(NORMAL);
+                // Show state indicator
+                if (p.state === 'lost') {
+                    fill(255, 100, 100, 180); textSize(8);
+                    text('LOST', offsetX + 40, curY);
+                } else if (p.state === 'new') {
+                    fill(100, 255, 100, 180); textSize(8);
+                    text('NEW', offsetX + 40, curY);
+                }
+                pop();
+                curY += 16;
+            }
+        }
+        else if (vizMode === 13) { // VEL (velocity vectors)
+            if (_persistenceEnabled && p.velocity) {
+                push();
+                let speed = p.velocity.mag();
+                if (speed > 0.5) {
+                    stroke(0, 255, 200, 180); strokeWeight(2); noFill();
+                    let arrowLen = speed * 3;
+                    let ax = p.posicao.x + p.velocity.x / speed * arrowLen;
+                    let ay = p.posicao.y + p.velocity.y / speed * arrowLen;
+                    line(p.posicao.x, p.posicao.y, ax, ay);
+                    // Arrowhead
+                    let angle = atan2(p.velocity.y, p.velocity.x);
+                    let headLen = min(8, arrowLen * 0.3);
+                    line(ax, ay, ax - headLen * cos(angle - 0.4), ay - headLen * sin(angle - 0.4));
+                    line(ax, ay, ax - headLen * cos(angle + 0.4), ay - headLen * sin(angle + 0.4));
+                }
+                noStroke(); fill(0, 255, 200, 180); textSize(9);
+                text(`${speed.toFixed(1)}px/f`, offsetX, curY);
+                pop();
+                curY += 14;
+            }
         }
     }
 }

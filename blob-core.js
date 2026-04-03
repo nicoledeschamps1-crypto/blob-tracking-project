@@ -65,6 +65,32 @@ let customHue = 195;
 let flickerScores = {};
 let p5Canvas = null;
 let bgDim = 0;
+
+// ── BLOB PERSISTENCE (Tier 1+2) ─────────
+let _persistentBlobs = [];      // PersistentBlob[] master list
+let _nextBlobId = 1;            // monotonic counter
+let _persistenceEnabled = false; // master toggle (false = legacy)
+let _maxMoveDistance = 80;       // px threshold for ID matching
+let _persistDuration = 30;       // frames to keep lost blobs
+let _minBlobAge = 0;             // frames before blob visible
+let _blobSmoothing = 0.4;       // EMA factor (0=none, 1=frozen)
+let _dedupRadius = 0;            // merge candidates within this px (0=off)
+let _bgRefFrame = null;          // Uint8Array — captured BG reference
+let _bgThreshold = 30;           // RGB distance threshold for BG sub
+let _clusterEnabled = false;     // DBSCAN post-processing toggle
+let _clusterEps = 25;            // DBSCAN epsilon (px)
+let _clusterMinPts = 3;          // DBSCAN minimum points per cluster
+let _roiEnabled = false;         // region of interest toggle
+let _roiRect = null;             // {x1,y1,x2,y2} in video coords
+let _roiDrawing = false;         // currently drawing ROI
+let _roiStart = null;            // drag start point
+let _heatmapCanvas = null;       // offscreen heatmap accumulator
+let _heatmapCtx = null;
+let _heatmapDecay = 0.95;        // per-frame fade factor
+let _trailEnabled = false;       // draw motion path trails
+let _trailLength = 30;           // max trail points per blob
+let _trailOpacity = 0.5;         // trail base opacity
+
 let productInfo = { brand: '', name: '', material: '', price: '', size: '' };
 let activeVizModes = new Set([1]);
 let activeEffects = new Set();
@@ -493,7 +519,8 @@ let _cachedBeatKey = '';
 const MODE_NAMES = {
     0:'Off', 1:'Blue', 2:'Red', 3:'Motion', 4:'Skin', 5:'Custom',
     6:'Bright', 7:'Dark', 8:'Edge', 9:'Chroma', 10:'Warm', 11:'Cool',
-    12:'Flicker', 13:'Invert', 14:'Mask', 15:'Eyes', 16:'Lips', 17:'Face'
+    12:'Flicker', 13:'Invert', 14:'Mask', 15:'Eyes', 16:'Lips', 17:'Face',
+    19:'BG Sub'
 };
 
 // Face landmark tracking state (MediaPipe Face Landmarker)
@@ -1769,6 +1796,32 @@ class TrackedPoint {
     }
 }
 
+class PersistentBlob {
+    constructor(x, y, c, blobVarLevel, id) {
+        this.id = id;
+        this.posicao = createVector(x, y);
+        this.prevPos = createVector(x, y);
+        this.velocity = createVector(0, 0);
+        this.cor = c;
+        this.brightness = brightness(c);
+        let sizeScale = map(paramValues[4], 0, 100, 0.3, 5);
+        let baseHeight = (11 + (this.brightness / 100.0) * 30) * sizeScale;
+        let baseWidth = 11 * sizeScale;
+        let maxVariation = map(blobVarLevel, 0, 100, 0, 145) * sizeScale;
+        let offsetX = random(-maxVariation, maxVariation);
+        let offsetY = random(-maxVariation, maxVariation);
+        this.width = max(2, baseWidth + offsetX);
+        this.height = max(2, baseHeight + offsetY);
+        this.pulseOffset = random(0, 0.4);
+        this.dynamicWord = generateSpecialCode();
+        this.age = 0;
+        this.state = 'new';       // new | active | lost | expired
+        this.lostFrames = 0;
+        this.matchedThisFrame = false;
+        this.trail = [];
+    }
+}
+
 function generateSpecialCode() {
     const rWord = () => wordBank[floor(random(wordBank.length))];
     const rChar = () => specialChars[floor(random(specialChars.length))];
@@ -1794,6 +1847,13 @@ function setup() {
     p5Canvas.setAttribute('role', 'img');
     p5Canvas.setAttribute('aria-label', 'Hues of Dispositions — live webcam effects canvas');
     canvas.elt.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Pause draw loop when tab is hidden (battery/thermal savings on mobile)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { noLoop(); }
+        else { loop(); }
+    });
+
     background(0);
     textFont('Helvetica Neue');
     textSize(11);
@@ -2186,6 +2246,26 @@ function draw() {
         drawingContext.clip();
 
         if (showLines && trackedPoints.length > 1) drawLines();
+        if (_trailEnabled && _persistenceEnabled) drawTrails();
+        drawHeatmap();
+
+        // Draw ROI rectangle overlay
+        if (_roiEnabled && _roiRect) {
+            let sc1 = videoToScreenCoords(_roiRect.x1, _roiRect.y1);
+            let sc2 = videoToScreenCoords(_roiRect.x2, _roiRect.y2);
+            noFill(); stroke(0, 255, 200, 180); strokeWeight(1.5);
+            drawingContext.setLineDash([6, 4]);
+            rect(sc1.x, sc1.y, sc2.x - sc1.x, sc2.y - sc1.y);
+            drawingContext.setLineDash([]);
+            fill(0, 255, 200, 150); noStroke(); textSize(9);
+            text('ROI', sc1.x + 4, sc1.y - 4);
+        }
+        if (_roiDrawing && _roiStart) {
+            noFill(); stroke(0, 255, 200, 120); strokeWeight(1);
+            drawingContext.setLineDash([4, 3]);
+            rect(_roiStart.x, _roiStart.y, mouseX - _roiStart.x, mouseY - _roiStart.y);
+            drawingContext.setLineDash([]);
+        }
 
         let _tbc = color(trackBoxColor); // parse once, reuse per blob
         for (let p of trackedPoints) {
@@ -2812,6 +2892,85 @@ function setupCoreUIListeners() {
         if (e.target === settingsOverlay) toggleSettings();
     });
 
+    // ── PERSISTENCE UI WIRING ─────────────
+    const persistToggle = document.getElementById('persistence-toggle');
+    const persistOpts = document.getElementById('persistence-options');
+    if (persistToggle) {
+        persistToggle.checked = _persistenceEnabled;
+        persistToggle.addEventListener('change', () => {
+            _persistenceEnabled = persistToggle.checked;
+            if (persistOpts) persistOpts.style.display = _persistenceEnabled ? '' : 'none';
+            if (!_persistenceEnabled) { _persistentBlobs = []; _nextBlobId = 1; }
+        });
+    }
+    // Generic slider+input sync helper for persistence controls
+    function wirePersistSlider(sliderId, inputId, setter) {
+        let sl = document.getElementById(sliderId);
+        let inp = document.getElementById(inputId);
+        if (!sl || !inp) return;
+        function sync(val) { let v = parseFloat(val); if (!isNaN(v)) { sl.value = v; inp.value = v; setter(v); } }
+        sl.addEventListener('input', () => sync(sl.value));
+        inp.addEventListener('change', () => sync(inp.value));
+    }
+    wirePersistSlider('slider-match-dist', 'val-match-dist', v => { _maxMoveDistance = v; });
+    wirePersistSlider('slider-persist-dur', 'val-persist-dur', v => { _persistDuration = v; });
+    wirePersistSlider('slider-min-age', 'val-min-age', v => { _minBlobAge = v; });
+    wirePersistSlider('slider-smoothing', 'val-smoothing', v => { _blobSmoothing = v / 100; });
+    wirePersistSlider('slider-dedup', 'val-dedup', v => { _dedupRadius = v; });
+    const roiToggle = document.getElementById('roi-toggle');
+    const roiHint = document.getElementById('roi-hint');
+    const clearRoiBtn = document.getElementById('btn-clear-roi');
+    if (roiToggle) {
+        roiToggle.addEventListener('change', () => {
+            _roiEnabled = roiToggle.checked;
+            if (roiHint) roiHint.style.display = _roiEnabled ? '' : 'none';
+            if (clearRoiBtn) clearRoiBtn.style.display = (_roiEnabled && _roiRect) ? '' : 'none';
+            if (!_roiEnabled) { _roiRect = null; _roiDrawing = false; _roiStart = null; }
+        });
+    }
+    if (clearRoiBtn) {
+        clearRoiBtn.addEventListener('click', () => {
+            _roiRect = null; _roiDrawing = false; _roiStart = null;
+            clearRoiBtn.style.display = 'none';
+        });
+    }
+    const clusterToggle = document.getElementById('cluster-toggle');
+    const clusterOpts = document.getElementById('cluster-options');
+    if (clusterToggle) {
+        clusterToggle.checked = _clusterEnabled;
+        clusterToggle.addEventListener('change', () => {
+            _clusterEnabled = clusterToggle.checked;
+            if (clusterOpts) clusterOpts.style.display = _clusterEnabled ? '' : 'none';
+        });
+    }
+    wirePersistSlider('slider-cluster-eps', 'val-cluster-eps', v => { _clusterEps = v; });
+    wirePersistSlider('slider-cluster-min', 'val-cluster-min', v => { _clusterMinPts = v; });
+    const trailToggle = document.getElementById('trail-toggle');
+    const trailOpts = document.getElementById('trail-options');
+    if (trailToggle) {
+        trailToggle.checked = _trailEnabled;
+        trailToggle.addEventListener('change', () => {
+            _trailEnabled = trailToggle.checked;
+            if (trailOpts) trailOpts.style.display = _trailEnabled ? '' : 'none';
+        });
+    }
+    wirePersistSlider('slider-trail-len', 'val-trail-len', v => { _trailLength = v; });
+    wirePersistSlider('slider-trail-opacity', 'val-trail-opacity', v => { _trailOpacity = v / 100; });
+
+    // BG SUB capture button
+    const captureBgBtn = document.getElementById('btn-capture-bg');
+    if (captureBgBtn) {
+        captureBgBtn.addEventListener('click', () => {
+            if (!videoEl || !videoLoaded) return;
+            videoEl.loadPixels();
+            if (videoEl.pixels.length > 0) {
+                _bgRefFrame = new Uint8Array(videoEl.pixels);
+                let status = document.getElementById('bg-sub-status');
+                if (status) status.textContent = 'Background captured (' + videoEl.width + 'x' + videoEl.height + ')';
+            }
+        });
+    }
+
     // Off-canvas drawer toggle (responsive)
     const overlay = document.getElementById('panel-overlay');
     const leftPanel = document.getElementById('left-panel');
@@ -2854,6 +3013,110 @@ function setupCoreUIListeners() {
     if (closeLeft) closeLeft.addEventListener('click', () => closeDrawer(leftPanel));
     if (closeRight) closeRight.addEventListener('click', () => closeDrawer(rightPanel));
     if (overlay) overlay.addEventListener('click', closeAllDrawers);
+
+    // ── Bottom Sheet (≤600px) ──
+    const sheetHandle = document.getElementById('sheet-handle');
+    const sheetTabs = document.getElementById('sheet-section-tabs');
+    let _sheetState = 'collapsed'; // collapsed | half | full | hidden
+    let _sheetDragStart = null;
+    let _sheetDragY = null;
+
+    function isBottomSheetMode() {
+        return window.innerWidth <= 600;
+    }
+
+    function setSheetState(state) {
+        if (!leftPanel) return;
+        _sheetState = state;
+        leftPanel.classList.remove('sheet-collapsed', 'sheet-half', 'drawer-open');
+        if (state === 'collapsed') leftPanel.classList.add('sheet-collapsed');
+        else if (state === 'half') { leftPanel.classList.add('drawer-open', 'sheet-half'); }
+        else if (state === 'full') { leftPanel.classList.add('drawer-open'); }
+        // hidden = no class = fully off-screen
+        if (overlay) overlay.classList.toggle('visible', state === 'full');
+    }
+
+    // Populate sheet section tabs (clone from top bar nav)
+    function populateSheetTabs() {
+        if (!sheetTabs) return;
+        const topTabs = document.querySelectorAll('.tb-section-nav .section-tab');
+        sheetTabs.innerHTML = '';
+        topTabs.forEach(tab => {
+            const clone = tab.cloneNode(true);
+            clone.addEventListener('click', (e) => {
+                e.stopPropagation();
+                let section = clone.dataset.section;
+                if (section) {
+                    switchSection(section);
+                    // Update active state in sheet tabs
+                    sheetTabs.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+                    clone.classList.add('active');
+                    // Also update top bar tabs
+                    topTabs.forEach(t => t.classList.toggle('active', t.dataset.section === section));
+                }
+                if (_sheetState === 'collapsed') setSheetState('half');
+            });
+            sheetTabs.appendChild(clone);
+        });
+    }
+
+    // Touch drag on handle for snap positions
+    if (sheetHandle) {
+        sheetHandle.addEventListener('touchstart', (e) => {
+            _sheetDragStart = e.touches[0].clientY;
+            _sheetDragY = _sheetDragStart;
+        }, { passive: true });
+
+        sheetHandle.addEventListener('touchmove', (e) => {
+            _sheetDragY = e.touches[0].clientY;
+        }, { passive: true });
+
+        sheetHandle.addEventListener('touchend', () => {
+            if (_sheetDragStart === null) return;
+            let delta = _sheetDragY - _sheetDragStart;
+            _sheetDragStart = null;
+            // Swipe down: collapse one level
+            if (delta > 40) {
+                if (_sheetState === 'full') setSheetState('half');
+                else if (_sheetState === 'half') setSheetState('collapsed');
+            }
+            // Swipe up: expand one level
+            else if (delta < -40) {
+                if (_sheetState === 'collapsed') setSheetState('half');
+                else if (_sheetState === 'half') setSheetState('full');
+            }
+        });
+
+        // Click handle to toggle half/collapsed
+        sheetHandle.addEventListener('click', () => {
+            if (_sheetState === 'collapsed') setSheetState('half');
+            else if (_sheetState === 'half' || _sheetState === 'full') setSheetState('collapsed');
+        });
+    }
+
+    // Initialize bottom sheet on resize
+    function initBottomSheet() {
+        if (isBottomSheetMode()) {
+            if (sheetHandle) sheetHandle.style.display = '';
+            populateSheetTabs();
+            setSheetState('collapsed');
+        } else {
+            if (sheetHandle) sheetHandle.style.display = 'none';
+            leftPanel.classList.remove('sheet-collapsed', 'sheet-half');
+        }
+    }
+    initBottomSheet();
+    window.addEventListener('resize', initBottomSheet);
+
+    // Override drawer toggles to use bottom sheet on mobile
+    const origOpenDrawer = openDrawer;
+    openDrawer = function(panel) {
+        if (isBottomSheetMode()) {
+            setSheetState('half');
+        } else {
+            origOpenDrawer(panel);
+        }
+    };
 
     // ── Section nav ──
     let previousSection = 'create';
@@ -3008,6 +3271,7 @@ function setupCoreUIListeners() {
             window._trackTabUserSelected = false; // allow auto-tab-switch to match new mode
             if (currentMode === 3) prevGridPixels = {};
             if (currentMode === 12) flickerScores = {};
+            _persistentBlobs = []; _nextBlobId = 1; // reset persistence on mode change
             if (currentMode < 15 || currentMode > 17) { faceLandmarkCache = null; smoothedLandmarks = null; }
             ui.customColorGroup.style.display = (currentMode === 5 || currentMode === 13) ? '' : 'none';
             if (currentMode === 14) {
@@ -3019,6 +3283,9 @@ function setupCoreUIListeners() {
             if (currentMode >= 15 && currentMode <= 17) {
                 if (window.initFaceLandmarkerLazy) window.initFaceLandmarkerLazy();
             }
+            // BG SUB controls visibility
+            let bgCtrl = document.getElementById('bg-sub-controls');
+            if (bgCtrl) bgCtrl.style.display = (currentMode === 19) ? '' : 'none';
             // Ensure tracking stays on when selecting a mode
             let tt = document.getElementById('tracking-toggle');
             if (tt && !tt.checked) tt.checked = true;
@@ -3419,6 +3686,25 @@ function setupCoreUIListeners() {
     document.addEventListener('pointercancel', _clearSliderActive);
     document.addEventListener('lostpointercapture', _clearSliderActive);
     window.addEventListener('blur', _clearSliderActive);
+
+    // Live slider tooltip (shows value above thumb during drag)
+    const sliderTooltip = document.getElementById('slider-tooltip');
+    if (sliderTooltip) {
+        document.addEventListener('input', (e) => {
+            if (!e.target.matches('input[type="range"]')) return;
+            let rect = e.target.getBoundingClientRect();
+            let ratio = (e.target.value - e.target.min) / (e.target.max - e.target.min);
+            let thumbX = rect.left + ratio * rect.width;
+            let thumbY = rect.top;
+            sliderTooltip.textContent = parseFloat(e.target.value).toFixed(e.target.step && e.target.step < 1 ? 1 : 0);
+            sliderTooltip.style.left = thumbX + 'px';
+            sliderTooltip.style.top = thumbY + 'px';
+            sliderTooltip.style.display = 'block';
+        });
+        let hideTooltip = () => { if (sliderTooltip) sliderTooltip.style.display = 'none'; };
+        document.addEventListener('pointerup', hideTooltip);
+        document.addEventListener('pointercancel', hideTooltip);
+    }
 
     // Audio source selector (FILE / MIC / VIDEO)
     document.querySelectorAll('#audio-source-buttons .selector-btn').forEach(btn => {
@@ -4013,11 +4299,16 @@ function syncUI() {
 }
 
 function windowResized() {
-    pixelDensity(1); resizeCanvas(windowWidth, windowHeight);
-    // Update cached timeline height on resize
-    let tlEl = document.getElementById('timeline-container');
-    window._cachedTimelineHeight = (tlEl && !tlEl.classList.contains('hidden')) ? tlEl.offsetHeight : 0;
+    // iOS Safari reports pre-rotation dimensions for ~200ms after orientation change
+    if (_windowResizeTimer) clearTimeout(_windowResizeTimer);
+    _windowResizeTimer = setTimeout(() => {
+        pixelDensity(1); resizeCanvas(windowWidth, windowHeight);
+        // Update cached timeline height on resize
+        let tlEl = document.getElementById('timeline-container');
+        window._cachedTimelineHeight = (tlEl && !tlEl.classList.contains('hidden')) ? tlEl.offsetHeight : 0;
+    }, /iPhone|iPad|iPod/.test(navigator.userAgent) ? 200 : 0);
 }
+let _windowResizeTimer = null;
 
 // ── FILE / WEBCAM HANDLERS ────────────────
 
@@ -4029,13 +4320,27 @@ function toggleWebcam() {
     }
 }
 
-function startWebcam(deviceId) {
+let _currentFacingMode = 'user'; // user (front) or environment (back)
+
+function flipCamera() {
+    if (!usingWebcam) return;
+    _currentFacingMode = _currentFacingMode === 'user' ? 'environment' : 'user';
+    startWebcam(null, _currentFacingMode);
+}
+
+function startWebcam(deviceId, facingMode) {
     // Stop video audio if active (switching away from file video)
     if (typeof videoAudioActive !== 'undefined' && videoAudioActive && typeof stopVideoAudio === 'function') stopVideoAudio();
     if (typeof _videoAudioSource !== 'undefined') _videoAudioSource = null;
     const vab = document.getElementById('audio-src-video');
     if (vab) { vab.disabled = true; vab.classList.remove('active'); }
-    if (videoEl) { videoEl.stop(); videoEl.remove(); videoEl = null; }
+    if (videoEl) {
+        // Stop all tracks before switching (required for iOS)
+        if (videoEl.elt && videoEl.elt.srcObject) {
+            videoEl.elt.srcObject.getTracks().forEach(t => t.stop());
+        }
+        videoEl.remove(); videoEl = null;
+    }
     usingWebcam = true;
     videoLoaded = false;
     videoDuration = 0;
@@ -4044,11 +4349,16 @@ function startWebcam(deviceId) {
     ui.fileName.innerText = 'webcam active';
     currentMode = 1; _userMode = 1;
 
-    // Use selected device or saved preference
+    // Build constraints: deviceId > facingMode > default
     const savedDevice = deviceId || localStorage.getItem('hod-camera-device') || undefined;
-    const constraints = savedDevice
-        ? { video: { deviceId: { exact: savedDevice } } }
-        : VIDEO;
+    let constraints;
+    if (savedDevice) {
+        constraints = { video: { deviceId: { exact: savedDevice } } };
+    } else if (facingMode) {
+        constraints = { video: { facingMode: facingMode } }; // loose, not exact (iOS compat)
+    } else {
+        constraints = VIDEO;
+    }
 
     videoEl = createCapture(constraints, () => {
         videoEl.hide();
@@ -4058,6 +4368,8 @@ function startWebcam(deviceId) {
         syncPlayIcon(true);
         // Populate device selector after permission is granted
         populateCameraDevices();
+        let flipBtn = document.getElementById('btn-flip-camera');
+        if (flipBtn) flipBtn.style.display = '';
     });
     // Handle webcam permission denial / errors
     if (videoEl && videoEl.elt) {
@@ -4078,7 +4390,7 @@ function populateCameraDevices() {
         const cams = devices.filter(d => d.kind === 'videoinput');
         const row = document.getElementById('camera-device-row');
         if (!row) return;
-        if (cams.length <= 1) { row.style.display = 'none'; return; }
+        if (cams.length < 1) { row.style.display = 'none'; return; }
         row.style.display = '';
         row.innerHTML = '';
         const saved = localStorage.getItem('hod-camera-device');
@@ -4115,6 +4427,10 @@ function stopWebcam() {
     usingWebcam = false;
     videoLoaded = false;
     videoPlaying = false;
+    let flipBtn = document.getElementById('btn-flip-camera');
+    if (flipBtn) flipBtn.style.display = 'none';
+    let devRow = document.getElementById('camera-device-row');
+    if (devRow) devRow.style.display = 'none';
     ui.webcamBtn.classList.remove('active');
     ui.fileName.innerText = 'mp4 or mov';
     syncPlayIcon(false);
@@ -4717,6 +5033,25 @@ function mouseDragged(evt) {
     return true;
 }
 
+function mouseReleased(evt) {
+    if (_roiDrawing && _roiStart) {
+        _roiDrawing = false;
+        let vc1 = screenToVideoCoords(_roiStart.x, _roiStart.y);
+        let vc2 = screenToVideoCoords(mouseX, mouseY);
+        if (vc1 && vc2) {
+            _roiRect = {
+                x1: Math.min(vc1.x, vc2.x), y1: Math.min(vc1.y, vc2.y),
+                x2: Math.max(vc1.x, vc2.x), y2: Math.max(vc1.y, vc2.y)
+            };
+            // Min size guard — too small = accidental click
+            if ((_roiRect.x2 - _roiRect.x1) < 10 || (_roiRect.y2 - _roiRect.y1) < 10) _roiRect = null;
+            let crb = document.getElementById('btn-clear-roi');
+            if (crb) crb.style.display = _roiRect ? '' : 'none';
+        }
+        _roiStart = null;
+    }
+}
+
 function mousePressed(evt) {
     // Don't handle clicks that landed on UI elements (buttons, inputs, panels)
     // Use the actual event target or clientX/Y for viewport-correct element detection
@@ -4725,6 +5060,13 @@ function mousePressed(evt) {
     // Only handle canvas clicks — bail if click wasn't on our canvas
     if (el && el.tagName !== 'CANVAS') return;
     if (mouseButton === RIGHT) { lastX = mouseX; return false; }
+    // ROI drawing — intercept left-click when ROI mode is active
+    if (_roiEnabled && mouseButton === LEFT && mouseX >= videoX && mouseX <= videoX + videoW && mouseY >= videoY && mouseY <= videoY + videoH) {
+        _roiDrawing = true;
+        _roiStart = { x: mouseX, y: mouseY };
+        _roiRect = null;
+        return false;
+    }
     if (currentMode === 14 && mouseButton === LEFT) {
         if (mouseX >= videoX && mouseX <= videoX + videoW && mouseY >= videoY && mouseY <= videoY + videoH) {
             if (window.mpSegmenterReady) {
@@ -4764,4 +5106,155 @@ function mousePressed(evt) {
         }
     }
     return false;
+}
+
+// ── TOUCH GESTURE HANDLERS ───────────────
+// p5.js touch events — declared globally to intercept touch on canvas
+// These replace mouse events on touch devices for proper gesture routing
+
+let _touchPinchDist = 0;       // distance between two fingers at start
+let _touchPinchZoom = 1;       // zoom level at pinch start
+let _touchTwoFingerY = 0;      // two-finger vertical drag start Y
+let _touchTwoFingerParam = 0;  // param value at drag start
+let _touchLongPressTimer = null;
+let _touchStartPos = null;     // {x, y} for single tap detection
+let _touchMoved = false;
+
+function touchStarted(event) {
+    // Only handle touches on the canvas
+    if (!event || !event.target || event.target.tagName !== 'CANVAS') return;
+
+    let t = event.touches || touches;
+    _touchMoved = false;
+
+    if (t.length === 2) {
+        // Two-finger: start pinch zoom + vertical param drag
+        let dx = t[1].clientX - t[0].clientX;
+        let dy = t[1].clientY - t[0].clientY;
+        _touchPinchDist = Math.sqrt(dx * dx + dy * dy);
+        _touchPinchZoom = zoomTargetLevel;
+        _touchTwoFingerY = (t[0].clientY + t[1].clientY) / 2;
+        _touchTwoFingerParam = paramValues[currentParam];
+        if (_touchLongPressTimer) { clearTimeout(_touchLongPressTimer); _touchLongPressTimer = null; }
+        return false;
+    }
+
+    if (t.length === 1) {
+        _touchStartPos = { x: t[0].clientX, y: t[0].clientY };
+        // Long-press detection (500ms)
+        if (_touchLongPressTimer) clearTimeout(_touchLongPressTimer);
+        _touchLongPressTimer = setTimeout(() => {
+            if (!_touchMoved && _touchStartPos) {
+                _showTouchContextMenu(_touchStartPos.x, _touchStartPos.y);
+            }
+            _touchLongPressTimer = null;
+        }, 500);
+    }
+    return false;
+}
+
+function touchMoved(event) {
+    if (!event || !event.target || event.target.tagName !== 'CANVAS') return;
+
+    let t = event.touches || touches;
+    _touchMoved = true;
+    if (_touchLongPressTimer) { clearTimeout(_touchLongPressTimer); _touchLongPressTimer = null; }
+
+    if (t.length === 2) {
+        // Pinch zoom
+        let dx = t[1].clientX - t[0].clientX;
+        let dy = t[1].clientY - t[0].clientY;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (_touchPinchDist > 0) {
+            let scale = dist / _touchPinchDist;
+            let newZoom = Math.max(0.25, Math.min(8, _touchPinchZoom * scale));
+            let cx = (t[0].clientX + t[1].clientX) / 2;
+            let cy = (t[0].clientY + t[1].clientY) / 2;
+            let curZoom = zoomTargetLevel;
+            zoomTargetPanX = cx - (cx - zoomTargetPanX) * (newZoom / curZoom);
+            zoomTargetPanY = cy - (cy - zoomTargetPanY) * (newZoom / curZoom);
+            zoomTargetLevel = newZoom;
+            if (zoomTargetLevel >= 0.99 && zoomTargetLevel <= 1.01) { zoomTargetLevel = 1; zoomTargetPanX = 0; zoomTargetPanY = 0; }
+            updateZoomUI();
+        }
+
+        // Two-finger vertical drag → adjust current parameter (Snapseed pattern)
+        let midY = (t[0].clientY + t[1].clientY) / 2;
+        let deltaY = _touchTwoFingerY - midY; // up = positive
+        let sensitivity = 0.5; // 0.5 units per pixel dragged
+        let newVal = constrain(_touchTwoFingerParam + deltaY * sensitivity, 0, 100);
+        paramValues[currentParam] = newVal;
+        paramBaseline[currentParam] = newVal;
+        syncUI();
+
+        return false;
+    }
+
+    // Single finger: handled by p5 mousePressed/mouseDragged via fallback
+    return false;
+}
+
+function touchEnded(event) {
+    if (_touchLongPressTimer) { clearTimeout(_touchLongPressTimer); _touchLongPressTimer = null; }
+    _touchPinchDist = 0;
+
+    // Single tap (no drag) → forward to click-to-track logic
+    if (!_touchMoved && _touchStartPos && event && event.target && event.target.tagName === 'CANVAS') {
+        // Let mousePressed handle it via p5 fallback — just clean up
+    }
+    _touchStartPos = null;
+    _touchMoved = false;
+    return false;
+}
+
+// Simple context menu for long-press on canvas
+function _showTouchContextMenu(cx, cy) {
+    // Remove any existing menu
+    let existing = document.getElementById('touch-context-menu');
+    if (existing) existing.remove();
+
+    let menu = document.createElement('div');
+    menu.id = 'touch-context-menu';
+    menu.style.cssText = `
+        position:fixed; left:${cx}px; top:${cy - 10}px; transform:translateX(-50%) translateY(-100%);
+        background:rgba(17,14,22,0.95); border:1px solid rgba(139,69,232,0.3); border-radius:10px;
+        padding:6px 0; z-index:2000; min-width:160px; box-shadow:0 8px 24px rgba(0,0,0,0.6);
+        font-family:inherit; font-size:13px; color:#ddd;
+    `;
+
+    let items = [
+        { label: 'Track This Color', action: () => {
+            let c = get(Math.round(mouseX), Math.round(mouseY));
+            customHue = hue(c); _userCustomHue = customHue;
+            currentMode = 5; _userMode = 5;
+            updateButtonStates();
+        }},
+        { label: 'Reset Tracking', action: () => {
+            currentMode = 0; _userMode = 0;
+            _persistentBlobs = []; _nextBlobId = 1;
+            updateButtonStates();
+        }},
+        { label: 'Reset Zoom', action: () => {
+            zoomTargetLevel = 1; zoomTargetPanX = 0; zoomTargetPanY = 0;
+            updateZoomUI();
+        }},
+    ];
+
+    items.forEach(item => {
+        let btn = document.createElement('div');
+        btn.textContent = item.label;
+        btn.style.cssText = 'padding:10px 16px; cursor:pointer;';
+        btn.addEventListener('touchend', (e) => { e.stopPropagation(); item.action(); menu.remove(); });
+        btn.addEventListener('click', (e) => { e.stopPropagation(); item.action(); menu.remove(); });
+        menu.appendChild(btn);
+    });
+
+    document.body.appendChild(menu);
+    // Auto-dismiss on any tap outside
+    setTimeout(() => {
+        document.addEventListener('touchstart', function dismiss() {
+            menu.remove();
+            document.removeEventListener('touchstart', dismiss);
+        }, { once: true });
+    }, 100);
 }
