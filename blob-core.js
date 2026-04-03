@@ -3695,11 +3695,11 @@ function setupCoreUIListeners() {
     });
 
     // Blob style selector (in Visualize tab of left panel)
-    document.querySelectorAll('#blob-style-buttons-viz .selector-btn').forEach(btn => {
+    document.querySelectorAll('#blob-style-buttons-main .selector-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             blobStyle = e.target.dataset.value;
             if (blobStyle !== 'particle') _blobParticles.length = 0;
-            document.querySelectorAll('#blob-style-buttons-viz .selector-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#blob-style-buttons-main .selector-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
         });
     });

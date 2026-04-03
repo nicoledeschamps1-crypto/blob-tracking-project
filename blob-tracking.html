@@ -4432,23 +4432,7 @@
                         <button class="selector-btn viz-action" data-value="11" title="Heat-map style blob density">THERMO</button>
                         <button class="selector-btn viz-action" data-value="12" title="ASCII character art conversion">ASCII</button>
                     </div>
-                    <label id="label-blob-style-viz" style="margin-top:8px;">Blob Style</label>
-                    <div class="selector-row selector-wrap" id="blob-style-buttons-viz" aria-labelledby="label-blob-style-viz">
-                        <button class="selector-btn" data-value="none" title="No blob border — use with Region Effects or viz modes">NONE</button>
-                        <button class="selector-btn active" data-value="box" title="Standard rectangle outline around each blob">BOX</button>
-                        <button class="selector-btn" data-value="lframe" title="Corner brackets only — camera viewfinder style">L-FRAME</button>
-                        <button class="selector-btn" data-value="xframe" title="Diagonal cross with center diamond marker">X-FRAME</button>
-                        <button class="selector-btn" data-value="scope" title="Crosshair reticle with circle and tick marks">SCOPE</button>
-                        <button class="selector-btn" data-value="win2k" title="Retro Windows 2000 window frame with title bar">WIN2K</button>
-                        <button class="selector-btn" data-value="grid" title="Rule-of-thirds grid overlay inside each blob">GRID</button>
-                        <button class="selector-btn" data-value="dash" title="Dashed rectangle outline around each blob">DASH</button>
-                        <button class="selector-btn" data-value="glow" title="Soft glowing halo around each blob">GLOW</button>
-                        <button class="selector-btn" data-value="particle" title="Particles emit and drift from blob positions">PARTICLE</button>
-                        <button class="selector-btn" data-value="label" title="Blob ID label with background">LABEL</button>
-                        <button class="selector-btn" data-value="label2" title="Pill chip with ID and coordinates">LABEL2</button>
-                        <button class="selector-btn" data-value="backdrop" title="Semi-transparent filled rectangle behind blob">BACKDROP</button>
-                    </div>
-                    <!-- Region Effects moved below Blob Parameters for discoverability -->
+                    <!-- Blob Style + Region FX moved above, always visible when tracking ON -->
                     <div id="product-info-group" style="display:none;margin-top:8px;">
                         <label style="font-size:9px;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:4px;">Tag Text</label>
                         <input type="text" class="text-input" id="product-brand" placeholder="BRAND">
@@ -4458,6 +4442,60 @@
                         <input type="text" class="text-input" id="product-size" placeholder="Size">
                     </div>
                 </div>
+
+                <!-- ── Blob Style (always visible when tracking ON) ── -->
+                <div class="control-group" style="margin-top:10px;">
+                    <label id="label-blob-style-main" style="font-size:var(--font-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Blob Style</label>
+                    <div class="selector-row selector-wrap" id="blob-style-buttons-main" aria-labelledby="label-blob-style-main">
+                        <button class="selector-btn" data-value="none" title="No blob border">NONE</button>
+                        <button class="selector-btn active" data-value="box" title="Rectangle outline">BOX</button>
+                        <button class="selector-btn" data-value="lframe" title="Corner brackets">L-FRAME</button>
+                        <button class="selector-btn" data-value="xframe" title="Diagonal cross">X-FRAME</button>
+                        <button class="selector-btn" data-value="scope" title="Crosshair reticle">SCOPE</button>
+                        <button class="selector-btn" data-value="win2k" title="Windows 2000 frame">WIN2K</button>
+                        <button class="selector-btn" data-value="grid" title="Rule-of-thirds grid">GRID</button>
+                        <button class="selector-btn" data-value="dash" title="Dashed outline">DASH</button>
+                        <button class="selector-btn" data-value="glow" title="Soft glow halo">GLOW</button>
+                        <button class="selector-btn" data-value="particle" title="Particle emitter">PARTICLE</button>
+                        <button class="selector-btn" data-value="label" title="ID label">LABEL</button>
+                        <button class="selector-btn" data-value="label2" title="Pill chip with coords">LABEL2</button>
+                        <button class="selector-btn" data-value="backdrop" title="Filled backdrop">BACKDROP</button>
+                    </div>
+                </div>
+
+                <!-- ── Region Effects (always visible when tracking ON) ── -->
+                <div class="control-group" id="region-fx-group" style="margin-top:6px;">
+                    <label style="font-size:var(--font-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Region Effects</label>
+                    <label class="checkbox-label"><input type="checkbox" id="region-fx-toggle"> Enable</label>
+                    <span class="hint-text" id="rfx-tracking-hint" style="display:none;color:var(--accent);">Requires tracking to be ON</span>
+                    <div id="region-fx-options" style="display:none">
+                        <div class="selector-row selector-wrap" id="region-fx-buttons">
+                            <button class="selector-btn" data-rfx="inv">INV</button>
+                            <button class="selector-btn" data-rfx="pixel">PIXEL</button>
+                            <button class="selector-btn" data-rfx="thermal">THERMAL</button>
+                            <button class="selector-btn" data-rfx="blur">BLUR</button>
+                            <button class="selector-btn" data-rfx="glitch">GLITCH</button>
+                            <button class="selector-btn" data-rfx="tone">TONE</button>
+                            <button class="selector-btn" data-rfx="dither">DITHER</button>
+                            <button class="selector-btn" data-rfx="crt">CRT</button>
+                            <button class="selector-btn" data-rfx="edge">EDGE</button>
+                            <button class="selector-btn" data-rfx="xray">X-RAY</button>
+                            <button class="selector-btn" data-rfx="zoom">ZOOM</button>
+                            <button class="selector-btn" data-rfx="water">WATER</button>
+                            <button class="selector-btn" data-rfx="mask">MASK</button>
+                        </div>
+                        <div class="control-group" style="margin-top:6px;">
+                            <label>Intensity <span class="value-display" id="val-rfx-intensity">100</span></label>
+                            <input type="range" id="slider-rfx-intensity" min="0" max="100" value="100" step="1">
+                        </div>
+                        <div class="selector-row" style="margin-top:4px;">
+                            <label class="checkbox-label"><input type="checkbox" id="rfx-invert"> Invert</label>
+                            <label class="checkbox-label"><input type="checkbox" id="rfx-fusion"> Fusion</label>
+                            <label class="checkbox-label"><input type="checkbox" id="rfx-random"> Random</label>
+                        </div>
+                    </div>
+                </div>
+
                 </div><!-- /tracking-body -->
             </div>
 
@@ -4558,38 +4596,7 @@
             </div>
             </section>
 
-            <!-- ── Region Effects Card ── -->
-            <section aria-label="Region effects" class="slider-card" style="margin-top:8px;">
-                <div class="slider-card-label">Region Effects</div>
-                <label class="checkbox-label"><input type="checkbox" id="region-fx-toggle"> Enable</label>
-                <span class="hint-text" id="rfx-tracking-hint" style="display:none;color:var(--accent);">Requires tracking to be ON</span>
-                <div id="region-fx-options" style="display:none">
-                    <div class="selector-row selector-wrap" id="region-fx-buttons">
-                        <button class="selector-btn" data-rfx="inv">INV</button>
-                        <button class="selector-btn" data-rfx="pixel">PIXEL</button>
-                        <button class="selector-btn" data-rfx="thermal">THERMAL</button>
-                        <button class="selector-btn" data-rfx="blur">BLUR</button>
-                        <button class="selector-btn" data-rfx="glitch">GLITCH</button>
-                        <button class="selector-btn" data-rfx="tone">TONE</button>
-                        <button class="selector-btn" data-rfx="dither">DITHER</button>
-                        <button class="selector-btn" data-rfx="crt">CRT</button>
-                        <button class="selector-btn" data-rfx="edge">EDGE</button>
-                        <button class="selector-btn" data-rfx="xray">X-RAY</button>
-                        <button class="selector-btn" data-rfx="zoom">ZOOM</button>
-                        <button class="selector-btn" data-rfx="water">WATER</button>
-                        <button class="selector-btn" data-rfx="mask">MASK</button>
-                    </div>
-                    <div class="control-group" style="margin-top:6px;">
-                        <label>Intensity <span class="value-display" id="val-rfx-intensity">100</span></label>
-                        <input type="range" id="slider-rfx-intensity" min="0" max="100" value="100" step="1">
-                    </div>
-                    <div class="selector-row" style="margin-top:4px;">
-                        <label class="checkbox-label"><input type="checkbox" id="rfx-invert"> Invert</label>
-                        <label class="checkbox-label"><input type="checkbox" id="rfx-fusion"> Fusion</label>
-                        <label class="checkbox-label"><input type="checkbox" id="rfx-random"> Random</label>
-                    </div>
-                </div>
-            </section>
+            <!-- Region Effects now inside tracking-body above -->
 
             <!-- (Appearance + line options moved to Settings modal) -->
 
