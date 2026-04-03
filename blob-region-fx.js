@@ -471,7 +471,9 @@ function applyRegionFX(blob, canvasEl) {
     // Upload p5 canvas as texture once per frame
     if (_regionFrameUploaded !== frameCount) {
         gl.bindTexture(gl.TEXTURE_2D, _regionSrcTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // canvas top = V=1 (matches UV calc)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvasEl);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // restore default
         gl.bindTexture(gl.TEXTURE_2D, null);
         _regionFrameUploaded = frameCount;
     }
