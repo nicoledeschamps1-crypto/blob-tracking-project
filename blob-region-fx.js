@@ -64,7 +64,7 @@ uniform float u_intensity;
 out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
-    float blockSz = mix(2.0, 32.0, u_intensity);
+    float blockSz = mix(4.0, 48.0, u_intensity);
     vec2 cellSize = vec2(blockSz) / u_resolution;
     vec2 cellPos = floor(v_texCoord / cellSize + 0.5) * cellSize;
     vec2 hc = cellSize * 0.25;
@@ -142,15 +142,15 @@ out vec4 fragColor;
 void main() {
     vec4 orig = texture(u_texture, v_texCoord);
     float t = u_time * 3.0;
-    // Per-channel horizontal offset, scaled by intensity
-    float spread = u_intensity * 8.0 / u_resolution.x;
-    float offR = sin(t * 1.7 + v_texCoord.y * 40.0) * spread;
-    float offB = sin(t * 2.3 + v_texCoord.y * 30.0) * spread;
+    // Per-channel horizontal offset — use 0-1 UV space directly, not pixel coords
+    float spread = u_intensity * 0.08;
+    float offR = sin(t * 1.7 + v_texCoord.y * 12.0) * spread;
+    float offB = sin(t * 2.3 + v_texCoord.y * 8.0) * spread;
     float r = texture(u_texture, v_texCoord + vec2(offR, 0.0)).r;
     float g = orig.g;
     float b = texture(u_texture, v_texCoord + vec2(offB, 0.0)).b;
-    // Scan line artifacts
-    float scanline = 0.95 + 0.05 * sin(v_texCoord.y * u_resolution.y * 3.14159);
+    // Strong scan line artifacts
+    float scanline = mix(1.0, 0.5 + 0.5 * sin(v_texCoord.y * 30.0 * 3.14159), u_intensity * 0.6);
     fragColor = vec4(vec3(r, g, b) * scanline, orig.a);
 }`;
 
@@ -216,16 +216,16 @@ void main() {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    // RGB sub-pixel offset
-    float sep = u_intensity * 1.5 / u_resolution.x;
+    // RGB sub-pixel offset — use UV space, not pixel coords
+    float sep = u_intensity * 0.02;
     float r = texture(u_texture, uv + vec2(sep, 0.0)).r;
     float g = texture(u_texture, uv).g;
     float b = texture(u_texture, uv - vec2(sep, 0.0)).b;
     vec3 col = vec3(r, g, b);
-    // Scanlines
-    float scanline = 0.85 + 0.15 * sin(uv.y * u_resolution.y * 3.14159);
+    // Scanlines — fewer, thicker lines visible at any size
+    float scanline = mix(1.0, 0.4 + 0.6 * sin(uv.y * 20.0 * 3.14159), u_intensity * 0.7);
     // Flicker
-    float flicker = 0.98 + 0.02 * sin(u_time * 8.0);
+    float flicker = 0.95 + 0.05 * sin(u_time * 8.0);
     fragColor = vec4(col * scanline * flicker, 1.0);
 }`;
 
@@ -276,8 +276,8 @@ uniform float u_time;
 uniform float u_intensity;
 out vec4 fragColor;
 void main() {
-    float amp = u_intensity * 0.03;
-    float freq = 10.0;
+    float amp = u_intensity * 0.12;
+    float freq = 6.0;
     float t = u_time * 2.0;
     vec2 uv = v_texCoord;
     uv.x += sin(uv.y * freq + t) * amp;
