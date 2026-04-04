@@ -170,8 +170,8 @@ void main() {
     vec2 cell = floor(px / gridSz) * gridSz + gridSz * 0.5;
     float dist = length(px - cell) / (gridSz * 0.5);
     // Dot radius proportional to luminance
-    float dot = step(dist, lum);
-    fragColor = vec4(vec3(dot), c.a);
+    float halftone = step(dist, lum);
+    fragColor = vec4(vec3(halftone), c.a);
 }`;
 
 const FRAG_REGION_DITHER = `#version 300 es
@@ -190,8 +190,9 @@ void main() {
          3, 11,  1,  9,
         15,  7, 13,  5
     );
-    ivec2 px = ivec2(mod(v_texCoord * u_resolution, 4.0));
-    float threshold = float(bayer[px.y * 4 + px.x]) / 16.0 - 0.5;
+    ivec2 px = ivec2(int(mod(v_texCoord.x * u_resolution.x, 4.0)), int(mod(v_texCoord.y * u_resolution.y, 4.0)));
+    int idx = clamp(px.y * 4 + px.x, 0, 15);
+    float threshold = float(bayer[idx]) / 16.0 - 0.5;
     // Number of quantization levels based on intensity
     float levels = mix(2.0, 8.0, 1.0 - u_intensity);
     vec3 dithered = floor(c.rgb * levels + threshold + 0.5) / levels;
@@ -276,7 +277,7 @@ uniform float u_time;
 uniform float u_intensity;
 out vec4 fragColor;
 void main() {
-    float amp = u_intensity * 0.12;
+    float amp = u_intensity * 0.07;
     float freq = 6.0;
     float t = u_time * 2.0;
     vec2 uv = v_texCoord;

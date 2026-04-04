@@ -430,12 +430,12 @@ let currentVideoUrl = null;
 // ── COORDINATE HELPERS ──
 function videoToScreenCoords(vx, vy) {
     let sx = map(vx, 0, videoEl.width, videoX, videoX + videoW);
-    if (usingWebcam) sx = 2 * videoX + videoW - sx;
+    if (usingWebcam && _currentFacingMode === 'user') sx = 2 * videoX + videoW - sx;
     return { x: sx, y: map(vy, 0, videoEl.height, videoY, videoY + videoH) };
 }
 function screenToVideoCoords(sx, sy) {
     let vx = map(sx, videoX, videoX + videoW, 0, videoEl.width);
-    if (usingWebcam) vx = videoEl.width - vx;
+    if (usingWebcam && _currentFacingMode === 'user') vx = videoEl.width - vx;
     return { x: vx, y: map(sy, videoY, videoY + videoH, 0, videoEl.height) };
 }
 
