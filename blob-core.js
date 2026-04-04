@@ -4366,6 +4366,7 @@ function toggleWebcam() {
 }
 
 let _currentFacingMode = 'user'; // user (front) or environment (back)
+let _webcamRetried = false;      // prevents infinite retry loop on camera error
 
 function flipCamera() {
     if (!usingWebcam) return;
@@ -4411,14 +4412,32 @@ function startWebcam(deviceId, facingMode) {
         videoPlaying = true;
         updateButtonStates();
         syncPlayIcon(true);
+        // Update facing mode from actual stream track settings
+        if (videoEl.elt && videoEl.elt.srcObject) {
+            let track = videoEl.elt.srcObject.getVideoTracks()[0];
+            if (track) {
+                let facing = track.getSettings().facingMode;
+                if (facing === 'user' || facing === 'environment') _currentFacingMode = facing;
+                else if (!deviceId && !facingMode) _currentFacingMode = 'user'; // default built-in
+            }
+        }
         // Populate device selector after permission is granted
         populateCameraDevices();
         let flipBtn = document.getElementById('btn-flip-camera');
         if (flipBtn) flipBtn.style.display = '';
     });
-    // Handle webcam permission denial / errors
+    // Handle webcam permission denial / errors — fallback to default camera
     if (videoEl && videoEl.elt) {
         videoEl.elt.addEventListener('error', () => {
+            // If using a saved deviceId that's stale, retry without it
+            if (savedDevice && !_webcamRetried) {
+                _webcamRetried = true;
+                localStorage.removeItem('hod-camera-device');
+                console.warn('[Camera] Saved device failed, retrying with default');
+                startWebcam(null, null);
+                return;
+            }
+            _webcamRetried = false;
             usingWebcam = false;
             videoLoaded = false;
             videoPlaying = false;
